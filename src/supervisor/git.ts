@@ -10,6 +10,7 @@ import type {
   GitBranchListResult,
   GitDiffBatchResult,
   GitDiffResult,
+  GitEnsureInitialCommitResult,
   GitFileContentResult,
   GitFinishMergeResult,
   GitGetWorktreeOwnerResult,
@@ -419,6 +420,54 @@ export class GitService {
 
   async init(location: ProjectLocation): Promise<void> {
     await execGit(location, ["init"]);
+  }
+
+  private async isGitRepo(location: ProjectLocation): Promise<boolean> {
+    try {
+      await execGit(location, ["rev-parse", "--is-inside-work-tree"]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async hasHeadCommit(location: ProjectLocation): Promise<boolean> {
+    try {
+      await execGit(location, ["rev-parse", "--verify", "HEAD"]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Make sure `location` is a git repository with at least one commit, so a
+   * worktree always has a base commit to fork from. Idempotent: an existing
+   * repo that already has a commit is left untouched (no re-init, no new
+   * commit). Used to lazily initialize a local, non-git project folder the
+   * first time an experiment runs there. Returns the current (default) branch
+   * and its tip commit to use as the experiment base.
+   */
+  async ensureInitialCommit(location: ProjectLocation): Promise<GitEnsureInitialCommitResult> {
+    return this.withRepositoryMutation(location, async () => {
+      let initialized = false;
+      if (!(await this.isGitRepo(location))) {
+        await this.init(location);
+        initialized = true;
+      }
+      if (!(await this.hasHeadCommit(location))) {
+        await this.stageAll(location);
+        // `--allow-empty` covers an empty folder where `git add .` stages
+        // nothing — a worktree still needs a base commit to exist.
+        await execGit(location, ["commit", "-m", "Initial commit", "--allow-empty"], {
+          timeout: GIT_HOOK_TIMEOUT,
+        });
+        initialized = true;
+      }
+      const branch = (await execGit(location, ["symbolic-ref", "--short", "HEAD"])).trim();
+      const commit = (await execGit(location, ["rev-parse", "HEAD"])).trim();
+      return { branch, commit, initialized };
+    });
   }
 
   /**

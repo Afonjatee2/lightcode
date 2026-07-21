@@ -67,21 +67,44 @@ export const KIMI_PRESET_ROWS: ReadonlyArray<PresetEnvRow> = [
   { key: "CLAUDE_CODE_AUTO_COMPACT_WINDOW", value: "1048576", sensitive: false },
 ];
 
-/** Canonical Alibaba Cloud Coding Plan environment for Claude Code. */
-const QWEN_MODEL_ID = "qwen3.8-max-preview";
+/**
+ * Alibaba Cloud (DashScope / Model Studio) offers Qwen for Claude Code under two
+ * DISTINCT subscriptions, each with its own base URL and its own model ids —
+ * pairing one plan's endpoint with the other plan's model id returns a
+ * model-not-found error. See https://www.alibabacloud.com/help/en/model-studio/claude-code.
+ *   • Coding Plan → `coding-intl` endpoint, serves `qwen3.7-plus`.
+ *   • Token Plan  → `token-plan` (maas) endpoint, serves the `qwen3.8-max-preview` flagship.
+ * Two presets keep endpoint and model in lockstep so neither can be mismatched.
+ */
+const QWEN_CODING_MODEL_ID = "qwen3.7-plus";
+const QWEN_TOKEN_MODEL_ID = "qwen3.8-max-preview";
 
-export const QWEN_PRESET_ROWS: ReadonlyArray<PresetEnvRow> = [
+export const QWEN_CODING_PRESET_ROWS: ReadonlyArray<PresetEnvRow> = [
   {
     key: "ANTHROPIC_BASE_URL",
     value: "https://coding-intl.dashscope.aliyuncs.com/apps/anthropic",
     sensitive: false,
   },
   { key: "ANTHROPIC_AUTH_TOKEN", value: "", sensitive: true },
-  { key: "ANTHROPIC_MODEL", value: QWEN_MODEL_ID, sensitive: false },
-  { key: "ANTHROPIC_DEFAULT_OPUS_MODEL", value: QWEN_MODEL_ID, sensitive: false },
-  { key: "ANTHROPIC_DEFAULT_SONNET_MODEL", value: QWEN_MODEL_ID, sensitive: false },
-  { key: "ANTHROPIC_DEFAULT_HAIKU_MODEL", value: QWEN_MODEL_ID, sensitive: false },
-  { key: "CLAUDE_CODE_SUBAGENT_MODEL", value: QWEN_MODEL_ID, sensitive: false },
+  { key: "ANTHROPIC_MODEL", value: QWEN_CODING_MODEL_ID, sensitive: false },
+  { key: "ANTHROPIC_DEFAULT_OPUS_MODEL", value: QWEN_CODING_MODEL_ID, sensitive: false },
+  { key: "ANTHROPIC_DEFAULT_SONNET_MODEL", value: QWEN_CODING_MODEL_ID, sensitive: false },
+  { key: "ANTHROPIC_DEFAULT_HAIKU_MODEL", value: QWEN_CODING_MODEL_ID, sensitive: false },
+  { key: "CLAUDE_CODE_SUBAGENT_MODEL", value: QWEN_CODING_MODEL_ID, sensitive: false },
+];
+
+export const QWEN_TOKEN_PRESET_ROWS: ReadonlyArray<PresetEnvRow> = [
+  {
+    key: "ANTHROPIC_BASE_URL",
+    value: "https://token-plan.ap-southeast-1.maas.aliyuncs.com/apps/anthropic",
+    sensitive: false,
+  },
+  { key: "ANTHROPIC_AUTH_TOKEN", value: "", sensitive: true },
+  { key: "ANTHROPIC_MODEL", value: QWEN_TOKEN_MODEL_ID, sensitive: false },
+  { key: "ANTHROPIC_DEFAULT_OPUS_MODEL", value: QWEN_TOKEN_MODEL_ID, sensitive: false },
+  { key: "ANTHROPIC_DEFAULT_SONNET_MODEL", value: QWEN_TOKEN_MODEL_ID, sensitive: false },
+  { key: "ANTHROPIC_DEFAULT_HAIKU_MODEL", value: QWEN_TOKEN_MODEL_ID, sensitive: false },
+  { key: "CLAUDE_CODE_SUBAGENT_MODEL", value: QWEN_TOKEN_MODEL_ID, sensitive: false },
 ];
 
 /**
@@ -134,10 +157,17 @@ export const PROFILE_PRESETS: readonly ProfilePreset[] = [
     efforts: ["max"],
   },
   {
-    id: "qwen",
-    label: msg`Qwen`,
-    envRows: QWEN_PRESET_ROWS,
-    models: [{ id: QWEN_MODEL_ID, label: "Qwen3.8 Max Preview" }],
+    id: "qwen-coding",
+    label: msg`Qwen (Coding Plan)`,
+    envRows: QWEN_CODING_PRESET_ROWS,
+    models: [{ id: QWEN_CODING_MODEL_ID, label: "Qwen3.7 Plus" }],
+    efforts: CLAUDE_EFFORT_TIERS,
+  },
+  {
+    id: "qwen-token",
+    label: msg`Qwen 3.8 Max (Token Plan)`,
+    envRows: QWEN_TOKEN_PRESET_ROWS,
+    models: [{ id: QWEN_TOKEN_MODEL_ID, label: "Qwen3.8 Max" }],
     efforts: CLAUDE_EFFORT_TIERS,
   },
 ];

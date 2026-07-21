@@ -27,6 +27,7 @@ import { useAppStore } from "@/renderer/state/appStore";
 import {
   findExperimentByGroupId,
   findExperimentByThreadId,
+  useExperimentStore,
 } from "@/renderer/state/experimentStore";
 import { refreshGitProject } from "@/renderer/state/gitRefresh";
 import {
@@ -49,6 +50,7 @@ import { ThreadDraftView } from "@/renderer/components/thread/ThreadDraftView";
 import type { DraftStartInput } from "@/renderer/components/thread/ThreadDraftComposerArea";
 import { generateTitleAsync } from "@/renderer/utils/titleGen";
 import { HomeView } from "@/renderer/views/HomeView";
+import { ExperimentCompareHeader } from "@/renderer/views/ExperimentView/parts/ExperimentCompareHeader";
 import { ExperimentView } from "@/renderer/views/ExperimentView/ExperimentView";
 import { PullRequestsView } from "@/renderer/views/PullRequestsView/PullRequestsView";
 import { SchedulesView } from "@/renderer/views/SchedulesView/SchedulesView";
@@ -173,12 +175,19 @@ export function AppContent() {
   const draftLastDraftConfig = useInitialProjectDraftConfig(draftProjectId);
   const createThread = useAppStore((state) => state.createThread);
   const queueThreadLaunch = useAppStore((state) => state.queueThreadLaunch);
+  const activeGroupId = useAppStore((s) => {
+    const v = s.view;
+    return v.kind === "thread" ? v.activeGroupId : undefined;
+  });
   const activeGroupName = useAppStore((s) => {
     const v = s.view;
     if (v.kind !== "thread" || !v.activeGroupId) return undefined;
     const match = s.threads.find((thread) => thread.groupId === v.activeGroupId);
     return match?.groupName ?? match?.title ?? t`Group`;
   });
+  const compareExperimentExists = useExperimentStore((state) =>
+    activeGroupId ? state.experiments[activeGroupId] !== undefined : false,
+  );
   async function handleContinueInProvider(
     sourceThread: Thread,
     targetAgentKind: string,
@@ -334,8 +343,9 @@ export function AppContent() {
         </div>
       );
     }
-    const activeGroupId = view.activeGroupId;
-    const hasGroupHeader = !!(activeGroupId && activeGroupName);
+    const localActiveGroupId = view.activeGroupId;
+    const isExperimentCompare = !!(localActiveGroupId && compareExperimentExists);
+    const hasGroupHeader = isExperimentCompare || !!(localActiveGroupId && activeGroupName);
     function getPaneDomKey(paneId: string) {
       return resolvePaneDomKey({
         paneId,
@@ -392,7 +402,9 @@ export function AppContent() {
 
     return (
       <div className="flex h-full flex-col">
-        {activeGroupId && activeGroupName && (
+        {isExperimentCompare && localActiveGroupId ? (
+          <ExperimentCompareHeader experimentId={localActiveGroupId} />
+        ) : localActiveGroupId && activeGroupName ? (
           <div
             className={`poracode-content-over-drag-region ${macosTrafficLightPadClass} flex h-[env(titlebar-area-height,32px)] shrink-0 items-center gap-1 border-b border-[var(--hairline)] px-2`}
           >
@@ -406,7 +418,7 @@ export function AppContent() {
               <X className="size-3.5" />
             </button>
           </div>
-        )}
+        ) : null}
         <div className="min-h-0 flex-1">
           <SplitPaneContainer
             layout={paneLayout}

@@ -55,10 +55,15 @@ import { Button } from "@/renderer/components/common/Button";
 import { PixelLoader } from "@/renderer/components/common/PixelLoader";
 import { resolveModelLabel } from "@/renderer/components/providers/modelDisplay";
 import { launchExperiment } from "@/renderer/actions/experimentActions";
+import { isEligibleExperimentJudgeAgent } from "@/renderer/actions/experimentOperationState";
+import { getProjectAgentStatuses } from "@/shared/agentStatus";
+import { useShallow } from "zustand/shallow";
 import {
   ExperimentDraftTargets,
   type ExperimentDraftCandidate,
 } from "@/renderer/components/experiment/ExperimentDraftTargets";
+import { ExperimentSpecDraftDialog } from "@/renderer/components/experiment/ExperimentSpecDraftDialog";
+import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
@@ -287,6 +292,36 @@ export function ThreadDraftComposerArea(props: {
   const [experimentMode, setExperimentMode] = useState(false);
   const [experimentCandidates, setExperimentCandidates] = useState<ExperimentDraftCandidate[]>([]);
   const [experimentBaseBranch, setExperimentBaseBranch] = useState<string | null>(null);
+  const [showSpecDialog, setShowSpecDialog] = useState(false);
+  const disabledAgents = useSharedSettings((s) => s.disabledAgents);
+  // Installed, one-shot-capable agents that can act as the "draft spec"
+  // orchestrator. Kept intentionally looser than the AI-judge eligibility (no
+  // authState/model-count gate) so the picker isn't empty for CLI/profile
+  // agents whose model list populates lazily; generateExecutorSpec falls back
+  // to the adapter's defaultOneShotModel when no model is chosen.
+  const orchestratorAgents = useAgentStatusesStore(
+    useShallow((state) =>
+      getProjectAgentStatuses(
+        props.project.location,
+        state.agentStatuses,
+        state.wslAgentStatuses,
+      ).filter(
+        (agent) =>
+          agent.installed &&
+          agent.capabilities.supportsOneShot === true &&
+          !disabledAgents.includes(agent.kind),
+      ),
+    ),
+  );
+  const eligibleFallbackAgents = useAgentStatusesStore(
+    useShallow((state) =>
+      getProjectAgentStatuses(
+        props.project.location,
+        state.agentStatuses,
+        state.wslAgentStatuses,
+      ).filter((agent) => isEligibleExperimentJudgeAgent(agent, disabledAgents)),
+    ),
+  );
   const isRemote = isRemoteSession();
   const isQuickComposer = window.poracode ? isQuickComposerWindow() : false;
   const showVoiceInputButton = useSharedSettings((s) => s.audio.showVoiceInputButton) && !isRemote;
@@ -697,11 +732,13 @@ export function ThreadDraftComposerArea(props: {
   async function runExperiment(allSegments: PromptSegment[], fallbackPrompt = "") {
     const input = resolveExperimentInput(allSegments, fallbackPrompt);
     const baseBranch = experimentBaseBranch ?? props.gitBranch;
-    if (!input || !baseBranch || experimentCandidates.length < 2 || isSubmitting) return;
+    if (!input || experimentCandidates.length < 2 || isSubmitting) return;
     setIsSubmitting(true);
     const experimentId = await launchExperiment({
       projectId: props.project.id,
-      baseBranch,
+      // No base branch means the folder isn't a git repo yet — launchExperiment
+      // initializes it lazily and forks from the freshly-created default branch.
+      ...(baseBranch ? { baseBranch } : {}),
       prompt: input.prompt,
       segments: input.segments,
       candidates: experimentCandidates.map(
@@ -848,28 +885,53 @@ export function ThreadDraftComposerArea(props: {
                 }}
               />
             ) : null}
-            {experimentMode && props.gitBranch ? (
-              <ExperimentDraftTargets
-                candidates={experimentCandidates}
-                isSubmitting={isSubmitting}
-                isAddDisabled={
-                  authRequired ||
-                  agentUpdating ||
-                  isSubmitting ||
-                  experimentCandidates.length >= MAX_EXPERIMENT_CANDIDATES
-                }
-                onRemove={(id) =>
-                  setExperimentCandidates((current) =>
-                    current.filter((candidate) => candidate.id !== id),
-                  )
-                }
-                onCancel={() => {
-                  setExperimentMode(false);
-                  setExperimentCandidates([]);
-                  setExperimentBaseBranch(null);
-                }}
-                onAdd={addExperimentCandidate}
-              />
+            {experimentMode ? (
+              <>
+                <ExperimentDraftTargets
+                  candidates={experimentCandidates}
+                  eligibleFallbackAgents={eligibleFallbackAgents}
+                  isSubmitting={isSubmitting}
+                  isAddDisabled={
+                    authRequired ||
+                    agentUpdating ||
+                    isSubmitting ||
+                    experimentCandidates.length >= MAX_EXPERIMENT_CANDIDATES
+                  }
+                  onRemove={(id) =>
+                    setExperimentCandidates((current) =>
+                      current.filter((candidate) => candidate.id !== id),
+                    )
+                  }
+                  onCancel={() => {
+                    setExperimentMode(false);
+                    setExperimentCandidates([]);
+                    setExperimentBaseBranch(null);
+                  }}
+                  onAdd={addExperimentCandidate}
+                  onFallbackChange={(candidateId, fallbackChain) =>
+                    setExperimentCandidates((current) =>
+                      current.map((c) =>
+                        c.id === candidateId ? { ...c, fallbackChain } : c,
+                      ),
+                    )
+                  }
+                  onDraftSpec={() => setShowSpecDialog(true)}
+                  isDraftSpecDisabled={authRequired || agentUpdating || isSubmitting}
+                />
+                {showSpecDialog ? (
+                  <ExperimentSpecDraftDialog
+                    agents={orchestratorAgents}
+                    projectLocation={props.project.location}
+                    preferredAgentKind={props.selectedAgent.kind}
+                    onUseSpec={(spec) => {
+                      mentionRef.current?.clear();
+                      mentionRef.current?.insertText(spec);
+                      setShowSpecDialog(false);
+                    }}
+                    onClose={() => setShowSpecDialog(false)}
+                  />
+                ) : null}
+              </>
             ) : null}
           </>
         }
@@ -1005,7 +1067,7 @@ export function ThreadDraftComposerArea(props: {
             customMcpServers={customMcpServers}
             showVoiceInputButton={showVoiceInputButton}
             isDisabled={authRequired || agentUpdating || isSubmitting}
-            {...(!isHomeScope && !isRemote && !isQuickComposer && props.gitBranch
+            {...(!isHomeScope && !isRemote && !isQuickComposer
               ? {
                   experiment: {
                     enabled: experimentMode,
@@ -1078,6 +1140,12 @@ export function ThreadDraftComposerArea(props: {
                 }
               : {})}
           />
+        </div>
+      ) : experimentMode ? (
+        <div data-draft-worktree-row="" className="mt-1.5 flex flex-wrap items-center gap-1 px-1">
+          <span className="text-xs text-muted">
+            <Trans>This folder will be initialized as a git repo on first run.</Trans>
+          </span>
         </div>
       ) : null}
     </>

@@ -8,7 +8,8 @@ import {
   KIMI_PRESET_ROWS,
   MINIMAX_PRESET_ROWS,
   profileUsesExternalProvider,
-  QWEN_PRESET_ROWS,
+  QWEN_CODING_PRESET_ROWS,
+  QWEN_TOKEN_PRESET_ROWS,
   rowsFromEnvironment,
   ZAI_PRESET_ROWS,
   type EnvRow,
@@ -112,12 +113,26 @@ describe("ClaudeProfileSettingsModel", () => {
       expect(byKey.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe("1048576");
     });
 
-    it("adds the current Alibaba Cloud Coding Plan endpoint and Qwen model mapping", () => {
+    it("pairs the Qwen Coding Plan endpoint with the qwen3.7-plus model it serves", () => {
       const byKey = Object.fromEntries(
-        applyPresetEnvRows(QWEN_PRESET_ROWS, [], nextRowId).map((row) => [row.key, row.value]),
+        applyPresetEnvRows(QWEN_CODING_PRESET_ROWS, [], nextRowId).map((row) => [row.key, row.value]),
       );
       expect(byKey.ANTHROPIC_BASE_URL).toBe(
         "https://coding-intl.dashscope.aliyuncs.com/apps/anthropic",
+      );
+      expect(byKey.ANTHROPIC_MODEL).toBe("qwen3.7-plus");
+      expect(byKey.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe("qwen3.7-plus");
+      expect(byKey.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe("qwen3.7-plus");
+      expect(byKey.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe("qwen3.7-plus");
+      expect(byKey.CLAUDE_CODE_SUBAGENT_MODEL).toBe("qwen3.7-plus");
+    });
+
+    it("pairs the Qwen Token Plan endpoint with the qwen3.8-max-preview flagship it serves", () => {
+      const byKey = Object.fromEntries(
+        applyPresetEnvRows(QWEN_TOKEN_PRESET_ROWS, [], nextRowId).map((row) => [row.key, row.value]),
+      );
+      expect(byKey.ANTHROPIC_BASE_URL).toBe(
+        "https://token-plan.ap-southeast-1.maas.aliyuncs.com/apps/anthropic",
       );
       expect(byKey.ANTHROPIC_MODEL).toBe("qwen3.8-max-preview");
       expect(byKey.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe("qwen3.8-max-preview");

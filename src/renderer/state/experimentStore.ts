@@ -14,6 +14,7 @@ interface ExperimentStore {
   addExperiment: (experiment: Experiment) => void;
   renameExperiment: (experimentId: string, title: string) => void;
   setExperimentCrown: (experimentId: string, crown: ExperimentCrown) => void;
+  updateCandidateAgent: (experimentId: string, threadId: string, agentKind: string) => void;
   decideExperiment: (experimentId: string, winnerThreadId: string) => void;
   removeExperiment: (experimentId: string) => void;
   removeProjectExperiments: (projectId: string) => void;
@@ -64,6 +65,25 @@ export const useExperimentStore = create<ExperimentStore>()(
               [experimentId]: {
                 ...experiment,
                 crown,
+                updatedAt: new Date().toISOString(),
+              },
+            },
+          };
+        }),
+      updateCandidateAgent: (experimentId, threadId, agentKind) =>
+        set((state) => {
+          const experiment = state.experiments[experimentId];
+          if (!experiment) return state;
+          return {
+            experiments: {
+              ...state.experiments,
+              [experimentId]: {
+                ...experiment,
+                candidates: experiment.candidates.map((candidate) =>
+                  candidate.threadId === threadId
+                    ? { ...candidate, agentKind, agentLabel: undefined, model: undefined, effort: undefined, fast: undefined }
+                    : candidate,
+                ),
                 updatedAt: new Date().toISOString(),
               },
             },

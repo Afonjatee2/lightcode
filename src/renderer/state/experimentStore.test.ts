@@ -100,4 +100,48 @@ describe("experimentStore", () => {
 
     expect(useExperimentStore.getState().experiments["experiment-1"]).toEqual(record);
   });
+
+  it("updateCandidateAgent changes agentKind and clears stale model/effort/fast", () => {
+    useExperimentStore.getState().addExperiment(
+      experiment({
+        candidates: [
+          {
+            threadId: "thread-1",
+            agentKind: "codex",
+            agentLabel: "Codex",
+            model: "gpt-5",
+            effort: "high",
+            fast: true,
+            worktreePath: "C:/repo/one",
+            worktreeBranch: "poracode/one",
+            worktreeOwnerToken: "experiment-1:thread-1",
+            worktreeState: "owned",
+          },
+          {
+            threadId: "thread-2",
+            agentKind: "codex",
+            model: "gpt-5",
+            worktreePath: "C:/repo/two",
+            worktreeBranch: "poracode/two",
+            worktreeOwnerToken: "experiment-1:thread-2",
+            worktreeState: "owned",
+          },
+        ],
+      }),
+    );
+
+    useExperimentStore.getState().updateCandidateAgent("experiment-1", "thread-1", "claude");
+
+    const exp = useExperimentStore.getState().experiments["experiment-1"];
+    const candidate = exp?.candidates.find((c) => c.threadId === "thread-1");
+    expect(candidate?.agentKind).toBe("claude");
+    expect(candidate?.agentLabel).toBeUndefined();
+    expect(candidate?.model).toBeUndefined();
+    expect(candidate?.effort).toBeUndefined();
+    expect(candidate?.fast).toBeUndefined();
+    expect(candidate?.worktreePath).toBe("C:/repo/one");
+
+    const otherCandidate = exp?.candidates.find((c) => c.threadId === "thread-2");
+    expect(otherCandidate?.agentKind).toBe("codex");
+  });
 });

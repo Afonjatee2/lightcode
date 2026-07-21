@@ -80,6 +80,7 @@ export interface ThreadSlice {
   renameThread: (threadId: string, title: string) => void;
   setThreadWorktree: (threadId: string, worktreePath: string, worktreeBranch?: string) => void;
   updateThreadConfig: (threadId: string, config: ThreadConfig) => void;
+  setThreadAgentKind: (threadId: string, agentKind: string, config: ThreadConfig) => void;
   updateThreadRuntime: (
     threadId: string,
     input: {
@@ -301,6 +302,21 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
         };
       });
       return changed ? { threads } : {};
+    }),
+  setThreadAgentKind: (threadId, agentKind, config) =>
+    set((state) => {
+      const threads = state.threads.map((thread) => {
+        if (thread.id !== threadId) return thread;
+        return {
+          ...thread,
+          agentKind,
+          config,
+          canResumeWithConfig: false,
+          sessionRef: undefined,
+          updatedAt: new Date().toISOString(),
+        };
+      });
+      return { threads };
     }),
   updateThreadRuntime: (threadId, input) =>
     set((state) => {

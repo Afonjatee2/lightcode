@@ -11,6 +11,7 @@ export function ConfirmDialog(props: {
   confirmLabel: string;
   cancelLabel?: string;
   confirmVariant?: ConfirmVariant;
+  confirmDisabled?: boolean;
   status?: "danger" | "warning";
   onConfirm: () => void;
   onClose: () => void;
@@ -23,6 +24,7 @@ export function ConfirmDialog(props: {
     confirmLabel,
     cancelLabel,
     confirmVariant = "danger",
+    confirmDisabled = false,
     status = "danger",
     onConfirm,
     onClose,
@@ -42,7 +44,7 @@ export function ConfirmDialog(props: {
             <Button slot="close" variant="ghost" className="text-muted">
               {resolvedCancelLabel}
             </Button>
-            <Button variant={confirmVariant} onPress={onConfirm}>
+            <Button variant={confirmVariant} isDisabled={confirmDisabled} onPress={onConfirm}>
               {confirmLabel}
             </Button>
           </AlertDialog.Footer>

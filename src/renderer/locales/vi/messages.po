@@ -30,10 +30,10 @@ msgstr "(không có nhánh)"
 msgid "(no message)"
 msgstr "(không có tin nhắn)"
 
-#. placeholder {0}: candidates.length
+#. placeholder {0}: props.candidateCount
 #. placeholder {0}: props.candidates.length
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "{0, plural, one {# candidate} other {# candidates}}"
 msgstr "{0, plural, one {# ứng viên} other {# ứng viên}}"
 
@@ -666,6 +666,7 @@ msgid "Activity metric"
 msgstr "Chỉ số hoạt động"
 
 #: src/mobile/views/ManageProjectsView.tsx
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
@@ -733,6 +734,10 @@ msgstr "Thêm tệp đính kèm hoặc khả năng"
 msgid "Add candidate"
 msgstr "Thêm ứng viên"
 
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+msgid "Add candidates"
+msgstr "Thêm ứng viên"
+
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Add Claude profile"
 msgstr "Thêm hồ sơ Claude"
@@ -740,6 +745,10 @@ msgstr "Thêm hồ sơ Claude"
 #: src/renderer/components/thread/ThreadAuthRequiredDock.tsx
 msgid "Add credentials before this thread can run."
 msgstr "Thêm thông tin xác thực trước khi chuỗi này có thể chạy."
+
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+msgid "Add fallback agent"
+msgstr "Thêm agent dự phòng"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Add folder"
@@ -828,6 +837,10 @@ msgstr "Tác nhân"
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Agent ({subagent}): {description}"
 msgstr "Tác nhân ({subagent}): {description}"
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Agent and model"
+msgstr "Agent và mô hình"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
@@ -938,7 +951,7 @@ msgstr "Tất cả tài khoản"
 msgid "All agent apps"
 msgstr "Tất cả ứng dụng agent"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitDialogs.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "All candidate sessions, worktrees, and branches will be removed."
 msgstr "Tất cả phiên, cây làm việc và nhánh của các ứng viên sẽ bị xóa."
@@ -1017,6 +1030,10 @@ msgstr "Luôn bị loại trừ"
 msgid "An expected worktree owner requires a branch"
 msgstr "Chủ sở hữu cây làm việc dự kiến yêu cầu một nhánh"
 
+#: src/renderer/actions/experimentDecisionActions.ts
+msgid "An external \"request changes\" review is advisory — not mergeable."
+msgstr "Đánh giá \"yêu cầu thay đổi\" từ bên ngoài chỉ mang tính tham khảo — không thể hợp nhất."
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "An MCP server with the name {serverName} already exists."
 #~ msgstr "Máy chủ MCP có tên {serverName} đã tồn tại."
@@ -1068,6 +1085,7 @@ msgstr "Áp dụng cấu hình nhà cung cấp"
 msgid "Approval or reply required from you."
 msgstr "Cần có sự phê duyệt hoặc trả lời từ bạn."
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Approve"
 msgstr "Phê duyệt"
@@ -1079,6 +1097,10 @@ msgstr "đã được phê duyệt"
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Approved"
 msgstr "Đã được phê duyệt"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Approved externally"
+msgstr "Đã phê duyệt bên ngoài"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -1165,14 +1187,24 @@ msgstr "Đặt câu hỏi"
 msgid "At"
 msgstr "Lúc"
 
+#: src/renderer/actions/experimentDecisionActions.ts
+msgid "At least two candidates must finish before comparing them."
+msgstr "Cần ít nhất hai ứng viên hoàn tất trước khi có thể so sánh chúng."
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
+msgid "At least two candidates must finish before judging."
+msgstr "Cần ít nhất hai ứng viên hoàn tất trước khi có thể đánh giá."
+
 #: src/renderer/actions/experimentActions.ts
 msgid "At least two worktrees must be created. Any partial experiment was cleaned up."
 msgstr "Cần tạo ít nhất hai cây làm việc. Mọi thử nghiệm chỉ được tạo một phần đã được dọn dẹp."
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "Attach"
 msgstr "Đính kèm"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "Attach files"
 msgstr "Đính kèm tập tin"
@@ -1391,6 +1423,10 @@ msgstr "Bị trình duyệt chặn. Hãy cho phép thông báo cho trang web nà
 msgid "blocked:"
 msgstr "bị chặn:"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
+msgid "Board"
+msgstr "Bảng"
+
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/NotesEditor.tsx
 msgid "Bold"
 msgstr "Đậm"
@@ -1582,12 +1618,14 @@ msgstr "Không thể tải danh sách cổng"
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/components/common/ConfirmDialog.tsx
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 #: src/renderer/components/thread/ChatPane/parts/CheckpointRevertControls.tsx
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/ThreadRuntimeRequestPanel.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
@@ -1633,6 +1671,11 @@ msgstr "đã hủy"
 msgid "Cancelled"
 msgstr "Đã hủy"
 
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Candidate {0}"
+msgstr "Ứng viên {0}"
+
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Candidate actions"
 msgstr "Hành động của ứng viên"
@@ -1644,6 +1687,10 @@ msgstr "Không thể tạo đường dẫn cây làm việc mặc định mà kh
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Cannot switch branches — commit or stash your changes first"
 msgstr "Không thể chuyển nhánh — trước tiên hãy commit hoặc stash các thay đổi của bạn"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Change data is unavailable for this candidate."
+msgstr "Dữ liệu thay đổi không khả dụng cho ứng viên này."
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 msgid "Change project folder"
@@ -1686,6 +1733,7 @@ msgstr "Thay đổi áp dụng cho cuộc trò chuyện mới. Nhà cung cấp h
 msgid "Changes in PR"
 msgstr "Những thay đổi trong PR"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Changes requested"
 msgstr "Đã yêu cầu thay đổi"
@@ -2010,7 +2058,7 @@ msgstr "Đóng trình chỉnh sửa"
 msgid "Close Editor Tab"
 msgstr "Đóng tab trình chỉnh sửa"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Close experiment"
 msgstr "Đóng thử nghiệm"
 
@@ -2300,6 +2348,10 @@ msgstr "Cam kết"
 msgid "Compacting context"
 msgstr "Đang nén ngữ cảnh"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
+msgid "Compare"
+msgstr "So sánh"
+
 #: src/mobile/views/DesktopsView.tsx
 msgid "Compare this fingerprint with the one shown by your server."
 msgstr "So sánh dấu vân tay này với dấu vân tay hiển thị trên máy chủ của bạn."
@@ -2346,8 +2398,14 @@ msgid "completed"
 msgstr "hoàn thành"
 
 #: src/renderer/utils/prStatus.ts
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Completed"
 msgstr "Đã hoàn tất"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Completed · no changes"
+msgstr "Hoàn thành · không có thay đổi"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
@@ -2583,12 +2641,17 @@ msgstr "Cuộc trò chuyện"
 #: src/renderer/components/thread/ChatPane/parts/items/CopyTextButton.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
 #: src/renderer/RendererCrashScreen.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copied"
 msgstr "Đã sao chép"
 
 #: src/renderer/views/ProfileOverlay/parts/ShareDialog.tsx
 msgid "Copied to clipboard"
 msgstr "Đã sao chép vào bộ nhớ tạm"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copied to clipboard."
+msgstr "Đã sao chép vào bảng nhớ tạm."
 
 #: src/renderer/components/terminal/XTermSurface.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -2629,6 +2692,15 @@ msgstr "Sao chép chi tiết"
 msgid "Copy diagnostics"
 msgstr "Sao chép chẩn đoán"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy diff"
+msgstr "Sao chép diff"
+
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy diff for candidate {0}"
+msgstr "Sao chép diff của ứng viên {0}"
+
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copy failed"
 msgstr "Sao chép không thành công"
@@ -2660,6 +2732,10 @@ msgstr "Sao chép token ghép đôi"
 msgid "Copy Path"
 msgstr "Sao chép đường dẫn"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
+msgid "Copy prompt"
+msgstr "Sao chép prompt"
+
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
 msgid "Copy Relative Path"
 msgstr "Sao chép đường dẫn tương đối"
@@ -2671,6 +2747,10 @@ msgstr "Sao chép lựa chọn"
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Copy Tailscale URL"
 msgstr "Sao chép URL Tailscale"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy the candidate's changes for external review."
+msgstr "Sao chép các thay đổi của ứng viên để đánh giá bên ngoài."
 
 #: src/renderer/components/thread/WorktreeModeSelect.tsx
 msgid "Copy uncommitted changes here (keeps them on this branch)"
@@ -2940,7 +3020,7 @@ msgstr "Đã bật Crossagents cho chủ đề này"
 msgid "Crown"
 msgstr "Chọn làm ứng viên thắng"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
 msgid "Crown with AI"
 msgstr "Dùng AI chọn ứng viên thắng"
@@ -3183,6 +3263,10 @@ msgstr "Từ chối"
 msgid "Deny and tell the agent what to do differently…"
 msgstr "Từ chối và cho tác nhân biết cần làm gì khác đi…"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Describe the task briefly. The selected agent will turn it into an editable executor prompt."
+msgstr "Mô tả ngắn gọn nhiệm vụ. Agent được chọn sẽ chuyển đổi thành prompt thực thi có thể chỉnh sửa."
+
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
 #~ msgstr "Mô tả tác vụ cần chạy với nhiều tác nhân…"
@@ -3273,6 +3357,10 @@ msgstr "Thiết bị được dùng cho nút nhập giọng nói của khung so�
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Devices can pair while this desktop is reachable."
 msgstr "Thiết bị có thể ghép nối khi máy tính này có thể truy cập được."
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+#~ msgid "Diff copied. Paste it into an external reviewer."
+#~ msgstr ""
 
 #: src/mobile/views/PortsView.tsx
 #~ msgid "Direct connection required"
@@ -3367,12 +3455,13 @@ msgstr "Hủy thay đổi"
 msgid "Discard changes to <0>{title}</0>? This cannot be undone."
 msgstr "Hủy thay đổi trong <0>{title}</0>? Không thể hoàn tác."
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitDialogs.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Discard experiment"
 msgstr "Hủy bỏ thử nghiệm"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitDialogs.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Discard experiment?"
 msgstr "Hủy bỏ thử nghiệm?"
@@ -3478,6 +3567,27 @@ msgstr "Đang tải xuống mẫu giọng nói..."
 msgid "Draft"
 msgstr "Bản nháp"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Draft an executor spec"
+msgstr "Soạn thảo spec thực thi"
+
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Draft spec"
+msgstr "Bản nháp spec"
+
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+msgid "Draft spec from a task"
+msgstr "Soạn thảo spec từ nhiệm vụ"
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Drafted executor spec"
+msgstr "Spec thực thi đã soạn"
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Drafted spec — edit before using"
+msgstr "Spec đã soạn — chỉnh sửa trước khi dùng"
+
 #: src/renderer/views/SettingsOverlay/parts/ModelOrderSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Drag to reorder how providers appear in the model picker."
@@ -3507,6 +3617,10 @@ msgstr "Tên máy chủ bị trùng trong kết quả quét"
 #: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
 msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk refactors, Claude Opus for anything subtle."
 msgstr "ví dụ: Codex GPT-5.5 fast cho các tra cứu nhanh, OpenCode GLM cho tái cấu trúc hàng loạt, Claude Opus cho những việc tinh tế."
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "e.g. Fix the Overview page so ?month= controls the displayed reporting month"
+msgstr "vd. Sửa trang tổng quan để ?month= điều khiển tháng báo cáo hiển thị"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "e.g. Work"
@@ -3927,6 +4041,10 @@ msgstr "Nhà cung cấp bên ngoài"
 #~ msgid "External provider skills"
 #~ msgstr "Skill của nhà cung cấp bên ngoài"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "External verdict"
+msgstr "Phán quyết bên ngoài"
+
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "Extra High"
 msgstr "Cực cao"
@@ -3947,6 +4065,7 @@ msgid "failed"
 msgstr "thất bại"
 
 #: src/renderer/utils/prStatus.ts
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "Failed"
 msgstr "Thất bại"
@@ -3990,6 +4109,10 @@ msgstr "Không thể ghi siêu dữ liệu nguồn đã đóng băng: {detail}. 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Failed to record owned branch metadata: {detail}. Rollback left branch {branch}: {rollback}"
 msgstr "Không thể ghi siêu dữ liệu của nhánh có chủ sở hữu: {detail}. Quá trình hoàn tác vẫn để lại nhánh {branch}: {rollback}"
+
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+msgid "Fallback:"
+msgstr "Dự phòng:"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/providers/modelDisplay.ts
@@ -4515,6 +4638,10 @@ msgstr "Handle"
 msgid "Hard Reload"
 msgstr "Tải lại cứng"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
+msgid "Has errors"
+msgstr "Có lỗi"
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/DraftIndicator.tsx
 msgid "Has unsent draft"
 msgstr "Có bản nháp chưa gửi"
@@ -4631,6 +4758,10 @@ msgstr "HTTP (hỗ trợ truyền phát)"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "https://example.com/mcp"
 msgstr "https://example.com/mcp"
+
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
+msgid "I reviewed these changes"
+msgstr "Tôi đã xem lại các thay đổi này"
 
 #. placeholder {0}: agent.id
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
@@ -4910,7 +5041,7 @@ msgstr "Nghiêng"
 msgid "JSON"
 msgstr "JSON"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Judging…"
 msgstr "Đang đánh giá…"
 
@@ -5015,8 +5146,12 @@ msgid "Less"
 msgstr "Ít"
 
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
-msgid "Let an AI judge compare the candidate changes."
-msgstr "Để AI đánh giá so sánh các thay đổi của ứng viên."
+#~ msgid "Let an AI judge compare the candidate changes."
+#~ msgstr "Để AI đánh giá so sánh các thay đổi của ứng viên."
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
+msgid "Let an AI judge compare the finished candidates."
+msgstr "Để trọng tài AI so sánh các ứng viên đã hoàn tất."
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 msgid "Lets agents call <0>eval</0> to run arbitrary JavaScript inside the embedded page. Off by default — turn on only when you trust the loaded sites and the agent."
@@ -6051,6 +6186,10 @@ msgstr "Không có tab trình duyệt nào mở"
 msgid "No camera found"
 msgstr "Không tìm thấy camera"
 
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+msgid "No candidates selected"
+msgstr "Chưa chọn ứng viên"
+
 #: src/renderer/components/diff/DiffCardList.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrReviewSidebar.tsx
 msgid "No changes"
@@ -6229,6 +6368,10 @@ msgstr "Không tìm thấy micrô."
 msgid "No models found"
 msgstr "Không tìm thấy mô hình nào"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "No one-shot-capable agent is available. Sign in to an agent that supports one-shot generation (Codex, Claude, Kimi, Qwen…) to draft a spec."
+msgstr "Không có agent nào hỗ trợ tạo một bước. Đăng nhập vào agent hỗ trợ tạo một bước (Codex, Claude, Kimi, Qwen…) để soạn thảo spec."
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No other agents installed"
 msgstr "Không có tác nhân nào khác được cài đặt"
@@ -6382,7 +6525,7 @@ msgid "None"
 msgstr "Không có"
 
 #: src/renderer/actions/experimentDecisionActions.ts
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "None of these agents can run the AI comparison."
 msgstr "Không tác nhân nào trong số này có thể thực hiện phép so sánh bằng AI."
 
@@ -6516,6 +6659,7 @@ msgid "Only when unfocused"
 msgstr "Chỉ khi không tập trung"
 
 #: src/renderer/notifications.ts
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrMetaRow.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
@@ -6544,7 +6688,6 @@ msgstr "Mở terminal"
 msgid "Open a thread first to attach to it."
 msgstr "Mở một luồng trước để đính kèm vào đó."
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ExperimentGroupHeader.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Open All"
@@ -6570,6 +6713,11 @@ msgstr "Mở trình duyệt"
 #: src/renderer/commands/registry.ts
 msgid "Open browser tab"
 msgstr "Mở tab trình duyệt"
+
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Open candidate {0}"
+msgstr "Mở ứng viên {0}"
 
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
@@ -6771,6 +6919,10 @@ msgstr "Mở terminal trong worktree"
 msgid "Open the effort picker"
 msgstr "Mở bộ chọn nỗ lực"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Open the Git review panel for this candidate."
+msgstr "Mở bảng xem lại Git cho ứng viên này."
+
 #: src/renderer/components/providers/codex/index.tsx
 msgid "Open the model picker"
 msgstr "Mở bộ chọn mô hình"
@@ -6797,6 +6949,10 @@ msgstr "Khóa riêng OpenSSH"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Optional"
 msgstr "Không bắt buộc"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Optional note..."
+msgstr "Ghi chú tùy chọn..."
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Optional status hooks. Installed hooks update automatically; missing hooks are never installed automatically."
@@ -7472,14 +7628,26 @@ msgstr "Đẩy các cập nhật đến những thiết bị di động đã gh�
 msgid "Questions"
 msgstr "Câu hỏi"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Queued"
+msgstr "Đang chờ"
+
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/providers/usageFormat.ts
 msgid "Quota reached"
 msgstr "Đã đạt hạn ngạch"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
-msgid "Qwen"
-msgstr "Qwen"
+#~ msgid "Qwen"
+#~ msgstr "Qwen"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
+msgid "Qwen (Coding Plan)"
+msgstr "Qwen (Coding Plan)"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
+msgid "Qwen 3.8 Max (Token Plan)"
+msgstr "Qwen 3.8 Max (Token Plan)"
 
 #: src/renderer/components/providers/qwen/manifest.ts
 msgid "Qwen Code"
@@ -7492,6 +7660,11 @@ msgstr "Đã hết"
 #: src/renderer/components/providers/usageFormat.ts
 msgid "Ran out · resets in {resets}"
 msgstr "Đã hết · đặt lại sau {resets}"
+
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Rate candidate {0} externally"
+msgstr "Đánh giá ứng viên {0} bên ngoài"
 
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Rate limited"
@@ -7529,6 +7702,10 @@ msgstr "Sẵn sàng"
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "Ready for Review"
 msgstr "Sẵn sàng để xem xét"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
+msgid "Ready to review"
+msgstr "Sẵn sàng xem xét"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Ready. New pairing codes will advertise the Tailscale HTTPS URL when serve is active."
@@ -7574,6 +7751,10 @@ msgstr "Được xây dựng lại từ nhật ký cục bộ ở mức API côn
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Redact notification content"
 msgstr "Ẩn nội dung thông báo"
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Redraft"
+msgstr "Soạn lại"
 
 #. Button: re-fetch one provider's usage now
 #. Button: re-fetch provider usage now
@@ -7759,6 +7940,10 @@ msgstr "Xóa kết nối"
 msgid "Remove environment variable"
 msgstr "Xóa biến môi trường"
 
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+msgid "Remove fallback agent"
+msgstr "Xóa agent dự phòng"
+
 #: src/renderer/components/common/ProviderModelMenu/ProviderModelMenu.tsx
 msgid "Remove from favorites"
 msgstr "Xóa khỏi mục yêu thích"
@@ -7891,6 +8076,7 @@ msgstr "Hook pre-receive của kho lưu trữ đang chặn việc hợp nhất."
 msgid "Repository URL"
 msgstr "URL kho lưu trữ"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Request changes"
 msgstr "Yêu cầu thay đổi"
@@ -7984,7 +8170,11 @@ msgstr "Khôi phục hoặc xóa"
 msgid "Restore thread"
 msgstr "Khôi phục luồng"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Result ready"
+msgstr "Kết quả đã sẵn sàng"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Results"
 msgstr "Kết quả"
 
@@ -8009,7 +8199,7 @@ msgstr "Thử lại {serverName}"
 msgid "Retry check"
 msgstr "Thử kiểm tra lại"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Retry cleanup"
 msgstr "Thử dọn dẹp lại"
 
@@ -8074,6 +8264,16 @@ msgstr "Xem xét và theo dõi công việc trên các tài khoản GitHub của
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Review candidate {0} ({label}) changes"
 msgstr "Xem lại các thay đổi của ứng viên {0} ({label})"
+
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Review candidate {0} changes"
+msgstr "Xem lại các thay đổi của ứng viên {0}"
+
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Review changes"
+msgstr "Xem lại thay đổi"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/useWorktreeActions.ts
@@ -8223,9 +8423,15 @@ msgid "running"
 msgstr "đang chạy"
 
 #: src/renderer/utils/prStatus.ts
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "Running"
 msgstr "Đang chạy"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Running · no changes yet"
+msgstr "Đang chạy · chưa có thay đổi"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Running now"
@@ -9541,6 +9747,10 @@ msgstr "Nhà cung cấp mục tiêu"
 msgid "Task"
 msgstr "Tác vụ"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Task description"
+msgstr "Mô tả nhiệm vụ"
+
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Task output"
 msgstr "Đầu ra nhiệm vụ"
@@ -9775,6 +9985,10 @@ msgstr "người dùng Windows"
 msgid "the winner"
 msgstr "ứng viên thắng"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "The worktree for this candidate is not available."
+msgstr "Cây làm việc của ứng viên này không khả dụng."
+
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Theme"
@@ -9783,6 +9997,10 @@ msgstr "Chủ đề"
 #: src/mobile/settingsSections.ts
 msgid "Theme and chat font size"
 msgstr "Giao diện và cỡ chữ chat"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "There are no reviewable changes yet."
+msgstr "Chưa có thay đổi nào để xem lại."
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "These built-in MCP servers are shared by OpenCode threads. Saving updates running GUI projects; removing a server can interrupt an active turn. Terminal threads pick up changes on their next launch."
@@ -9840,6 +10058,10 @@ msgstr "Tệp này sử dụng mã hóa không được hỗ trợ."
 #: src/mobile/views/HostFolderPicker.tsx
 msgid "This folder is empty."
 msgstr "Thư mục này trống."
+
+#: src/renderer/components/thread/ThreadDraftComposerArea.tsx
+msgid "This folder will be initialized as a git repo on first run."
+msgstr "Thư mục này sẽ được khởi tạo thành kho lưu trữ git ở lần chạy đầu tiên."
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "This name is reserved by a built-in MCP server."
@@ -10195,6 +10417,10 @@ msgstr "Không thể xóa worktree."
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "Unable to determine the experiment's source branch."
 msgstr "Không thể xác định nhánh nguồn của thử nghiệm."
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Unable to fetch the diff."
+msgstr "Không thể lấy diff."
 
 #. placeholder {0}: props.selectedAgent.label
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
@@ -10662,6 +10888,10 @@ msgstr "Sử dụng tài khoản này để theo dõi việc sử dụng hoặc 
 msgid "Use this folder"
 msgstr "Sử dụng thư mục này"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Use this spec"
+msgstr "Dùng spec này"
+
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Use WebGPU acceleration"
@@ -10786,16 +11016,16 @@ msgid "Wait for every candidate to finish before cleaning up."
 msgstr "Hãy đợi tất cả ứng viên hoàn tất trước khi dọn dẹp."
 
 #: src/renderer/actions/experimentDecisionActions.ts
-msgid "Wait for every candidate to finish before comparing them."
-msgstr "Hãy đợi tất cả ứng viên hoàn tất trước khi so sánh."
+#~ msgid "Wait for every candidate to finish before comparing them."
+#~ msgstr "Hãy đợi tất cả ứng viên hoàn tất trước khi so sánh."
 
 #: src/renderer/actions/experimentDecisionActions.ts
 #~ msgid "Wait for every candidate to finish before discarding the experiment."
 #~ msgstr "Hãy đợi tất cả ứng viên hoàn tất trước khi hủy bỏ thử nghiệm."
 
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
-msgid "Wait for every candidate to finish before judging."
-msgstr "Hãy đợi tất cả ứng viên hoàn tất trước khi đánh giá."
+#~ msgid "Wait for every candidate to finish before judging."
+#~ msgstr "Hãy đợi tất cả ứng viên hoàn tất trước khi đánh giá."
 
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "Wait for every candidate to finish before merging a winner."
@@ -11097,6 +11327,10 @@ msgstr "Vị trí cây làm việc"
 #: src/renderer/components/thread/WorktreeModeSelect.tsx
 msgid "Worktree mode"
 msgstr "Chế độ cây làm việc"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Worktree removed"
+msgstr "Cây làm việc đã bị xóa"
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/ProjectWorktreeLocation.tsx
 msgid "Worktree root for this project (a Linux path). Reset to use the global setting."

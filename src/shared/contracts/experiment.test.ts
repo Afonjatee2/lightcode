@@ -86,6 +86,29 @@ describe("experimentSchema", () => {
         },
       }).success,
     ).toBe(true);
+    expect(
+      experimentSchema.safeParse({
+        ...runningExperiment(),
+        crown: {
+          threadId: "thread-1",
+          source: "external",
+          verdict: "approve",
+          createdAt: "2026-07-13T00:01:00.000Z",
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      experimentSchema.safeParse({
+        ...runningExperiment(),
+        crown: {
+          threadId: "thread-1",
+          source: "external",
+          verdict: "request-changes",
+          note: "Need a different approach.",
+          createdAt: "2026-07-13T00:01:00.000Z",
+        },
+      }).success,
+    ).toBe(true);
   });
 
   it("rejects blank prompts and fewer than two candidates", () => {
@@ -188,6 +211,38 @@ describe("experimentSchema", () => {
         },
       }).success,
     ).toBe(false);
+  });
+
+  it("rejects a decided experiment whose sole crown is an external request-changes", () => {
+    expect(
+      experimentSchema.safeParse({
+        ...runningExperiment(),
+        status: "decided",
+        winnerThreadId: "thread-1",
+        crown: {
+          threadId: "thread-1",
+          source: "external",
+          verdict: "request-changes",
+          createdAt: "2026-07-13T00:01:00.000Z",
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts a decided experiment with an external approve crown", () => {
+    expect(
+      experimentSchema.safeParse({
+        ...runningExperiment(),
+        status: "decided",
+        winnerThreadId: "thread-1",
+        crown: {
+          threadId: "thread-1",
+          source: "external",
+          verdict: "approve",
+          createdAt: "2026-07-13T00:01:00.000Z",
+        },
+      }).success,
+    ).toBe(true);
   });
 });
 

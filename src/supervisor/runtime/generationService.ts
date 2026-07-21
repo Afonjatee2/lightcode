@@ -4,6 +4,8 @@ import type {
   ExtractContextResult,
   GenerateCommitMessagePayload,
   GenerateCommitMessageResult,
+  GenerateExecutorSpecPayload,
+  GenerateExecutorSpecResult,
   GeneratePrSummaryPayload,
   GeneratePrSummaryResult,
   GenerateTitlePayload,
@@ -12,6 +14,7 @@ import type {
   JudgeExperimentResult,
 } from "@/shared/contracts";
 import { generateCommitMessage } from "../commitMessageGenerator";
+import { generateExecutorSpec } from "../executorSpecGenerator";
 import {
   extractContext as extractContextFn,
   extractContextFromScrollback,
@@ -75,6 +78,24 @@ export class GenerationService {
         payload.effort,
         payload.language,
         payload.fast,
+      ),
+    };
+  }
+
+  async generateExecutorSpec(
+    payload: GenerateExecutorSpecPayload,
+  ): Promise<GenerateExecutorSpecResult> {
+    const adapter = this.requireAdapter(payload.agentKind);
+    return {
+      spec: await generateExecutorSpec(
+        payload.projectLocation,
+        adapter,
+        payload.task,
+        payload.model,
+        payload.effort,
+        payload.fast,
+        payload.language,
+        payload.attachments,
       ),
     };
   }

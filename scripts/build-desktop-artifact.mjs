@@ -503,6 +503,13 @@ function buildElectronBuilderConfig(macArtifactKind = "branded") {
   const publishChannelLine = updaterChannel ? `\n  channel: ${updaterChannel}` : "";
   const macEntitlements = "build/entitlements.mac.plist";
   const macEntitlementsInherit = "build/entitlements.mac.plist";
+  // Local unsigned build (PORACODE_LOCAL_UNSIGNED=1): skip Developer-ID signing,
+  // hardened runtime, and notarization so a .dmg can be produced without an Apple
+  // Developer account. The signed production path is unchanged when the flag is off.
+  const localUnsigned = process.env.PORACODE_LOCAL_UNSIGNED === "1";
+  const macIdentityLine = localUnsigned ? "\n  identity: null" : "";
+  const macHardenedRuntime = localUnsigned ? "false" : "true";
+  const macNotarize = localUnsigned ? "false" : "true";
   const packagedDistFilesYaml = PACKAGED_DIST_FILES.map((glob) =>
     glob.startsWith("!") ? `  - "${glob}"` : `  - ${glob}`,
   ).join("\n");
@@ -587,7 +594,7 @@ linux:
   artifactName: ${prefix}-\${version}-\${arch}.\${ext}
 
 mac:
-  executableName: ${macExecutableName}
+  executableName: ${macExecutableName}${macIdentityLine}
   target:
     - target: dmg
       arch:
@@ -600,13 +607,13 @@ mac:
   icon: build/icon${iconSuffix}.icns
   category: public.app-category.developer-tools
   artifactName: ${prefix}-\${version}-\${arch}.\${ext}
-  hardenedRuntime: true
+  hardenedRuntime: ${macHardenedRuntime}
   gatekeeperAssess: false
   extendInfo:
     NSMicrophoneUsageDescription: Poracode uses the microphone for local voice input in the composer.
   entitlements: ${macEntitlements}
   entitlementsInherit: ${macEntitlementsInherit}
-  notarize: true
+  notarize: ${macNotarize}
 
 npmRebuild: false
 `;

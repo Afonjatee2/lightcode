@@ -73,6 +73,7 @@ export const GIT_REMOTE_PROCEDURE_SCOPES = {
   gitRevertAll: "session:operate",
   gitCommit: "session:operate",
   gitInit: "session:operate",
+  gitEnsureInitialCommit: "session:operate",
   gitAddRemote: "session:operate",
 
   // AI helpers (run on the paired desktop's providers)

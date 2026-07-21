@@ -74,6 +74,18 @@ export function isThreadTurnActive(status: ThreadStatus): boolean {
   );
 }
 
+/**
+ * "Result-ready" — the thread has settled back to idle/finished after a turn,
+ * so it holds a completed result a consumer (e.g. an experiment judge) can
+ * compare. Deliberately excludes `error` and never-started/stuck states: a
+ * candidate that failed or hung must not count toward, nor block, a
+ * "enough candidates are done" gate — otherwise one broken candidate deadlocks
+ * the whole experiment.
+ */
+export function isThreadResultReady(status: ThreadStatus): boolean {
+  return status === "idle" || status === "finished";
+}
+
 export const threadAttentionSchema = z.enum([
   "none",
   "working",

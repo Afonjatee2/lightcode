@@ -16,6 +16,7 @@ import {
   launchExperiment,
   mergeExperimentWinner,
   retryExperimentCleanup,
+  setExternalExperimentCrown,
 } from "./experimentActions";
 
 const mocks = vi.hoisted(() => ({
@@ -43,6 +44,10 @@ const mocks = vi.hoisted(() => ({
         branches: Array<{ name: string; current: boolean; commit: string; isRemote: boolean }>;
       }>
     >(),
+    gitEnsureInitialCommit:
+      vi.fn<
+        (payload: unknown) => Promise<{ branch: string; commit: string; initialized: boolean }>
+      >(),
     gitAddWorktree: vi.fn<(payload: unknown) => Promise<{ path: string }>>(),
     getExperimentCandidateDiff:
       vi.fn<(payload: unknown) => Promise<{ diff: string; headCommit: string }>>(),
@@ -249,6 +254,11 @@ describe("experimentActions", () => {
     mocks.bridge.gitListBranches.mockResolvedValue({
       current: "main",
       branches: [{ name: "main", current: true, commit: BASE_COMMIT, isRemote: false }],
+    });
+    mocks.bridge.gitEnsureInitialCommit.mockResolvedValue({
+      branch: "main",
+      commit: BASE_COMMIT,
+      initialized: true,
     });
     mocks.bridge.gitListWorktrees.mockResolvedValue({
       worktrees: [
@@ -540,6 +550,58 @@ describe("experimentActions", () => {
       experimentId: id,
       projectId: project.id,
     });
+  });
+
+  it("initializes a non-git folder on first run and forks from the new default branch", async () => {
+    const id = await launchExperiment({
+      projectId: project.id,
+      prompt: "Implement it",
+      candidates: [
+        { agentKind: "codex", config: { model: "gpt-5" }, presentationMode: "gui" },
+        { agentKind: "claude", config: { model: "opus" }, presentationMode: "terminal" },
+      ],
+    });
+
+    expect(id).toBeTruthy();
+    expect(mocks.bridge.gitEnsureInitialCommit).toHaveBeenCalledWith({
+      projectLocation: project.location,
+    });
+    // The base came from the freshly-initialized repo, not the branch list.
+    expect(mocks.bridge.gitListBranches).not.toHaveBeenCalled();
+    expect(mocks.bridge.gitAddWorktree).toHaveBeenCalledTimes(2);
+    expect(
+      mocks.bridge.gitAddWorktree.mock.calls.map(
+        (call) => (call[0] as { startPoint: string }).startPoint,
+      ),
+    ).toEqual([BASE_COMMIT, BASE_COMMIT]);
+    expect(
+      mocks.bridge.gitAddWorktree.mock.calls.map(
+        (call) => (call[0] as { sourceBranch: string }).sourceBranch,
+      ),
+    ).toEqual(["main", "main"]);
+    expect(useExperimentStore.getState().experiments[id!]).toMatchObject({
+      baseBranch: "main",
+      baseCommit: BASE_COMMIT,
+      status: "running",
+    });
+    expect(mocks.performInitialThreadLaunch).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not re-initialize an existing git repo when a base branch is provided", async () => {
+    const id = await launchExperiment({
+      projectId: project.id,
+      prompt: "Implement it",
+      baseBranch: "main",
+      candidates: [
+        { agentKind: "codex", config: { model: "gpt-5" }, presentationMode: "gui" },
+        { agentKind: "claude", config: { model: "opus" }, presentationMode: "terminal" },
+      ],
+    });
+
+    expect(id).toBeTruthy();
+    expect(mocks.bridge.gitEnsureInitialCommit).not.toHaveBeenCalled();
+    expect(mocks.bridge.gitListBranches).toHaveBeenCalled();
+    expect(mocks.bridge.gitAddWorktree).toHaveBeenCalledTimes(2);
   });
 
   it("creates candidate worktrees in parallel without changing candidate order", async () => {
@@ -1437,5 +1499,174 @@ describe("experimentActions", () => {
     expect(
       useAppStore.getState().threads.find((item) => item.id === "thread-1"),
     ).not.toHaveProperty("worktreePath");
+  });
+
+  it("setExternalExperimentCrown writes a source:external crown matching the guards", () => {
+    useExperimentStore.getState().addExperiment(experiment());
+    setExternalExperimentCrown("experiment-1", "thread-1", "approve");
+    expect(useExperimentStore.getState().experiments["experiment-1"]?.crown).toMatchObject({
+      threadId: "thread-1",
+      source: "external",
+      verdict: "approve",
+    });
+    expect(useExperimentStore.getState().experiments["experiment-1"]?.crown).not.toHaveProperty(
+      "note",
+    );
+
+    setExternalExperimentCrown("experiment-1", "thread-2", "request-changes", "Rework the loop");
+    expect(useExperimentStore.getState().experiments["experiment-1"]?.crown).toMatchObject({
+      threadId: "thread-2",
+      source: "external",
+      verdict: "request-changes",
+      note: "Rework the loop",
+    });
+  });
+
+  it("setExternalExperimentCrown rejects a non-existent candidate thread", () => {
+    useExperimentStore.getState().addExperiment(experiment());
+    setExternalExperimentCrown("experiment-1", "missing", "approve");
+    expect(useExperimentStore.getState().experiments["experiment-1"]?.crown).toBeUndefined();
+  });
+
+  it("setExternalExperimentCrown ignores a decided experiment", () => {
+    useExperimentStore.getState().addExperiment({
+      ...experiment(),
+      status: "decided",
+      winnerThreadId: "thread-1",
+    });
+    setExternalExperimentCrown("experiment-1", "thread-2", "approve");
+    expect(useExperimentStore.getState().experiments["experiment-1"]?.crown).toBeUndefined();
+  });
+
+  it("setExternalExperimentCrown clamps the note to the schema max length", () => {
+    useExperimentStore.getState().addExperiment(experiment());
+    const longNote = "a".repeat(600);
+    setExternalExperimentCrown("experiment-1", "thread-1", "approve", longNote);
+    expect(useExperimentStore.getState().experiments["experiment-1"]?.crown).toMatchObject({
+      threadId: "thread-1",
+      source: "external",
+      verdict: "approve",
+      note: "a".repeat(500),
+    });
+  });
+
+  it("setExternalExperimentCrown rejects a verdict while a merge is in flight", async () => {
+    useAppStore.setState((state) => ({
+      ...state,
+      threads: [
+        thread("thread-1", "/repo/one", "poracode/one"),
+        thread("thread-2", "/repo/two", "poracode/two"),
+      ],
+    }));
+    useExperimentStore.getState().addExperiment({
+      ...experiment(),
+      crown: {
+        threadId: "thread-1",
+        source: "external",
+        verdict: "approve",
+        createdAt: "2026-07-13T00:01:00.000Z",
+      },
+    });
+    // Hold the merge open at the git-status step so its operation stays in flight.
+    let releaseStatus!: () => void;
+    const statusGate = new Promise<void>((resolve) => {
+      releaseStatus = resolve;
+    });
+    mocks.bridge.getGitStatus.mockImplementation(async (payload) => {
+      await statusGate;
+      const path = (payload as { projectLocation: { path: string } }).projectLocation.path;
+      return {
+        branch: path.endsWith("/two") ? "poracode/two" : "poracode/one",
+        staged: [],
+        unstaged: [],
+      };
+    });
+    mocks.runGitMergeToSource.mockResolvedValue({ merged: true, fastForward: true });
+
+    const mergePromise = mergeExperimentWinner("experiment-1");
+
+    // The merge/commit is in flight, so the verdict must be rejected and the
+    // existing crown left untouched.
+    setExternalExperimentCrown("experiment-1", "thread-2", "request-changes");
+    expect(useExperimentStore.getState().experiments["experiment-1"]?.crown).toMatchObject({
+      threadId: "thread-1",
+      source: "external",
+      verdict: "approve",
+    });
+
+    releaseStatus();
+    await expect(mergePromise).resolves.toBe(true);
+  });
+
+  it("setExternalExperimentCrown rejects a verdict on a running candidate", () => {
+    useAppStore.setState((state) => ({
+      ...state,
+      threads: [
+        { ...thread("thread-1", "/repo/one", "poracode/one"), status: "working" },
+        thread("thread-2", "/repo/two", "poracode/two"),
+      ],
+    }));
+    useExperimentStore.getState().addExperiment(experiment());
+    setExternalExperimentCrown("experiment-1", "thread-1", "approve");
+    expect(useExperimentStore.getState().experiments["experiment-1"]?.crown).toBeUndefined();
+  });
+
+  it("blocks merge for a request-changes external crown", async () => {
+    useAppStore.setState((state) => ({
+      ...state,
+      threads: [
+        thread("thread-1", "/repo/one", "poracode/one"),
+        thread("thread-2", "/repo/two", "poracode/two"),
+      ],
+    }));
+    useExperimentStore.getState().addExperiment({
+      ...experiment(),
+      crown: {
+        threadId: "thread-1",
+        source: "external",
+        verdict: "request-changes",
+        note: "Rework the loop",
+        createdAt: "2026-07-13T00:01:00.000Z",
+      },
+    });
+
+    await expect(mergeExperimentWinner("experiment-1")).resolves.toBe(false);
+
+    expect(mocks.bridge.gitCommit).not.toHaveBeenCalled();
+    expect(mocks.runGitMergeToSource).not.toHaveBeenCalled();
+  });
+
+  it("allows merge for an external approve crown", async () => {
+    useAppStore.setState((state) => ({
+      ...state,
+      threads: [
+        thread("thread-1", "/repo/one", "poracode/one"),
+        thread("thread-2", "/repo/two", "poracode/two"),
+      ],
+    }));
+    useExperimentStore.getState().addExperiment({
+      ...experiment(),
+      crown: {
+        threadId: "thread-1",
+        source: "external",
+        verdict: "approve",
+        createdAt: "2026-07-13T00:01:00.000Z",
+      },
+    });
+    mocks.bridge.getGitStatus.mockImplementation(async (payload) => {
+      const path = (payload as { projectLocation: { path: string } }).projectLocation.path;
+      return {
+        branch: path.endsWith("/two") ? "poracode/two" : "poracode/one",
+        staged: [],
+        unstaged: [],
+      };
+    });
+    mocks.bridge.gitGetWorktreeSourceBranch.mockImplementation(async (payload) => ({
+      sourceBranch: "main",
+      ownerToken: ownerTokenForBranch((payload as { branch: string }).branch),
+    }));
+    mocks.runGitMergeToSource.mockResolvedValue({ merged: true, fastForward: true });
+
+    await expect(mergeExperimentWinner("experiment-1")).resolves.toBe(true);
   });
 });

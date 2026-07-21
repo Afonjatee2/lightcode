@@ -115,9 +115,11 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
       return { ...result, message: payload.message };
     },
     gitInit: (payload) => git.init(payload.projectLocation),
+    gitEnsureInitialCommit: (payload) => git.ensureInitialCommit(payload.projectLocation),
     gitAddRemote: (payload) => git.addRemote(payload.projectLocation, payload.remote, payload.url),
     generateCommitMessage: (payload) => generation.generateCommitMessage(payload),
     generateTitle: (payload) => generation.generateTitle(payload),
+    generateExecutorSpec: (payload) => generation.generateExecutorSpec(payload),
     generatePrSummary: (payload) => generation.generatePrSummary(payload),
     createExperimentWorktrees: (payload) => git.createExperimentWorktrees(payload),
     removeExperimentWorktrees: (payload) => runtime.removeExperimentWorktrees(payload),
@@ -125,6 +127,8 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     judgeExperimentSnapshot: (payload) => runtime.judgeExperimentSnapshot(payload),
     getExperimentCandidateStats: (payload) =>
       git.getExperimentCandidateStats(payload.projectLocation, payload.baseRef),
+    getExperimentCandidateDiff: (payload) =>
+      git.getExperimentCandidateDiff(payload.projectLocation, payload.baseRef),
     cancelJudgeExperiment: (payload) => {
       generation.cancelJudgeExperiment(payload.experimentId);
     },
