@@ -44,6 +44,10 @@ const mocks = vi.hoisted(() => ({
         branches: Array<{ name: string; current: boolean; commit: string; isRemote: boolean }>;
       }>
     >(),
+    gitEnsureInitialCommit:
+      vi.fn<
+        (payload: unknown) => Promise<{ branch: string; commit: string; initialized: boolean }>
+      >(),
     gitAddWorktree: vi.fn<(payload: unknown) => Promise<{ path: string }>>(),
     getExperimentCandidateDiff:
       vi.fn<(payload: unknown) => Promise<{ diff: string; headCommit: string }>>(),
@@ -250,6 +254,11 @@ describe("experimentActions", () => {
     mocks.bridge.gitListBranches.mockResolvedValue({
       current: "main",
       branches: [{ name: "main", current: true, commit: BASE_COMMIT, isRemote: false }],
+    });
+    mocks.bridge.gitEnsureInitialCommit.mockResolvedValue({
+      branch: "main",
+      commit: BASE_COMMIT,
+      initialized: true,
     });
     mocks.bridge.gitListWorktrees.mockResolvedValue({
       worktrees: [
@@ -541,6 +550,58 @@ describe("experimentActions", () => {
       experimentId: id,
       projectId: project.id,
     });
+  });
+
+  it("initializes a non-git folder on first run and forks from the new default branch", async () => {
+    const id = await launchExperiment({
+      projectId: project.id,
+      prompt: "Implement it",
+      candidates: [
+        { agentKind: "codex", config: { model: "gpt-5" }, presentationMode: "gui" },
+        { agentKind: "claude", config: { model: "opus" }, presentationMode: "terminal" },
+      ],
+    });
+
+    expect(id).toBeTruthy();
+    expect(mocks.bridge.gitEnsureInitialCommit).toHaveBeenCalledWith({
+      projectLocation: project.location,
+    });
+    // The base came from the freshly-initialized repo, not the branch list.
+    expect(mocks.bridge.gitListBranches).not.toHaveBeenCalled();
+    expect(mocks.bridge.gitAddWorktree).toHaveBeenCalledTimes(2);
+    expect(
+      mocks.bridge.gitAddWorktree.mock.calls.map(
+        (call) => (call[0] as { startPoint: string }).startPoint,
+      ),
+    ).toEqual([BASE_COMMIT, BASE_COMMIT]);
+    expect(
+      mocks.bridge.gitAddWorktree.mock.calls.map(
+        (call) => (call[0] as { sourceBranch: string }).sourceBranch,
+      ),
+    ).toEqual(["main", "main"]);
+    expect(useExperimentStore.getState().experiments[id!]).toMatchObject({
+      baseBranch: "main",
+      baseCommit: BASE_COMMIT,
+      status: "running",
+    });
+    expect(mocks.performInitialThreadLaunch).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not re-initialize an existing git repo when a base branch is provided", async () => {
+    const id = await launchExperiment({
+      projectId: project.id,
+      prompt: "Implement it",
+      baseBranch: "main",
+      candidates: [
+        { agentKind: "codex", config: { model: "gpt-5" }, presentationMode: "gui" },
+        { agentKind: "claude", config: { model: "opus" }, presentationMode: "terminal" },
+      ],
+    });
+
+    expect(id).toBeTruthy();
+    expect(mocks.bridge.gitEnsureInitialCommit).not.toHaveBeenCalled();
+    expect(mocks.bridge.gitListBranches).toHaveBeenCalled();
+    expect(mocks.bridge.gitAddWorktree).toHaveBeenCalledTimes(2);
   });
 
   it("creates candidate worktrees in parallel without changing candidate order", async () => {

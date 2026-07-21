@@ -115,6 +115,7 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
       return { ...result, message: payload.message };
     },
     gitInit: (payload) => git.init(payload.projectLocation),
+    gitEnsureInitialCommit: (payload) => git.ensureInitialCommit(payload.projectLocation),
     gitAddRemote: (payload) => git.addRemote(payload.projectLocation, payload.remote, payload.url),
     generateCommitMessage: (payload) => generation.generateCommitMessage(payload),
     generateTitle: (payload) => generation.generateTitle(payload),

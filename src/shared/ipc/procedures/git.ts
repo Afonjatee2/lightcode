@@ -15,6 +15,7 @@ import {
   gitAddWorktreePayloadSchema,
   gitCommitPayloadSchema,
   gitDeleteBranchPayloadSchema,
+  gitEnsureInitialCommitPayloadSchema,
   gitFetchPayloadSchema,
   gitFinishMergePayloadSchema,
   gitGetWorktreeOwnerPayloadSchema,
@@ -73,6 +74,8 @@ import type {
   GitDeleteBranchPayload,
   GitDiffBatchResult,
   GitDiffResult,
+  GitEnsureInitialCommitPayload,
+  GitEnsureInitialCommitResult,
   GitFetchPayload,
   GitFileContentResult,
   GitFinishMergePayload,
@@ -199,6 +202,11 @@ export const gitProcedures = {
     "supervisor",
     gitInitPayloadSchema,
   ),
+  gitEnsureInitialCommit: definePayloadProcedure<
+    GitEnsureInitialCommitPayload,
+    GitEnsureInitialCommitResult,
+    "supervisor"
+  >("gitEnsureInitialCommit", "supervisor", gitEnsureInitialCommitPayloadSchema),
   gitAddRemote: definePayloadProcedure<GitAddRemotePayload, void, "supervisor">(
     "gitAddRemote",
     "supervisor",

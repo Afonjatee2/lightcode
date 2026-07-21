@@ -10053,6 +10053,10 @@ msgstr "このファイルはサポートされていないエンコーディン
 msgid "This folder is empty."
 msgstr "このフォルダーは空です。"
 
+#: src/renderer/components/thread/ThreadDraftComposerArea.tsx
+msgid "This folder will be initialized as a git repo on first run."
+msgstr ""
+
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "This name is reserved by a built-in MCP server."
 msgstr "この名前は組み込みMCPサーバーによって予約されています。"

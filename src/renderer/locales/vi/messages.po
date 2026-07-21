@@ -10055,6 +10055,10 @@ msgstr "Tệp này sử dụng mã hóa không được hỗ trợ."
 msgid "This folder is empty."
 msgstr "Thư mục này trống."
 
+#: src/renderer/components/thread/ThreadDraftComposerArea.tsx
+msgid "This folder will be initialized as a git repo on first run."
+msgstr ""
+
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "This name is reserved by a built-in MCP server."
 msgstr "Tên này được dành riêng cho máy chủ MCP tích hợp sẵn."

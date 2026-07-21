@@ -10055,6 +10055,10 @@ msgstr "Ten plik używa nieobsługiwanego kodowania."
 msgid "This folder is empty."
 msgstr "Ten folder jest pusty."
 
+#: src/renderer/components/thread/ThreadDraftComposerArea.tsx
+msgid "This folder will be initialized as a git repo on first run."
+msgstr ""
+
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "This name is reserved by a built-in MCP server."
 msgstr "Ta nazwa jest zastrzeżona przez wbudowany serwer MCP."

@@ -10055,6 +10055,10 @@ msgstr "이 파일은 지원되지 않는 인코딩을 사용합니다."
 msgid "This folder is empty."
 msgstr "이 폴더는 비어 있습니다."
 
+#: src/renderer/components/thread/ThreadDraftComposerArea.tsx
+msgid "This folder will be initialized as a git repo on first run."
+msgstr ""
+
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "This name is reserved by a built-in MCP server."
 msgstr "이 이름은 기본 제공 MCP 서버용으로 예약되어 있습니다."

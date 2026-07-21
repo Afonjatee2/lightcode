@@ -44,7 +44,12 @@ export interface LaunchExperimentInput {
   projectId: string;
   prompt: string;
   segments?: PromptSegment[];
-  baseBranch: string;
+  /**
+   * Local branch to fork the candidate worktrees from. Omitted when the
+   * project folder isn't a git repo yet — `launchExperiment` then initializes
+   * it lazily and uses the freshly-created default branch as the base.
+   */
+  baseBranch?: string;
   candidates: ExperimentCandidateSpec[];
 }
 
@@ -97,22 +102,38 @@ export async function launchExperiment(input: LaunchExperimentInput): Promise<st
     return null;
   }
 
-  const branches = await readBridge()
-    .gitListBranches({
-      projectLocation: project.location,
-      includeRemote: false,
-    })
-    .catch((error) => {
-      toast.danger(friendlyError(error));
+  let base: { name: string; commit: string };
+  if (input.baseBranch) {
+    const branches = await readBridge()
+      .gitListBranches({
+        projectLocation: project.location,
+        includeRemote: false,
+      })
+      .catch((error) => {
+        toast.danger(friendlyError(error));
+        return null;
+      });
+    if (!branches) return null;
+    const found = branches.branches.find(
+      (branch) => branch.name === input.baseBranch && !branch.isRemote,
+    );
+    if (!found) {
+      toast.danger(i18n._(msg`Choose a local base branch for the experiment.`));
       return null;
-    });
-  if (!branches) return null;
-  const base = branches.branches.find(
-    (branch) => branch.name === input.baseBranch && !branch.isRemote,
-  );
-  if (!base) {
-    toast.danger(i18n._(msg`Choose a local base branch for the experiment.`));
-    return null;
+    }
+    base = { name: found.name, commit: found.commit };
+  } else {
+    // Local folder that isn't a git repo yet (or has no commits). Initialize it
+    // lazily on first run so the candidate worktrees have a base commit to fork
+    // from, then use the freshly-created default branch as the base.
+    const ensured = await readBridge()
+      .gitEnsureInitialCommit({ projectLocation: project.location })
+      .catch((error) => {
+        toast.danger(friendlyError(error));
+        return null;
+      });
+    if (!ensured) return null;
+    base = { name: ensured.branch, commit: ensured.commit };
   }
 
   const { agentStatuses, wslAgentStatuses } = useAgentStatusesStore.getState();

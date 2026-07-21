@@ -10055,6 +10055,10 @@ msgstr "Bu dosya desteklenmeyen bir kodlama kullanıyor."
 msgid "This folder is empty."
 msgstr "Bu klasör boş."
 
+#: src/renderer/components/thread/ThreadDraftComposerArea.tsx
+msgid "This folder will be initialized as a git repo on first run."
+msgstr ""
+
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "This name is reserved by a built-in MCP server."
 msgstr "Bu ad, yerleşik bir MCP sunucusu için ayrılmıştır."

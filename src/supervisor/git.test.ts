@@ -1100,6 +1100,86 @@ describe("GitService.init", () => {
   });
 });
 
+describe("GitService.ensureInitialCommit", () => {
+  const location = { kind: "posix" as const, path: "/repo" };
+  const NEW_COMMIT = "n".repeat(40);
+  const EXISTING_COMMIT = "e".repeat(40);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function recordedCommands(): string[][] {
+    return execFileMock.mock.calls.map((call) => gitSubcommandArgs(call[1] as string[]));
+  }
+
+  it("initializes a non-git folder and creates an initial commit", async () => {
+    mockGitCommands((args) => {
+      if (args[0] === "rev-parse" && args.includes("--is-inside-work-tree")) {
+        return { error: new Error("not a git repository") };
+      }
+      if (args[0] === "rev-parse" && args.includes("--verify")) {
+        return { error: new Error("ambiguous argument 'HEAD'") };
+      }
+      if (args[0] === "symbolic-ref") return { stdout: "main\n" };
+      if (args[0] === "rev-parse") return { stdout: `${NEW_COMMIT}\n` };
+      return { stdout: "" };
+    });
+
+    const result = await new GitService().ensureInitialCommit(location);
+
+    expect(result).toEqual({ branch: "main", commit: NEW_COMMIT, initialized: true });
+    const commands = recordedCommands();
+    expect(commands).toContainEqual(["init"]);
+    expect(commands).toContainEqual(["add", "."]);
+    expect(commands).toContainEqual(["commit", "-m", "Initial commit", "--allow-empty"]);
+  });
+
+  it("creates the first commit in a repo that has none without re-initializing", async () => {
+    mockGitCommands((args) => {
+      if (args[0] === "rev-parse" && args.includes("--is-inside-work-tree")) {
+        return { stdout: "true\n" };
+      }
+      if (args[0] === "rev-parse" && args.includes("--verify")) {
+        return { error: new Error("ambiguous argument 'HEAD'") };
+      }
+      if (args[0] === "symbolic-ref") return { stdout: "main\n" };
+      if (args[0] === "rev-parse") return { stdout: `${NEW_COMMIT}\n` };
+      return { stdout: "" };
+    });
+
+    const result = await new GitService().ensureInitialCommit(location);
+
+    expect(result).toEqual({ branch: "main", commit: NEW_COMMIT, initialized: true });
+    const commands = recordedCommands();
+    expect(commands.some((command) => command[0] === "init")).toBe(false);
+    expect(commands).toContainEqual(["add", "."]);
+    expect(commands).toContainEqual(["commit", "-m", "Initial commit", "--allow-empty"]);
+  });
+
+  it("leaves an existing repo with a commit untouched", async () => {
+    mockGitCommands((args) => {
+      if (args[0] === "rev-parse" && args.includes("--is-inside-work-tree")) {
+        return { stdout: "true\n" };
+      }
+      if (args[0] === "rev-parse" && args.includes("--verify")) {
+        return { stdout: `${EXISTING_COMMIT}\n` };
+      }
+      if (args[0] === "symbolic-ref") return { stdout: "main\n" };
+      if (args[0] === "rev-parse") return { stdout: `${EXISTING_COMMIT}\n` };
+      return { stdout: "" };
+    });
+
+    const result = await new GitService().ensureInitialCommit(location);
+
+    expect(result).toEqual({ branch: "main", commit: EXISTING_COMMIT, initialized: false });
+    const commands = recordedCommands();
+    expect(commands.some((command) => command[0] === "init")).toBe(false);
+    expect(commands.some((command) => command[0] === "add")).toBe(false);
+    expect(commands.some((command) => command[0] === "commit")).toBe(false);
+  });
+});
+
 describe("GitService.addRemote", () => {
   const location = {
     kind: "windows" as const,

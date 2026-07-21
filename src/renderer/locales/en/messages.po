@@ -10055,6 +10055,10 @@ msgstr "This file uses an unsupported encoding."
 msgid "This folder is empty."
 msgstr "This folder is empty."
 
+#: src/renderer/components/thread/ThreadDraftComposerArea.tsx
+msgid "This folder will be initialized as a git repo on first run."
+msgstr "This folder will be initialized as a git repo on first run."
+
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "This name is reserved by a built-in MCP server."
 msgstr "This name is reserved by a built-in MCP server."

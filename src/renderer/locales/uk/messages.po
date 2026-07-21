@@ -10055,6 +10055,10 @@ msgstr "Цей файл використовує непідтримуване к
 msgid "This folder is empty."
 msgstr "Ця папка порожня."
 
+#: src/renderer/components/thread/ThreadDraftComposerArea.tsx
+msgid "This folder will be initialized as a git repo on first run."
+msgstr ""
+
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "This name is reserved by a built-in MCP server."
 msgstr "Цю назву зарезервовано вбудованим сервером MCP."

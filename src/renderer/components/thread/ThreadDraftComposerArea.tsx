@@ -732,11 +732,13 @@ export function ThreadDraftComposerArea(props: {
   async function runExperiment(allSegments: PromptSegment[], fallbackPrompt = "") {
     const input = resolveExperimentInput(allSegments, fallbackPrompt);
     const baseBranch = experimentBaseBranch ?? props.gitBranch;
-    if (!input || !baseBranch || experimentCandidates.length < 2 || isSubmitting) return;
+    if (!input || experimentCandidates.length < 2 || isSubmitting) return;
     setIsSubmitting(true);
     const experimentId = await launchExperiment({
       projectId: props.project.id,
-      baseBranch,
+      // No base branch means the folder isn't a git repo yet — launchExperiment
+      // initializes it lazily and forks from the freshly-created default branch.
+      ...(baseBranch ? { baseBranch } : {}),
       prompt: input.prompt,
       segments: input.segments,
       candidates: experimentCandidates.map(
@@ -883,7 +885,7 @@ export function ThreadDraftComposerArea(props: {
                 }}
               />
             ) : null}
-            {experimentMode && props.gitBranch ? (
+            {experimentMode ? (
               <>
                 <ExperimentDraftTargets
                   candidates={experimentCandidates}
@@ -1065,7 +1067,7 @@ export function ThreadDraftComposerArea(props: {
             customMcpServers={customMcpServers}
             showVoiceInputButton={showVoiceInputButton}
             isDisabled={authRequired || agentUpdating || isSubmitting}
-            {...(!isHomeScope && !isRemote && !isQuickComposer && props.gitBranch
+            {...(!isHomeScope && !isRemote && !isQuickComposer
               ? {
                   experiment: {
                     enabled: experimentMode,
@@ -1138,6 +1140,12 @@ export function ThreadDraftComposerArea(props: {
                 }
               : {})}
           />
+        </div>
+      ) : experimentMode ? (
+        <div data-draft-worktree-row="" className="mt-1.5 flex flex-wrap items-center gap-1 px-1">
+          <span className="text-xs text-muted">
+            <Trans>This folder will be initialized as a git repo on first run.</Trans>
+          </span>
         </div>
       ) : null}
     </>

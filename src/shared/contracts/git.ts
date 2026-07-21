@@ -207,6 +207,20 @@ export const gitInitPayloadSchema = z.object({
 });
 export type GitInitPayload = z.infer<typeof gitInitPayloadSchema>;
 
+export const gitEnsureInitialCommitPayloadSchema = z.object({
+  projectLocation: projectLocationSchema,
+});
+export type GitEnsureInitialCommitPayload = z.infer<typeof gitEnsureInitialCommitPayloadSchema>;
+
+export interface GitEnsureInitialCommitResult {
+  /** The current (default) branch name, usable as an experiment base branch. */
+  branch: string;
+  /** The commit that anchors the base branch. */
+  commit: string;
+  /** True when this call initialized the repo and/or created the first commit. */
+  initialized: boolean;
+}
+
 export const gitAddRemotePayloadSchema = z.object({
   projectLocation: projectLocationSchema,
   remote: z.string().min(1),
