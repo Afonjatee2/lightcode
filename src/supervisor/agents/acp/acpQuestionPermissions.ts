@@ -1,5 +1,6 @@
 import type { RequestPermissionRequest, RequestPermissionResponse } from "@agentclientprotocol/sdk";
 import type { RuntimeEvent } from "@/shared/contracts";
+import { isAskUserQuestionToolName } from "@/shared/toolCallClassification";
 import { chosenOptionIds } from "../questionAnswers";
 import {
   buildQuestionAnswerEvents,
@@ -193,14 +194,7 @@ export function isAcpAskUserQuestionToolCall(toolCall: {
   _meta?: unknown;
 }): boolean {
   const metaName = isRecord(toolCall._meta) ? toolCall._meta.toolName : undefined;
-  return [metaName, toolCall.title].some(matchesAskUserQuestionTitle);
-}
-
-function matchesAskUserQuestionTitle(candidate: unknown): boolean {
-  return (
-    typeof candidate === "string" &&
-    /^(?:ask[_ ]?user[_ ]?question|ask user \d+ questions?)(?::|\b)/iu.test(candidate.trim())
-  );
+  return [metaName, toolCall.title].some(isAskUserQuestionToolName);
 }
 
 function normalizeQuestionAnswers(

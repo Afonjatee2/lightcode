@@ -1262,6 +1262,10 @@ describe("ACP turn config sync", () => {
     await expect(selected).resolves.toEqual({
       outcome: { outcome: "selected", optionId: "once" },
     });
+    expect(listener.onUpdate).toHaveBeenLastCalledWith({
+      status: "working",
+      attention: "working",
+    });
 
     const cancelled = session.handlePermissionRequest(request);
     await session.interruptTurn();

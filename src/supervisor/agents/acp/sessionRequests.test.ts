@@ -114,7 +114,8 @@ function makeRequests(
   };
   const availableModeIds = overrides.availableModeIds ?? ["default", "plan", "yolo"];
   const emitRuntimeEvents = vi.fn<(events: RuntimeEvent[]) => void>();
-  const setRequestAttention = vi.fn<(attention: "needs_approval" | "needs_reply") => void>();
+  const setRequestAttention =
+    vi.fn<(attention: "needs_approval" | "needs_reply" | "working") => void>();
   const requests = new AcpSessionRequests({
     threadId: "thread-1",
     getPermissionContext: () => ({ config, availableModeIds }),
@@ -200,6 +201,7 @@ describe("AcpSessionRequests permissions", () => {
       outcome: { outcome: "selected", optionId: "proceed_once" },
       answers: { "0": "Focused", "1": "Tests, Lint" },
     });
+    expect(setRequestAttention).toHaveBeenLastCalledWith("working");
     expect(emitRuntimeEvents).toHaveBeenCalledWith([
       {
         type: "item.started",
@@ -235,7 +237,7 @@ describe("AcpSessionRequests permissions", () => {
   });
 
   it("cancels Qwen AskUserQuestion without forwarding answers", async () => {
-    const { emitRuntimeEvents, requests } = makeRequests();
+    const { emitRuntimeEvents, requests, setRequestAttention } = makeRequests();
     const response = requests.requestPermission(questionPermissionRequest());
 
     requests.resolve("acp-perm-0", { action: "cancel" });
@@ -249,6 +251,7 @@ describe("AcpSessionRequests permissions", () => {
         outcome: "answered",
       },
     ]);
+    expect(setRequestAttention).toHaveBeenLastCalledWith("working");
   });
 
   it("maps Kimi AskUserQuestion (content + options) to a reply form and returns the picked option", async () => {
