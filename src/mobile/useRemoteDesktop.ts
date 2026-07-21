@@ -608,6 +608,7 @@ export function useRemoteDesktop() {
     // populates state.view, and a finished thread stays "Finished" forever.
     // ThreadsRoute resets the view to home on the way back so unwatched
     // completions keep earning their badge.
+    const wasFinished = thread.status === "finished";
     const wasDone = thread.done === true;
     useAppStore.getState().openThread(thread.id);
     setSelectedThreadId(thread.id);
@@ -618,6 +619,15 @@ export function useRemoteDesktop() {
     setThreadSnapshot((current) => (current?.thread.id === thread.id ? current : null));
     const desktop = activeDesktop;
     if (!desktop) return;
+    // `finished` is the source desktop's unread-completion marker. Clearing
+    // only this PWA's mirror leaves the desktop row blue, so acknowledge the
+    // open on the source as well. The command is idempotent and best-effort;
+    // local navigation and cached history remain available while offline.
+    if (wasFinished) {
+      void clientFor(desktop)
+        .sendThreadCommand({ kind: "acknowledge", threadId: thread.id })
+        .catch(() => undefined);
+    }
     // The store clear above only touches this PWA's in-memory mirror. Unlike
     // the desktop — whose renderer store is authoritative and persisted — it
     // never reaches the desktop DB, so the next snapshot would revert `done`

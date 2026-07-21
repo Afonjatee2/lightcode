@@ -136,7 +136,10 @@ export function openThread(
       // Clear in the same auto-batched commit as the pane swap so the highlight
       // hands off to `view.panes` without a flicker.
       nextStore.setPendingActiveThread(null);
-      if (options?.focusComposer) {
+      // Opening a thread on the desktop is a handoff to its composer. GUI
+      // panes deliberately keep their DOM slot mounted across thread switches,
+      // so mount-time autofocus alone cannot cover this path.
+      if (options?.focusComposer !== false) {
         useAppStore.getState().requestComposerFocus(threadId);
       }
       // Late-rendering items (virtualizer measurement, hydration, streaming) can
@@ -358,6 +361,19 @@ export function toggleStarThread(threadId: string): void {
 
 export function renameThread(threadId: string, title: string): void {
   useAppStore.getState().renameThread(threadId, title);
+}
+
+/** Clear the unread completion marker without navigating the source desktop. */
+export function acknowledgeThread(threadId: string): void {
+  useAppStore.setState((state) => {
+    const thread = state.threads.find((item) => item.id === threadId);
+    if (thread?.status !== "finished") return {};
+    return {
+      threads: state.threads.map((item) =>
+        item.id === threadId ? { ...item, status: "idle" as const } : item,
+      ),
+    };
+  });
 }
 
 function deleteThreadOnly(threadId: string): void {

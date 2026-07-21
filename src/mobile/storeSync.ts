@@ -9,6 +9,7 @@ import {
   applyThreadSnapshot,
   clearPendingRuntimeEvents,
   dispatchRemoteSupervisorEvent as dispatchRemoteSupervisorEventCore,
+  isThreadVisible,
   type RemoteDispatchHooks,
 } from "@/renderer/state/remote";
 import { createInitialRuntimeEventState } from "@/renderer/state/slices/runtimeEventSlice";
@@ -54,6 +55,12 @@ export function applyShellSnapshot(snapshot: RemoteShellSnapshot): void {
     // next shell refresh, so keep the local "finished" until the thread is
     // opened or genuinely changes state.
     const incomingThreads = snapshot.threads.map((incoming) => {
+      // Some hosts can persist `finished` long enough for a shell/history
+      // refresh to race the open action. A visible thread has already been
+      // acknowledged on this client, so do not resurrect its unread badge.
+      if (incoming.status === "finished" && isThreadVisible(current.view, incoming.id)) {
+        return { ...incoming, status: "idle" as const };
+      }
       if (incoming.status !== "idle") return incoming;
       return currentById.get(incoming.id)?.status === "finished"
         ? { ...incoming, status: "finished" as const }

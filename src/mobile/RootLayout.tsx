@@ -14,6 +14,7 @@ import { getChrome } from "./chrome";
 import { NarrowShell } from "./NarrowShell";
 import { WideShell } from "./WideShell";
 import { usePushLifecycle } from "./push/usePushLifecycle";
+import { WebPushPermissionPrompt } from "./push/WebPushPermissionPrompt";
 
 const PROJECT_FILTER_PREF = "threads.projectFilter";
 
@@ -175,6 +176,7 @@ export function RootLayout() {
       <PullFromSourceDialog />
       <ImageLightboxHost />
       <UserMessageActionsSheet />
+      <WebPushPermissionPrompt />
     </MobileAppProvider>
   );
 }

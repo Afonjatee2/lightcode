@@ -2,9 +2,48 @@ import { describe, expect, it } from "vitest";
 import { defaultSharedSettings } from "../settings";
 import {
   pickRemoteSettings,
+  remotePushRegistrationSchema,
   remoteSettingsPatchSchema,
   remoteShellSnapshotSchema,
 } from "./protocol";
+
+describe("remote push registrations", () => {
+  const subscription = {
+    endpoint: "https://web.push.apple.com/subscription-1",
+    expirationTime: null,
+    keys: { p256dh: "key-1", auth: "auth-1" },
+  };
+
+  it("accepts an installed-web-app subscription and route base", () => {
+    expect(
+      remotePushRegistrationSchema.parse({
+        deviceId: "browser-1234",
+        platform: "web",
+        webPushSubscription: subscription,
+        webAppBasePath: "/app",
+      }),
+    ).toMatchObject({ platform: "web", webPushSubscription: subscription });
+  });
+
+  it("rejects native credentials on web and web subscriptions on native", () => {
+    expect(
+      remotePushRegistrationSchema.safeParse({
+        deviceId: "browser-1234",
+        platform: "web",
+        deviceToken: "not-allowed",
+        webPushSubscription: subscription,
+        webAppBasePath: "/",
+      }).success,
+    ).toBe(false);
+    expect(
+      remotePushRegistrationSchema.safeParse({
+        deviceId: "native-1234",
+        platform: "ios",
+        webPushSubscription: subscription,
+      }).success,
+    ).toBe(false);
+  });
+});
 
 describe("remote project snapshots", () => {
   it("strip MCP definitions because env and headers may contain secrets", () => {

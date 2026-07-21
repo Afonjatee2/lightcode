@@ -655,6 +655,22 @@ describe("useRemoteDesktop", () => {
     });
   });
 
+  it("opening a FINISHED thread acknowledges it on the source desktop", async () => {
+    const d = makeDesktop("d1");
+    const client = clientFor("d1");
+    const view = await mountWith([d], "d1");
+    client.sendThreadCommand.mockClear();
+
+    await act(async () => {
+      await view.result.current.openThread({ id: "finished1", status: "finished" } as never);
+    });
+
+    expect(client.sendThreadCommand).toHaveBeenCalledWith({
+      kind: "acknowledge",
+      threadId: "finished1",
+    });
+  });
+
   it("opening a thread that is not done sends no set-done command", async () => {
     const d = makeDesktop("d1");
     const client = clientFor("d1");

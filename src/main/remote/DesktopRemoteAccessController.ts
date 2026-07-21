@@ -29,7 +29,12 @@ import {
 import { readOrCreateRemoteAccessIdentity } from "./identity";
 import { getRemoteAccessPairingInfo } from "./pairingInfo";
 import { createPortForwarding, type PortForwarding } from "./portForward/portForwarding";
-import { createPushGateway, PushCoordinator, PushRegistrationStore } from "./push";
+import {
+  createPushGateway,
+  createWebPushPublicKeyResolver,
+  PushCoordinator,
+  PushRegistrationStore,
+} from "./push";
 import {
   RemoteAccessServer,
   type RemoteAccessServerInfo,
@@ -275,12 +280,13 @@ export function createDesktopRemoteAccessController(
       });
       attempt.forwarding = portForwarding;
       const pushStore = new PushRegistrationStore(options.paths.baseDir);
+      const pushGatewayOptions = {
+        onError: (error: unknown) =>
+          options.reportError(error, { "poracode.feature_area": "remote-push" }),
+      };
       const coordinator = new PushCoordinator({
         store: pushStore,
-        sendPush: createPushGateway({
-          onError: (error) =>
-            options.reportError(error, { "poracode.feature_area": "remote-push" }),
-        }),
+        sendPush: createPushGateway(pushGatewayOptions),
         getThreads: () => dbGetThreads(),
         getProjects: () => dbGetProjects(),
         getSettings: () => {
@@ -338,6 +344,7 @@ export function createDesktopRemoteAccessController(
         // interface, so pass it directly instead of re-wrapping each method.
         schedules: options.scheduleService,
         pushRegistrations: {
+          webPublicKey: createWebPushPublicKeyResolver(pushGatewayOptions),
           upsert: (registration) => pushStore.upsert(registration),
           remove: (deviceId) => pushStore.remove(deviceId),
         },

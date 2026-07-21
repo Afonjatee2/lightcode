@@ -55,6 +55,7 @@ describe("threadActions", () => {
       threads: [],
       view: { kind: "home" },
       pendingActiveThreadId: null,
+      pendingComposerFocusThreadId: null,
       pendingThreadLaunches: {},
       runtimeItemIdsByThread: {},
       runtimeItemsByIdByThread: {},
@@ -145,6 +146,19 @@ describe("threadActions", () => {
       kind: "thread",
       panes: [thread.id],
     });
+    expect(useAppStore.getState().pendingComposerFocusThreadId).toBe(thread.id);
+  });
+
+  it("allows a thread open to opt out of composer focus", async () => {
+    const thread = makeThread({ status: "idle" });
+    useAppStore.setState((state) => ({ ...state, threads: [thread] }));
+
+    openThread(thread.id, { focusComposer: false });
+
+    await waitFor(() => {
+      expect(useAppStore.getState().view).toEqual({ kind: "thread", panes: [thread.id] });
+    });
+    expect(useAppStore.getState().pendingComposerFocusThreadId).toBeNull();
   });
 
   it("does not let an older GUI hydration override a newer thread open", async () => {

@@ -964,6 +964,7 @@ msgstr "所有项目"
 msgid "All sources"
 msgstr "所有来源"
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/helpers.ts
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Allow"
@@ -987,6 +988,7 @@ msgstr "允许评估"
 msgid "Allow replacing conflicting managed skills"
 msgstr "允许替换存在冲突的托管技能"
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Allow the browser to show notifications while the app is in the background."
 msgstr "允许浏览器在应用处于后台时显示通知。"
@@ -1577,6 +1579,7 @@ msgid "Can't load ports"
 msgstr "无法加载端口"
 
 #. Dialog button: dismiss without deleting
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/GitActionSheet.tsx
@@ -3617,6 +3620,7 @@ msgstr "启用语言服务器对类型检查、完成和诊断的支持。需要
 msgid "Enable microphone access in your system settings, then try again."
 msgstr "在系统设置中启用麦克风访问，然后重试。"
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Enable notifications"

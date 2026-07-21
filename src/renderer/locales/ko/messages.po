@@ -964,6 +964,7 @@ msgstr "모든 프로젝트"
 msgid "All sources"
 msgstr "모든 소스"
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/helpers.ts
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Allow"
@@ -987,6 +988,7 @@ msgstr "평가 허용"
 msgid "Allow replacing conflicting managed skills"
 msgstr "충돌하는 관리 스킬 교체 허용"
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Allow the browser to show notifications while the app is in the background."
 msgstr "앱이 백그라운드에 있을 때 브라우저가 알림을 표시하도록 허용하세요."
@@ -1577,6 +1579,7 @@ msgid "Can't load ports"
 msgstr "포트를 불러올 수 없습니다"
 
 #. Dialog button: dismiss without deleting
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/GitActionSheet.tsx
@@ -3617,6 +3620,7 @@ msgstr "유형 확인, 완성 및 진단을 위한 언어 서버 지원을 활�
 msgid "Enable microphone access in your system settings, then try again."
 msgstr "시스템 설정에서 마이크 액세스를 활성화한 후 다시 시도하세요."
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Enable notifications"

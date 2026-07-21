@@ -93,14 +93,16 @@ export default function PrivacyPage() {
           <section>
             <h2 className="mb-3 text-xl font-semibold text-white">Optional push notifications</h2>
             <p>
-              If you enable notifications in a native app, the device receives an Apple Push
-              Notification service (APNs) or Firebase Cloud Messaging (FCM) token and sends it to
-              your paired desktop. The desktop may send that token and notification content through
-              Poracode&apos;s hosted service at poracode.com, which forwards the message to APNs or
-              FCM. Notification content can include a project or thread name and status needed to
-              show the alert; desktop privacy settings can redact identifying titles. Apple, Google,
-              and Poracode&apos;s hosting provider process delivery data under their own terms. You
-              can disable notifications or remove the paired desktop to unregister the device.
+              If you enable notifications, the native app receives an Apple Push Notification
+              service (APNs) or Firebase Cloud Messaging (FCM) token; an installed web app creates a
+              browser Push API subscription. The app sends that registration to your paired desktop.
+              The desktop may send the registration and notification content through Poracode&apos;s
+              hosted service at poracode.com, which forwards the message to APNs, FCM, or the
+              browser push service. Notification content can include a project or thread name and
+              status needed to show the alert; desktop privacy settings can redact identifying
+              titles. Apple, Google, Mozilla, Microsoft, and Poracode&apos;s hosting provider may
+              process delivery data under their own terms. You can disable notifications or remove
+              the paired desktop to unregister the device.
             </p>
           </section>
 

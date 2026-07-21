@@ -17,6 +17,7 @@ const fixtures = vi.hoisted(() => ({
   } as Project,
   composerProps: [] as Array<{
     onSubmitInput?: (prompt: string) => Promise<void>;
+    autoFocusComposer?: boolean;
     composerPlaceholder?: string;
     submitOnEnter?: boolean;
   }>,
@@ -84,6 +85,7 @@ vi.mock("../GitSummaryParts", () => ({
 vi.mock("@/renderer/components/thread/ThreadComposerSection", () => ({
   ThreadComposerSection: (props: {
     onSubmitInput?: (prompt: string) => Promise<void>;
+    autoFocusComposer?: boolean;
     composerPlaceholder?: string;
   }) => {
     fixtures.composerProps.push(props);
@@ -175,7 +177,7 @@ describe("mobile ThreadView", () => {
     });
   });
 
-  it("enables Enter-to-send only for desktop-like PWA input", () => {
+  it("enables desktop composer behavior only for desktop-like PWA input", () => {
     const thread = makeTerminalThread();
     const props = {
       thread,
@@ -186,11 +188,13 @@ describe("mobile ThreadView", () => {
 
     const { unmount } = render(<ThreadView {...props} />);
     expect(fixtures.composerProps.at(-1)?.submitOnEnter).toBe(false);
+    expect(fixtures.composerProps.at(-1)?.autoFocusComposer).toBe(false);
     unmount();
 
     fixtures.desktopPointer = true;
     render(<ThreadView {...props} />);
     expect(fixtures.composerProps.at(-1)?.submitOnEnter).toBe(true);
+    expect(fixtures.composerProps.at(-1)?.autoFocusComposer).toBe(true);
   });
 
   it("mounts the subagent overlay for terminal threads", async () => {

@@ -324,4 +324,26 @@ describe("applyThreadSnapshot", () => {
     expect(useAppStore.getState().threads[0]?.status).toBe("idle");
     expect(useAppStore.getState().runtimeOpenTurnByThread[THREAD_ID]).toBe(false);
   });
+
+  it("does not restore a finished badge after the thread has been opened", () => {
+    useAppStore.setState({
+      threads: [makeThread("finished")],
+      view: { kind: "thread", panes: [THREAD_ID] },
+    });
+
+    applyThreadSnapshot(makeSnapshot({ status: "finished", items: [] }));
+
+    expect(useAppStore.getState().threads[0]?.status).toBe("idle");
+  });
+
+  it("keeps a finished badge from history while the thread is not visible", () => {
+    useAppStore.setState({
+      threads: [makeThread("idle")],
+      view: { kind: "home" },
+    });
+
+    applyThreadSnapshot(makeSnapshot({ status: "finished", items: [] }));
+
+    expect(useAppStore.getState().threads[0]?.status).toBe("finished");
+  });
 });

@@ -261,6 +261,7 @@ export function ThreadView(props: ThreadViewProps) {
     >
       <ThreadComposerSection
         {...commonProps}
+        autoFocusComposer={submitOnEnter}
         composerPlaceholder={t`Follow up...`}
         submitOnEnter={submitOnEnter}
         hideInfoDocks

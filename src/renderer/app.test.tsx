@@ -461,6 +461,33 @@ describe("App", () => {
     expect(useAppStore.getState().pendingComposerFocusThreadId).toBe(thread.id);
   });
 
+  it("acknowledges a remotely opened finished thread without navigating the desktop", () => {
+    const thread: Thread = {
+      id: "thread-opened-remotely",
+      projectId: "project-1",
+      title: "Finished remotely",
+      agentKind: "codex",
+      config: { model: "gpt-5" },
+      status: "finished",
+      attention: "none",
+      canResumeWithConfig: false,
+      archived: false,
+      done: false,
+      starred: false,
+      createdAt: "2026-07-16T00:00:00.000Z",
+      updatedAt: "2026-07-16T00:00:00.000Z",
+    };
+    useAppStore.setState({ threads: [thread], view: { kind: "home" } });
+
+    remoteThreadCommandListeners.at(-1)?.({
+      kind: "acknowledge",
+      threadId: thread.id,
+    });
+
+    expect(useAppStore.getState().threads[0]?.status).toBe("idle");
+    expect(useAppStore.getState().view).toEqual({ kind: "home" });
+  });
+
   it("keeps visible runtime streams frame-paced and throttles hidden threads", () => {
     vi.useFakeTimers();
     mockAnimationFrameWithFakeTimers();

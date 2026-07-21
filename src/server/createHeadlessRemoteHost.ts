@@ -19,6 +19,7 @@ import {
   createPersistentRemoteAuthStore,
   createPortForwarding,
   createPushGateway,
+  createWebPushPublicKeyResolver,
   PushCoordinator,
   PushRegistrationStore,
   readOrCreateRemoteAccessIdentity,
@@ -146,11 +147,12 @@ export async function createHeadlessRemoteHost(
   const identity = readOrCreateRemoteAccessIdentity(paths.baseDir);
   const authStore = createPersistentRemoteAuthStore(paths.baseDir);
   const pushStore = new PushRegistrationStore(paths.baseDir);
+  const pushGatewayOptions = {
+    ...(options.reportError ? { onError: (error: unknown) => options.reportError?.(error) } : {}),
+  };
   const pushCoordinator = new PushCoordinator({
     store: pushStore,
-    sendPush: createPushGateway({
-      ...(options.reportError ? { onError: (error) => options.reportError?.(error) } : {}),
-    }),
+    sendPush: createPushGateway(pushGatewayOptions),
     getThreads: () => dbGetThreads(),
     getProjects: () => dbGetProjects(),
     getSettings: () => {
@@ -257,6 +259,7 @@ export async function createHeadlessRemoteHost(
     // so pass it directly instead of re-wrapping each method.
     schedules: scheduleService,
     pushRegistrations: {
+      webPublicKey: createWebPushPublicKeyResolver(pushGatewayOptions),
       upsert: (registration) => pushStore.upsert(registration),
       remove: (deviceId) => pushStore.remove(deviceId),
     },

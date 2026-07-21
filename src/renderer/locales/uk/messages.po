@@ -964,6 +964,7 @@ msgstr "Усі проєкти"
 msgid "All sources"
 msgstr "Усі джерела"
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/helpers.ts
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Allow"
@@ -987,6 +988,7 @@ msgstr "Дозволити eval"
 msgid "Allow replacing conflicting managed skills"
 msgstr "Дозволити заміну конфліктних керованих навичок"
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Allow the browser to show notifications while the app is in the background."
 msgstr "Дозвольте браузеру показувати сповіщення, поки застосунок працює у фоновому режимі."
@@ -1577,6 +1579,7 @@ msgid "Can't load ports"
 msgstr "Не вдалося завантажити порти"
 
 #. Dialog button: dismiss without deleting
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/GitActionSheet.tsx
@@ -3617,6 +3620,7 @@ msgstr "Увімкнути підтримку мовного сервера дл
 msgid "Enable microphone access in your system settings, then try again."
 msgstr "Увімкніть доступ до мікрофона в налаштуваннях системи та спробуйте ще раз."
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Enable notifications"

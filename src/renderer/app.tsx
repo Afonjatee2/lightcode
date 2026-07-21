@@ -18,6 +18,7 @@ import {
 
 import { useAppStore } from "./state/appStore";
 import {
+  acknowledgeThread,
   archiveThread,
   deleteThread,
   openThread,
@@ -346,6 +347,9 @@ const mainWindowCleanups: Array<() => void> = isMainWindow
         const thread = useAppStore.getState().threads.find((t) => t.id === command.threadId);
         if (!thread) return;
         switch (command.kind) {
+          case "acknowledge":
+            acknowledgeThread(command.threadId);
+            break;
           case "rename":
             renameThread(command.threadId, command.title);
             break;

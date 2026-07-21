@@ -271,6 +271,7 @@ export const remoteThreadCommandSchema = z.discriminatedUnion("kind", [
     groupName: z.string().min(1),
   }),
   z.object({ kind: z.literal("rename"), threadId: z.string().min(1), title: z.string().min(1) }),
+  z.object({ kind: z.literal("acknowledge"), threadId: z.string().min(1) }),
   z.object({ kind: z.literal("set-done"), threadId: z.string().min(1), done: z.boolean() }),
   z.object({
     kind: z.literal("set-starred"),

@@ -111,6 +111,7 @@ vi.mock("./portForward/portForwarding", () => ({
 
 vi.mock("./push", () => ({
   createPushGateway: () => vi.fn<() => void>(),
+  createWebPushPublicKeyResolver: () => vi.fn<() => Promise<string>>(async () => "public-key"),
   PushRegistrationStore: class {
     upsert = vi.fn<(registration: unknown) => void>();
     remove = vi.fn<(deviceId: string) => void>();

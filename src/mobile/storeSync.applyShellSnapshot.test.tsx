@@ -101,6 +101,15 @@ describe("applyShellSnapshot", () => {
     expect(threadStatus()).toBe("idle");
   });
 
+  it("does not restore a finished badge onto an open thread", () => {
+    useAppStore.setState({ threads: [makeThread("finished")] });
+    useAppStore.getState().openThread(THREAD_ID);
+
+    applyShellSnapshot(makeShellSnapshot([makeThread("finished")]));
+
+    expect(threadStatus()).toBe("idle");
+  });
+
   it("preserves unchanged project and thread identities", () => {
     const project = {
       id: "proj-1",

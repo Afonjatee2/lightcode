@@ -181,7 +181,7 @@ export class PushCoordinator {
 
     // iOS: aggregate desktop-session Live Activity sync per device.
     for (const reg of this.options.store.list()) {
-      if (reg.platform === "android") continue;
+      if (reg.platform !== "ios") continue;
       this.scheduleDeviceSync(reg.deviceId, urgent, attentionAlert);
     }
 
@@ -309,7 +309,7 @@ export class PushCoordinator {
     alert: AlertContent | undefined,
   ): Promise<void> {
     const reg = this.options.store.get(deviceId);
-    if (!reg || reg.platform === "android") return;
+    if (!reg || reg.platform !== "ios") return;
     const active = [...this.activeThreads.values()];
     const contentState = buildContentState(active, this.options.getSettings().redactContent);
     const now = this.now();
@@ -395,7 +395,29 @@ export class PushCoordinator {
     await Promise.all(
       this.options.store.list().map(async (reg) => {
         // Android devices get their own status notifications (handleAndroidTransition).
-        if (reg.platform === "android" || !reg.deviceToken) return;
+        if (reg.platform === "android") return;
+        if (reg.platform === "web") {
+          if (!reg.webPushSubscription || !reg.webAppBasePath) return;
+          const basePath = reg.webAppBasePath === "/" ? "" : reg.webAppBasePath.replace(/\/$/, "");
+          const result = await this.options.sendPush({
+            platform: "web",
+            pushType: "alert",
+            subscription: reg.webPushSubscription,
+            payload: {
+              title: content.title,
+              body: content.body,
+              threadId,
+              url: `${basePath}/thread/${encodeURIComponent(threadId)}`,
+            },
+            priority: 10,
+            collapseId: threadId,
+          });
+          if (result.unregistered) {
+            this.options.store.removeToken(reg.deviceId, { kind: "web" });
+          }
+          return;
+        }
+        if (!reg.deviceToken) return;
         const result = await this.options.sendPush({
           token: reg.deviceToken,
           platform: "ios",

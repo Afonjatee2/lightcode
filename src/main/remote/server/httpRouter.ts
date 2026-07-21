@@ -544,9 +544,15 @@ export async function handleHttp(
       writeJson(res, 200, result);
       return;
     }
-    // Push registration is gated on session:operate (no separate push scope),
+    // Push config/registration is gated on session:operate (no separate push scope),
     // so already-paired devices register without re-pairing. POST (not
     // DELETE) for both, matching the existing endpoint conventions.
+    if (req.method === "GET" && url.pathname === "/api/push/config") {
+      ctx.security.requireBearer(req, ["session:operate"]);
+      const publicKey = await ctx.requirePushRegistrations().webPublicKey();
+      writeJson(res, 200, { publicKey });
+      return;
+    }
     if (req.method === "POST" && url.pathname === "/api/push/register") {
       ctx.security.requireBearer(req, ["session:operate"]);
       const registration = remotePushRegistrationSchema.parse(await readJsonBody(req));

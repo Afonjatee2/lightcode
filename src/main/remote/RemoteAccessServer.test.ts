@@ -743,6 +743,9 @@ describe("RemoteAccessServer", () => {
     const serviceWorker = await serviceWorkerResponse.text();
     expect(serviceWorker).toContain("poracode-remote-local-1.0.0");
     expect(serviceWorker).toContain("caches.delete(LEGACY_CACHE_NAME)");
+    expect(serviceWorker).toContain('self.addEventListener("push"');
+    expect(serviceWorker).toContain("showNotification");
+    expect(serviceWorker).toContain('self.addEventListener("notificationclick"');
     expect(serviceWorker).toContain("if (response.ok)");
     expect(serviceWorker).toContain('url.pathname.startsWith("/assets/")');
     expect(serviceWorker).toContain("NAVIGATION_FALLBACK_DELAY_MS = 500");
@@ -2433,6 +2436,40 @@ describe("RemoteAccessServer", () => {
     ws.close();
   });
 
+  it("acknowledges a finished thread in the source DB and renderer", async () => {
+    const db = mockThreadDb([createTestThread({ status: "finished" })]);
+    const dispatched: unknown[] = [];
+    const server = new RemoteAccessServer({
+      appVersion: "1.0.0",
+      identity: { desktopId: "desktop-test", label: "Test Desktop" },
+      host: "127.0.0.1",
+      port: 0,
+      callSupervisor: vi.fn<RemoteAccessServerOptions["callSupervisor"]>(
+        async () => undefined as never,
+      ),
+      dispatchThreadCommand: (command) => {
+        dispatched.push(command);
+        return true;
+      },
+    });
+    servers.push(server);
+    const info = await server.start();
+    const token = await issueAccessToken(info, ["session:operate"]);
+
+    const response = await fetch(new URL("/api/threads/thread-1/command", info.httpBaseUrl), {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ kind: "acknowledge" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(db.threads()[0]?.status).toBe("idle");
+    expect(dispatched).toEqual([{ kind: "acknowledge", threadId: "thread-1" }]);
+  });
+
   it("rejects destructive remote commands for experiment candidates before persistence", async () => {
     const candidate = createTestThread({
       worktreePath: "/repo/one",
@@ -3997,6 +4034,7 @@ describe("RemoteAccessServer", () => {
 
   it("registers and unregisters push tokens via the injected sink", async () => {
     const pushRegistrations = {
+      webPublicKey: vi.fn<() => Promise<string>>(async () => "vapid-public-key"),
       upsert: vi.fn<(registration: unknown) => void>(),
       remove: vi.fn<(deviceId: string) => void>(),
     };
@@ -4047,6 +4085,11 @@ describe("RemoteAccessServer", () => {
 
     // session:operate → happy path (consumes the startup pairing credential).
     const token = await issueAccessToken(info, ["session:read", "session:operate"]);
+    const configResponse = await fetch(new URL("/api/push/config", info.httpBaseUrl), {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(configResponse.status).toBe(200);
+    await expect(configResponse.json()).resolves.toEqual({ publicKey: "vapid-public-key" });
     const registration = {
       deviceId: "device-abcdef",
       platform: "ios",

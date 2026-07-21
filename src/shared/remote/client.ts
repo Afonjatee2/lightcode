@@ -14,6 +14,7 @@ import {
   remotePortUnforwardResultSchema,
   remotePortsStateSchema,
   remotePushRegistrationResultSchema,
+  remoteWebPushConfigResultSchema,
   remoteSettingsSchema,
   remoteSchedulesResponseSchema,
   remoteProjectCommandResultSchema,
@@ -735,6 +736,11 @@ export class RemoteDesktopClient {
       await this.requestJson("/api/push/register", { method: "POST", body: registration }),
       "push registration",
     );
+  }
+
+  /** Resolve the VAPID application-server key used by installed web apps. */
+  async webPushConfig(): Promise<{ publicKey: string }> {
+    return remoteWebPushConfigResultSchema.parse(await this.requestJson("/api/push/config"));
   }
 
   /** Drop all push registrations for a device (sign-out / unpair). */

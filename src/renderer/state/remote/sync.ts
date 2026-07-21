@@ -30,6 +30,17 @@ import { shouldReplaceRuntimeItemsFromSnapshot } from "./guards";
  * {@link RemoteDispatchHooks} options on {@link dispatchRemoteSupervisorEvent}.
  */
 
+type AppView = ReturnType<typeof useAppStore.getState>["view"];
+
+/**
+ * True when `threadId` is one of the panes currently shown in the thread view.
+ * A visible thread has already been acknowledged on this client, so an
+ * authoritative snapshot must not resurrect its `finished` unread badge.
+ */
+export function isThreadVisible(view: AppView, threadId: string): boolean {
+  return view.kind === "thread" && view.panes.includes(threadId);
+}
+
 function toCompletedTurnRecords(
   turns: RemoteThreadSnapshot["completedTurns"],
 ): CompletedTurnRecord[] {
@@ -121,11 +132,18 @@ function syncThreadMetadataFromSnapshot(
 ): void {
   if (!options.fromServer) return;
   useAppStore.setState((current) => {
+    const isVisible = isThreadVisible(current.view, snapshot.thread.id);
     let changed = false;
     const threads = current.threads.map((thread) => {
       if (thread.id !== snapshot.thread.id) return thread;
       changed = true;
-      return snapshot.thread;
+      // `finished` is the unread-completion badge, not the settled runtime
+      // state of a thread the user is currently watching. openThread clears
+      // it optimistically, but a slower authoritative history response can
+      // otherwise paint the same stale badge back onto the open thread.
+      return isVisible && snapshot.thread.status === "finished"
+        ? { ...snapshot.thread, status: "idle" as const }
+        : snapshot.thread;
     });
     return changed ? { threads } : {};
   });
@@ -199,8 +217,7 @@ let removeRuntimeSchedulingListeners: (() => void) | null = null;
 
 function isForegroundRuntimeThread(threadId: string): boolean {
   if (document.visibilityState === "hidden") return false;
-  const view = useAppStore.getState().view;
-  return view.kind === "thread" && view.panes.includes(threadId);
+  return isThreadVisible(useAppStore.getState().view, threadId);
 }
 
 function flushPendingRuntimeEvents(shouldFlush: (threadId: string) => boolean): void {

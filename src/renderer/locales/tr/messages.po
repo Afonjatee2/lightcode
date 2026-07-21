@@ -964,6 +964,7 @@ msgstr "Tüm projeler"
 msgid "All sources"
 msgstr "Tüm kaynaklar"
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/helpers.ts
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Allow"
@@ -987,6 +988,7 @@ msgstr "Değerlendirmeye izin ver"
 msgid "Allow replacing conflicting managed skills"
 msgstr "Çakışan yönetilen becerilerin değiştirilmesine izin ver"
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Allow the browser to show notifications while the app is in the background."
 msgstr "Uygulama arka plandayken tarayıcının bildirim göstermesine izin verin."
@@ -1577,6 +1579,7 @@ msgid "Can't load ports"
 msgstr "Portlar yüklenemedi"
 
 #. Dialog button: dismiss without deleting
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/GitActionSheet.tsx
@@ -3617,6 +3620,7 @@ msgstr "Tür denetimi, tamamlamalar ve tanılama için dil sunucusu desteğini e
 msgid "Enable microphone access in your system settings, then try again."
 msgstr "Sistem ayarlarınızdan mikrofon erişimini etkinleştirin ve tekrar deneyin."
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Enable notifications"

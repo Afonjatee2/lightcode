@@ -4695,24 +4695,15 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   -webkit-user-select: text;
 }
 
-/* iOS (and only iOS) zooms into inputs below 16px on focus; keep editable
-   text at 16px there. On Android and desktop browsers the same 16px floor
-   would just read oversized against the 14px root, so the rule is gated on
-   the platform attribute (see markMobilePlatformOnRoot), not width alone.
-   `.m-sheet` / `.m-picker` drawers are portaled to <body> (outside `.m-shell`)
-   by BottomSheet, ResponsiveMenuSurface, and the host folder picker, so they
-   need the guard spelled out separately — otherwise the model-picker search
-   field (and any other in-drawer input) zooms on focus. */
+/* iOS (and only iOS) zooms into editable controls below 16px on focus. Keep
+   every PWA text-entry surface at the platform's no-zoom floor. This is
+   intentionally document-wide: HeroUI overlays plus the mobile sheet, drawer,
+   and picker implementations are portaled to <body>, so a container allow-list
+   is easy to make incomplete (the pairing form's `.m-drawer` was the concrete
+   regression). On Android and desktop browsers the same 16px floor would read
+   oversized against the 14px root, so gate it on the iOS platform marker. */
 @media (max-width: 767px) {
-  html[data-mobile-platform="ios"] .m-shell textarea,
-  html[data-mobile-platform="ios"] .m-shell input,
-  html[data-mobile-platform="ios"] .m-shell [contenteditable="true"],
-  html[data-mobile-platform="ios"] .m-sheet textarea,
-  html[data-mobile-platform="ios"] .m-sheet input,
-  html[data-mobile-platform="ios"] .m-sheet [contenteditable="true"],
-  html[data-mobile-platform="ios"] .m-picker textarea,
-  html[data-mobile-platform="ios"] .m-picker input,
-  html[data-mobile-platform="ios"] .m-picker [contenteditable="true"] {
+  html[data-mobile-platform="ios"] :is(input, textarea, select, [contenteditable="true"]) {
     font-size: 16px;
   }
 }

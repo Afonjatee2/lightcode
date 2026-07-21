@@ -80,6 +80,8 @@ export const ChatScrollControls = forwardRef<
   const layoutSyncSecondRafRef = useRef<number | null>(null);
   const initialSettleRafRef = useRef<number | null>(null);
   const initialSettleSecondRafRef = useRef<number | null>(null);
+  const initialSettleRevealRafRef = useRef<number | null>(null);
+  const initialSettleRevealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const explicitPinRafRef = useRef<number | null>(null);
   const explicitPinSecondRafRef = useRef<number | null>(null);
   const virtualizerLayoutChangeUntilRef = useRef(0);
@@ -345,6 +347,14 @@ export const ChatScrollControls = forwardRef<
       cancelAnimationFrame(initialSettleSecondRafRef.current);
       initialSettleSecondRafRef.current = null;
     }
+    if (initialSettleRevealRafRef.current !== null) {
+      cancelAnimationFrame(initialSettleRevealRafRef.current);
+      initialSettleRevealRafRef.current = null;
+    }
+    if (initialSettleRevealTimeoutRef.current !== null) {
+      clearTimeout(initialSettleRevealTimeoutRef.current);
+      initialSettleRevealTimeoutRef.current = null;
+    }
   }
 
   function cancelScheduledExplicitPin() {
@@ -386,7 +396,37 @@ export const ChatScrollControls = forwardRef<
       initialSettleSecondRafRef.current = requestAnimationFrame(() => {
         initialSettleSecondRafRef.current = null;
         scrollToBottom({ reconcileVirtualizer: true });
-        onInitialScrollSettled();
+        // LegendList applies the second scrollToEnd reconciliation on its own
+        // next animation frame. Keep the initially hidden transcript hidden
+        // through that frame, then pin once more before revealing it. Safari
+        // otherwise exposes one paint at the estimated offset before the
+        // measured tail moves into its final position.
+        initialSettleRevealRafRef.current = requestAnimationFrame(() => {
+          initialSettleRevealRafRef.current = null;
+          const reveal = () => {
+            initialSettleRevealTimeoutRef.current = null;
+            // The hidden settle passes above already reconciled LegendList.
+            // Finish with a direct DOM pin only: another scrollToEnd here
+            // schedules a deferred virtualizer offset that can overwrite the
+            // correct pin on the first visible Safari paint.
+            scrollToBottom();
+            onInitialScrollSettled();
+          };
+          const remainingOpenSettleMs = Math.max(
+            0,
+            threadOpenCoalesceUntilRef.current - performance.now(),
+          );
+          if (remainingOpenSettleMs > 0) {
+            // Opacity does not suppress layout, so Markdown and LegendList can
+            // finish measuring underneath the hidden transcript. Reveal only
+            // after the same bounded open-storm window used by the scroll
+            // controller, avoiding a visible estimated-position frame on
+            // Safari without delaying the actual history work.
+            initialSettleRevealTimeoutRef.current = setTimeout(reveal, remainingOpenSettleMs);
+          } else {
+            reveal();
+          }
+        });
       });
     });
   });

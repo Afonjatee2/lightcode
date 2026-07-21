@@ -220,6 +220,59 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+function parsePushPayload(event) {
+  try {
+    const payload = event.data?.json();
+    if (
+      !payload ||
+      typeof payload.title !== "string" ||
+      typeof payload.body !== "string" ||
+      typeof payload.threadId !== "string" ||
+      typeof payload.url !== "string" ||
+      !/^\\/(?!\\/)[^?#]*$/.test(payload.url)
+    ) {
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+self.addEventListener("push", (event) => {
+  const payload = parsePushPayload(event);
+  if (!payload) return;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      if (windows.some((client) => client.visibilityState === "visible")) return;
+      return self.registration.showNotification(payload.title, {
+        body: payload.body,
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        tag: \`poracode-thread-\${payload.threadId}\`,
+        data: { url: payload.url },
+      });
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const path = event.notification.data?.url;
+  if (typeof path !== "string" || !/^\\/(?!\\/)[^?#]*$/.test(path)) return;
+  const targetUrl = new URL(path, self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (windows) => {
+      const existing = windows.find((client) => new URL(client.url).origin === self.location.origin);
+      if (existing) {
+        await existing.navigate(targetUrl);
+        return existing.focus();
+      }
+      return self.clients.openWindow(targetUrl);
+    }),
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;

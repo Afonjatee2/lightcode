@@ -964,6 +964,7 @@ msgstr "Todos os projetos"
 msgid "All sources"
 msgstr "Todas as fontes"
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/helpers.ts
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Allow"
@@ -987,6 +988,7 @@ msgstr "Permitir avaliação"
 msgid "Allow replacing conflicting managed skills"
 msgstr "Permitir a substituição de skills gerenciadas em conflito"
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Allow the browser to show notifications while the app is in the background."
 msgstr "Permita que o navegador mostre notificações enquanto o app estiver em segundo plano."
@@ -1577,6 +1579,7 @@ msgid "Can't load ports"
 msgstr "Não foi possível carregar as portas"
 
 #. Dialog button: dismiss without deleting
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/GitActionSheet.tsx
@@ -3617,6 +3620,7 @@ msgstr "Habilite o suporte a language server para verificação de tipos, autoco
 msgid "Enable microphone access in your system settings, then try again."
 msgstr "Ative o acesso ao microfone nas configurações do sistema e tente novamente."
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Enable notifications"

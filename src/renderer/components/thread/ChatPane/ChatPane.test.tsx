@@ -1215,7 +1215,7 @@ describe("ChatPane", () => {
 
     expect(screen.getByText("Still working")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Copy message" })).not.toBeInTheDocument();
-    expect(container.querySelector(".poracode-message-action-strip")).toBeNull();
+    expect(container.querySelector(".poracode-message-action-strip")).not.toBeNull();
   });
 
   it("shows the assistant copy action after the turn settles", async () => {

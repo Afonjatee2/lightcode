@@ -164,6 +164,7 @@ export interface RemoteAccessServerOptions {
    * are injected here. Absent on hosts that don't support push (returns 503).
    */
   readonly pushRegistrations?: {
+    webPublicKey(): Promise<string>;
     upsert(registration: RemotePushRegistration): void;
     remove(deviceId: string): void;
   };

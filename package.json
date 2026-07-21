@@ -16,6 +16,7 @@
     "postinstall": "electron-rebuild --only better-sqlite3 && node scripts/ensure-native-deps.mjs && pnpm run codex-protocol:gen",
     "setup:native": "electron-rebuild --only better-sqlite3 && node scripts/ensure-native-deps.mjs",
     "dev": "concurrently -k -n renderer,electron,app -c cyan,magenta,yellow \"pnpm run dev:renderer\" \"pnpm run dev:electron\" \"pnpm run dev:app\"",
+    "dev:test": "cross-env VITE_PORACODE_SKIP_WELCOME=1 pnpm run dev",
     "devtools": "node scripts/dev-react-devtools.mjs",
     "dev:devtools": "cross-env PORACODE_REACT_DEVTOOLS=1 concurrently -n react-devtools,app -c green,gray \"pnpm run devtools\" \"pnpm run dev\"",
     "website:dev": "pnpm --dir website dev",

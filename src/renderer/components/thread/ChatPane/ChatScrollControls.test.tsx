@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent } from "@testing-library/react";
 import { createRef, useRef } from "react";
 import { renderWithI18n } from "@/renderer/testUtils/i18n";
 import { ChatScrollControls, type ChatScrollControlsHandle } from "./ChatScrollControls";
+import { THREAD_OPEN_COALESCE_MS } from "./chatScrollGeometry";
 
 let scrollToBottomToken = 0;
 
@@ -21,6 +22,7 @@ function Harness(props: {
   controlsRef: React.RefObject<ChatScrollControlsHandle | null>;
   virtualScrollToBottom: () => void;
   initialScrollSettled?: boolean;
+  onInitialScrollSettled?: () => void;
 }) {
   const scrollRef = useRef(props.scrollEl);
   const virtualScrollToBottomRef = useRef(props.virtualScrollToBottom);
@@ -33,7 +35,7 @@ function Harness(props: {
       tailLoaderVisible={false}
       initialScrollSettled={props.initialScrollSettled ?? true}
       virtualScrollToBottomRef={virtualScrollToBottomRef}
-      onInitialScrollSettled={() => undefined}
+      onInitialScrollSettled={props.onInitialScrollSettled ?? (() => undefined)}
     />
   );
 }
@@ -41,6 +43,11 @@ function Harness(props: {
 describe("ChatScrollControls", () => {
   beforeEach(() => {
     scrollToBottomToken = 0;
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it("skips scrollTop writes and virtualizer reconcile when already at bottom", () => {
@@ -110,6 +117,62 @@ describe("ChatScrollControls", () => {
 
     // A scroll-away zeroes the window so consumers stop suppressing work.
     expect(controlsRef.current?.isThreadOpenSettling()).toBe(false);
+  });
+
+  it("reveals the initial transcript only after a post-reconcile animation frame", () => {
+    vi.useFakeTimers();
+    const animationFrames = new Map<number, FrameRequestCallback>();
+    let nextAnimationFrameHandle = 0;
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      nextAnimationFrameHandle += 1;
+      animationFrames.set(nextAnimationFrameHandle, callback);
+      return nextAnimationFrameHandle;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (handle: number) => {
+      animationFrames.delete(handle);
+    });
+    const scrollEl = document.createElement("div");
+    Object.defineProperties(scrollEl, {
+      scrollHeight: { configurable: true, get: () => 1000 },
+      clientHeight: { configurable: true, get: () => 200 },
+      scrollTop: { configurable: true, writable: true, value: 800 },
+    });
+    const onInitialScrollSettled = vi.fn<() => void>();
+    const virtualScrollToBottom = vi.fn<() => void>();
+
+    renderWithI18n(
+      <Harness
+        scrollEl={scrollEl}
+        controlsRef={createRef<ChatScrollControlsHandle>()}
+        virtualScrollToBottom={virtualScrollToBottom}
+        initialScrollSettled={false}
+        onInitialScrollSettled={onInitialScrollSettled}
+      />,
+    );
+
+    // Flush only the callbacks that were already queued at each paint. The
+    // reveal callback scheduled by the second settle must wait for the next
+    // paint instead of exposing LegendList's estimated offset.
+    const flushPaint = () => {
+      const callbacks = [...animationFrames.values()];
+      animationFrames.clear();
+      act(() => callbacks.forEach((callback) => callback(0)));
+    };
+    flushPaint();
+    expect(onInitialScrollSettled).not.toHaveBeenCalled();
+    flushPaint();
+    expect(onInitialScrollSettled).not.toHaveBeenCalled();
+    flushPaint();
+    expect(onInitialScrollSettled).not.toHaveBeenCalled();
+    flushPaint();
+    expect(onInitialScrollSettled).not.toHaveBeenCalled();
+    const reconcilesBeforeReveal = virtualScrollToBottom.mock.calls.length;
+
+    act(() => {
+      vi.advanceTimersByTime(THREAD_OPEN_COALESCE_MS);
+    });
+    expect(onInitialScrollSettled).toHaveBeenCalledOnce();
+    expect(virtualScrollToBottom).toHaveBeenCalledTimes(reconcilesBeforeReveal);
   });
 
   it("pins streaming content growth synchronously without waiting for LegendList", () => {

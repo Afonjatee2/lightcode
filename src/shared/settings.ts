@@ -523,7 +523,7 @@ export const defaultSharedSettings: SharedSettings = {
   searchExclude: { ...DEFAULT_SEARCH_EXCLUDE },
   notificationsEnabled: true,
   notificationSound: true,
-  notificationFilter: "unfocused",
+  notificationFilter: "all",
   notificationStatuses: { done: true, needsAttention: true, error: true },
   notifyL2Cli: true,
   remotePushEnabled: true,

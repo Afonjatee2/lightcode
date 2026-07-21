@@ -76,6 +76,7 @@ describe("PushCoordinator", () => {
 
     expect(sendPush).toHaveBeenCalledTimes(1);
     const [input] = sendPush.mock.calls[0]!;
+    if (input.platform === "web") throw new Error("expected native push");
     expect(input.token).toBe("pts-1");
     expect(input.pushType).toBe("liveactivity");
     const payload = input.payload as ApsPayload;
@@ -204,6 +205,57 @@ describe("PushCoordinator", () => {
     expect(store.get("device-0001")).toBeUndefined();
   });
 
+  it("web: sends a service-worker payload with the registered app route", async () => {
+    store.upsert({
+      deviceId: "browser-0001",
+      platform: "web",
+      webPushSubscription: {
+        endpoint: "https://web.push.apple.com/subscription-1",
+        expirationTime: null,
+        keys: { p256dh: "key-1", auth: "auth-1" },
+      },
+      webAppBasePath: "/app",
+    });
+    const coordinator = makeCoordinator();
+
+    coordinator.handleSupervisorEvent(threadState("thread-1", "working"));
+    coordinator.handleSupervisorEvent(threadState("thread-1", "finished"));
+    await tick();
+
+    const webCalls = sendPush.mock.calls.filter(([input]) => input.platform === "web");
+    expect(webCalls).toHaveLength(1);
+    expect(webCalls[0]![0]).toMatchObject({
+      platform: "web",
+      pushType: "alert",
+      collapseId: "thread-1",
+      payload: {
+        title: "Release check",
+        body: "Finished",
+        threadId: "thread-1",
+        url: "/app/thread/thread-1",
+      },
+    });
+  });
+
+  it("web: prunes a subscription rejected by the push service", async () => {
+    store.upsert({
+      deviceId: "browser-0001",
+      platform: "web",
+      webPushSubscription: {
+        endpoint: "https://web.push.apple.com/subscription-1",
+        expirationTime: null,
+        keys: { p256dh: "key-1", auth: "auth-1" },
+      },
+      webAppBasePath: "/",
+    });
+    sendPush.mockResolvedValue({ ok: false, status: 410, unregistered: true });
+
+    makeCoordinator().handleSupervisorEvent(threadState("thread-1", "needs_reply", "needs_reply"));
+    await tick();
+
+    expect(store.get("browser-0001")).toBeUndefined();
+  });
+
   // ---- Android (auto-rendered FCM notification messages) --------------------
 
   function androidCalls() {
@@ -223,6 +275,7 @@ describe("PushCoordinator", () => {
     const calls = androidCalls();
     expect(calls).toHaveLength(1);
     const [input] = calls[0]!;
+    if (input.platform === "web") throw new Error("expected Android push");
     expect(input.platform).toBe("android");
     expect(input.pushType).toBe("alert");
     expect(input.token).toBe("fcm-1");

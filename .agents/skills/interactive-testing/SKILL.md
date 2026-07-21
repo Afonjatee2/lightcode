@@ -78,8 +78,15 @@ The committed dev hooks must honor `PORACODE_CDP_PORT` and `PORACODE_BASE_DIR` (
 PORACODE_DEV_SERVER_PORT=<vitePort> \
 PORACODE_CDP_PORT=<cdpPort> \
 PORACODE_BASE_DIR="$HOME/.poracode-smoke/<run-id>" \
-pnpm run dev
+pnpm run dev:test
 ```
+
+`dev:test` is the manual-test entrypoint: it bypasses the first-launch welcome
+overlay before the renderer's first paint and releases the welcome gate for
+background work immediately. Use ordinary `pnpm run dev` when the welcome experience
+itself is under test. The one-command integration runner also keeps using the
+ordinary launch path because its baseline explicitly exercises and verifies the
+real welcome dismissal flow.
 
 Set `PORACODE_APP_URL="http://127.0.0.1:<vitePort>/"` and
 `PORACODE_CDP_PORT=<cdpPort>` before using the CDP helpers. Do not launch a
