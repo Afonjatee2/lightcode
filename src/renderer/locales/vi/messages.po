@@ -4184,6 +4184,10 @@ msgid "First-class Pi integration using a real terminal and Pi's native SDK runt
 msgstr "Tích hợp Pi đầy đủ bằng thiết bị đầu cuối thực và môi trường chạy SDK gốc của Pi."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+msgid "First-class Qoder CLI integration using Poracode's native terminal and ACP runtimes."
+msgstr "Tích hợp Qoder CLI hạng nhất bằng các môi trường chạy terminal và ACP gốc của Poracode."
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Qwen Code integration using Poracode's native terminal and ACP runtimes."
 msgstr "Tích hợp Qwen Code hạng nhất bằng các môi trường chạy terminal và ACP gốc của Poracode."
 
@@ -7503,6 +7507,10 @@ msgstr "Push không thành công: {detail}"
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Push updates to paired mobile devices when threads finish or need you, even when the app is closed."
 msgstr "Đẩy các cập nhật đến những thiết bị di động đã ghép nối khi luồng hoàn tất hoặc cần bạn, ngay cả khi ứng dụng đã đóng."
+
+#: src/renderer/components/providers/qoder/manifest.ts
+msgid "Qoder CLI"
+msgstr "Qoder CLI"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionSwitcher.tsx
 msgid "Questions"

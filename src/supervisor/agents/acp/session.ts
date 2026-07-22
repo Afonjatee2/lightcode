@@ -61,6 +61,7 @@ import {
   closeOpenTurnItems,
   createAcpMapperState,
   getDetachedSubAgentToolCallIdForNotification,
+  mapAcpGoalSlashCommand,
   mapAcpSessionUpdate,
   type AcpMapperState,
 } from "./canonicalMapping";
@@ -93,7 +94,11 @@ import {
 export { resolveAcpReadableHostFsPath, resolveAcpResourcePath, toAcpResourceUri };
 
 import { segmentsToContentBlocks } from "./sessionContentBlocks";
-import { filterAcpInboundNoise, looksLikeAcpSessionNotification } from "./sessionStreamFilter";
+import {
+  filterAcpInboundNoise,
+  filterAcpStdoutNonJsonLines,
+  looksLikeAcpSessionNotification,
+} from "./sessionStreamFilter";
 import { maybeCaptureAcpUpdate } from "./sessionDiagnostics";
 import { AcpTerminalManager } from "./terminalManager";
 import {
@@ -128,6 +133,8 @@ export interface AcpStructuredSessionOptions {
    * provider-agnostic.
    */
   sessionUpdateTransform?: (notification: SessionNotification) => SessionNotification;
+  /** Paint canonical state for this provider's `/goal` command family. */
+  goalCommands?: boolean;
   extensionSessionUpdateTransform?: import("../base/types").AcpExtensionSessionUpdateTransform;
   /**
    * Vendor ACP extension notifications (e.g. Cursor `cursor/task`) that are
@@ -147,6 +154,8 @@ export class AcpStructuredSession implements StructuredSessionHandle {
 
   private sessionUpdateTransform?: (notification: SessionNotification) => SessionNotification;
   private extensionSessionUpdateTransform?: import("../base/types").AcpExtensionSessionUpdateTransform;
+
+  private readonly goalCommands: boolean;
 
   private extensionNotificationHandler?: import("../base/types").AcpExtensionNotificationHandler;
 
@@ -288,6 +297,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     if (options?.sessionUpdateTransform) {
       this.sessionUpdateTransform = options.sessionUpdateTransform;
     }
+    this.goalCommands = options?.goalCommands === true;
     if (options?.extensionSessionUpdateTransform) {
       this.extensionSessionUpdateTransform = options.extensionSessionUpdateTransform;
     }
@@ -416,7 +426,9 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     // tsgo's strict generics require explicit casts.
     const toAgent = Writable.toWeb(child.stdin!) as WritableStream<Uint8Array>;
     const fromAgent = Readable.toWeb(child.stdout!) as ReadableStream<Uint8Array>;
-    const stream = filterAcpInboundNoise(ndJsonStream(toAgent, fromAgent));
+    const stream = filterAcpInboundNoise(
+      ndJsonStream(toAgent, filterAcpStdoutNonJsonLines(fromAgent)),
+    );
 
     let session: AcpStructuredSession;
 
@@ -708,6 +720,10 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       },
       { type: "item.completed", threadId: this.threadId, itemId: userItemId },
     ]);
+    if (this.goalCommands) {
+      const goalEvents = mapAcpGoalSlashCommand(prompt, this.ensureMapperState());
+      if (goalEvents.length > 0) this.emitRuntimeEvents(goalEvents);
+    }
 
     // Signal working state immediately
     this.emitListenerUpdate({ status: "working", attention: "working" });

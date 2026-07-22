@@ -168,6 +168,12 @@ export interface CreateStructuredSessionInput {
    */
   acpSessionUpdateTransform?: AcpSessionUpdateTransform;
   /**
+   * Enable canonical goal lifecycle events for providers whose ACP server
+   * implements the `/goal` command family. Kept opt-in so unsupported ACP
+   * providers do not paint an optimistic goal dock for an unknown command.
+   */
+  acpGoalCommands?: boolean;
+  /**
    * Translate a vendor ACP extension notification into a standard
    * `session/update` before canonical mapping. This is for providers that put
    * lifecycle boundaries on an extension method instead of the ACP stream.

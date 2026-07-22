@@ -1294,10 +1294,16 @@ export class SkillsService {
     enabled: boolean,
   ): Promise<LinkedImportMove[]> {
     const moves: LinkedImportMove[] = [];
-    // macOS commonly exposes the temporary directory through `/var` while
-    // `realpath()` canonicalizes it to `/private/var`. Compare canonical paths
-    // on both sides so linked imports still follow their provider source.
-    const resolvedSourcePath = await realpath(sourcePath).catch(() => sourcePath);
+    // Compare canonical paths on hosts such as macOS where a caller-visible
+    // path (`/var/...`) can resolve through a system symlink (`/private/var/...`).
+    // Comparing the link target to the unresolved source path leaves the
+    // managed import behind as a broken symlink when the source is disabled.
+    let canonicalSourcePath: string;
+    try {
+      canonicalSourcePath = await realpath(sourcePath);
+    } catch {
+      return moves;
+    }
     for (const availability of ["shared", "poracode"] as const) {
       const managedRoot = this.managedRoot(environment, "global", availability);
       const sourceRoot = enabled ? disabledRoot(managedRoot.fsPath) : managedRoot.fsPath;
@@ -1318,7 +1324,7 @@ export class SkillsService {
       } catch {
         continue;
       }
-      if (normalizePath(targetPath) !== normalizePath(resolvedSourcePath)) continue;
+      if (normalizePath(targetPath) !== normalizePath(canonicalSourcePath)) continue;
       const destinationPath = join(destinationRoot, linkName);
       if (await pathExists(destinationPath)) {
         throw new Error(`A linked skill named ${linkName} already exists in the destination.`);

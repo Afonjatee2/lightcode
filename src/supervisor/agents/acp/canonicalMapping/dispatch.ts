@@ -32,10 +32,15 @@ import {
   PORACODE_ACP_DETACHED_SUBAGENT_META_KEY,
   PORACODE_ACP_NEW_ASSISTANT_ITEM_META_KEY,
   removeActiveSubAgent,
+  selectActiveSubAgentForToolCall,
   tagSubAgentChildStarts,
 } from "./subagents";
 import { closeOpenContentItems, newItemId } from "./state";
 import type { ActiveAcpSubAgent, AcpMapperState } from "./state";
+import {
+  mapAcpCanonicalGoalUpdate as mapAcpCommandGoalUpdate,
+  readAcpCanonicalGoalUpdate,
+} from "./goal";
 import { mapAcpCanonicalGoalUpdate } from "./goals";
 
 function acpContentBlockToCanonical(block: ContentBlock): CanonicalContentBlock | undefined {
@@ -67,7 +72,7 @@ export function mapAcpSessionUpdate(
   const events: RuntimeEvent[] = [];
   const { threadId } = state;
   events.push(...mapAcpCanonicalGoalUpdate(update, state));
-  const activeSubAgent = getActiveSubAgentForNotification(state, update);
+  let activeSubAgent = getActiveSubAgentForNotification(state, update);
   let pendingSubAgent: ActiveAcpSubAgent | undefined;
 
   switch (update.sessionUpdate) {
@@ -237,6 +242,12 @@ export function mapAcpSessionUpdate(
         }
         break;
       }
+      const goalUpdate = readAcpCanonicalGoalUpdate(toolCall.rawInput);
+      if (goalUpdate) {
+        state.suppressedToolCallIds.add(toolCall.toolCallId);
+        events.push(...mapAcpCommandGoalUpdate(state, goalUpdate));
+        break;
+      }
       const itemId = newItemId("tool");
       const status =
         toolCall.status === "completed"
@@ -246,6 +257,9 @@ export function mapAcpSessionUpdate(
             : "running";
       const itemType = classifyToolCallItemType(toolCall.kind, toolCall.title, toolCall.locations);
       const isSubAgent = isAcpSubAgentToolCall(toolCall);
+      if (!isSubAgent) {
+        activeSubAgent = selectActiveSubAgentForToolCall(state, toolCall);
+      }
       const rawInput =
         toolCall.rawInput &&
         typeof toolCall.rawInput === "object" &&
@@ -302,7 +316,7 @@ export function mapAcpSessionUpdate(
         state.toolCallItems.delete(toolCall.toolCallId);
       }
       if (isSubAgent && toolCall.status !== "completed" && toolCall.status !== "failed") {
-        pendingSubAgent = { toolCallId: toolCall.toolCallId, itemId };
+        pendingSubAgent = { toolCallId: toolCall.toolCallId, itemId, hasChildActivity: false };
       }
       break;
     }
@@ -485,9 +499,11 @@ export function mapAcpSessionUpdate(
       break;
   }
 
-  const nestingSubAgent = activeSubAgent ?? pendingSubAgent;
-  if (nestingSubAgent) {
-    tagSubAgentChildStarts(events, nestingSubAgent, state);
+  // Consecutive sub-agent starts are ambiguous in ACP: the protocol carries no
+  // parent id. Treat them as parallel siblings until the active agent has
+  // emitted real child activity; only then is a later launch safely nested.
+  if (activeSubAgent && (!pendingSubAgent || activeSubAgent.hasChildActivity)) {
+    tagSubAgentChildStarts(events, activeSubAgent, state);
   }
   if (pendingSubAgent) {
     state.activeSubAgents.push(pendingSubAgent);

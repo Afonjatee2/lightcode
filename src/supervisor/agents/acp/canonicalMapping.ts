@@ -30,4 +30,5 @@ export {
   PORACODE_ACP_TOP_LEVEL_TOOL_CALL_META_KEY,
 } from "./canonicalMapping/subagents";
 export { mapAcpSessionUpdate } from "./canonicalMapping/dispatch";
+export { mapAcpGoalSlashCommand } from "./canonicalMapping/goal";
 export { mapAcpElicitationRequest, mapAcpPermissionRequest } from "./canonicalMapping/permissions";
