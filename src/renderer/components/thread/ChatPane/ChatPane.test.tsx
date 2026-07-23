@@ -1073,6 +1073,43 @@ describe("ChatPane", () => {
     );
   });
 
+  it("resets a long user message scroll position before collapsing it", async () => {
+    const thread = makeThread();
+    seedUserMessage(
+      thread.id,
+      [
+        "Validate optimisations and plan fixes",
+        "Issue one with enough context to fill the first visible line.",
+        "Issue two with enough context to fill the second visible line.",
+        "Issue three with enough context to fill the third visible line.",
+        "Issue four should be hidden until the message is expanded.",
+      ].join("\n"),
+    );
+
+    const { container } = renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const content = getUserMessageContent(container);
+    const metrics = installScrollMetrics(content, {
+      scrollHeight: 240,
+      clientHeight: 88,
+      scrollTop: 0,
+    });
+    act(() => {
+      MockResizeObserver.notify(content);
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Show more" }));
+    metrics.setScrollTop(152);
+    fireEvent.click(screen.getByRole("button", { name: "Show less" }));
+
+    expect(metrics.getScrollTop()).toBe(0);
+    expect(screen.getByRole("button", { name: "Show more" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+
   it("does not collapse a long raw prompt when it only renders as two rows", async () => {
     const thread = makeThread();
     seedUserMessage(

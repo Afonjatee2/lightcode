@@ -259,6 +259,11 @@ export const UserMessage = memo(function UserMessage({ item, checkpointRevert }:
               aria-expanded={isExpanded}
               aria-label={tooltipLabel}
               onClick={() => {
+                // Chromium preserves an overflow container's scrollTop when it
+                // becomes clamped. Reset it before collapsing so the first four
+                // lines paint from the top instead of overlapping the scrolled
+                // tail inside the shorter box.
+                if (isExpanded && bodyRef.current) bodyRef.current.scrollTop = 0;
                 setIsExpanded((prev) => !prev);
                 actions?.onContentHeightChange();
               }}
