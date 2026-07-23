@@ -903,6 +903,9 @@ if (!hasSingleInstanceLock) {
         notifySharedSettingsChanged: (settings) => {
           mainWindow?.webContents.send(IPC_EVENT_CHANNELS.sharedSettingsChanged, settings);
         },
+        notifyRemoteAccessPairingChanged: (info) => {
+          mainWindow?.webContents.send(IPC_EVENT_CHANNELS.remoteAccessPairingChanged, info);
+        },
         reportError: captureMainException,
         scheduleService,
       });

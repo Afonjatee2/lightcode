@@ -120,7 +120,7 @@ describe("kimiDefaultCapabilities", () => {
       "yolo",
     ]);
     expect(kimiDefaultCapabilities.bypassPermissions).toEqual({ approvalPolicy: "yolo" });
-    expect(kimiDefaultCapabilities.defaultApprovalPolicy).toBe("default");
+    expect(kimiDefaultCapabilities.defaultApprovalPolicy).toBe("auto");
   });
 
   it("supports both terminal and GUI presentation", () => {

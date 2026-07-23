@@ -189,7 +189,7 @@ describe("createAntigravityAdapter", () => {
       "yolo",
     ]);
     expect(adapter.capabilities.modes).toEqual(["agent", "plan"]);
-    expect(adapter.capabilities.defaultApprovalPolicy).toBe("default");
+    expect(adapter.capabilities.defaultApprovalPolicy).toBe("yolo");
     expect(adapter.defaultOneShotModel).toBe(ANTIGRAVITY_DEFAULT_MODEL_ID);
   });
 

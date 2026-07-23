@@ -58,12 +58,37 @@ export function resetComposerKeyboardMemoryForTests(): void {
 }
 
 /** Focus the composer's input (a contenteditable) inside `root`. */
-function getComposerInput(root: HTMLElement | null): HTMLElement | null {
+export function getComposerInput(root: HTMLElement | null): HTMLElement | null {
   return (
     root?.querySelector<HTMLElement>(
       '[data-composer-input-anchor] [contenteditable="true"], textarea:not(:disabled)',
     ) ?? null
   );
+}
+
+/** Programmatic compact-composer focus has no native tap location for WebKit
+ * to turn into a selection, so explicitly continue the draft at its end. */
+function placeComposerCaretAtEnd(input: HTMLElement): void {
+  if (input.getAttribute("contenteditable") !== "true") return;
+  const selection = input.ownerDocument.defaultView?.getSelection();
+  if (!selection) return;
+  const range = input.ownerDocument.createRange();
+  range.selectNodeContents(input);
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
+
+  // Selection placement alone does not make WebKit reveal that selection in
+  // a previously scrolled contenteditable. Push its internal viewport to the
+  // bottom now, then reassert after the expanded layout paints because focus
+  // can restore the old compact scroll position asynchronously.
+  const scrollToEnd = () => {
+    input.scrollTop = input.scrollHeight;
+  };
+  scrollToEnd();
+  input.ownerDocument.defaultView?.requestAnimationFrame(() => {
+    if (input.isConnected && input.ownerDocument.activeElement === input) scrollToEnd();
+  });
 }
 
 /** Focus through a fixed non-editable target so iOS does not pan before edit focus. */
@@ -73,6 +98,7 @@ function focusComposerInputFromNeutralTarget(root: HTMLElement | null): void {
   if (!input) return;
   focusWithoutScroll(getFocusSentinel(root));
   focusWithoutScroll(input);
+  placeComposerCaretAtEnd(input);
 }
 
 interface ComposerKeyboardOptions {
@@ -388,6 +414,7 @@ export function useComposerKeyboard(
       setInputFocused(true);
     });
     composerInput.focus({ preventScroll: true });
+    placeComposerCaretAtEnd(composerInput);
     return true;
   };
 

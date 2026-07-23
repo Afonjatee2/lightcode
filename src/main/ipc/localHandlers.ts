@@ -36,7 +36,7 @@ import {
   writeImageFile,
 } from "../attachments/localFiles";
 import { createProjectDirectory } from "../projectDirectory";
-import { diffSyncedThreadIds } from "./threadSyncBroadcast";
+import { diffSyncedThreads } from "./threadSyncBroadcast";
 import { showOsNotification } from "../osNotifications";
 import { showAndFocusWindow } from "../window/showAndFocusWindow";
 import {
@@ -309,6 +309,11 @@ export function createLocalIpcHandlers(
     setGlobalShortcutsSuspended: (payload) =>
       options.setGlobalShortcutsSuspended?.(payload.suspended),
     getRemoteAccessPairing: () => getRemoteAccessPairingInfo(options.getRemoteAccessServer()),
+    refreshRemoteAccessPairing: () => {
+      const server = options.getRemoteAccessServer();
+      server?.issuePairingUrl("Settings QR");
+      return getRemoteAccessPairingInfo(server);
+    },
     setRemoteAccessEnabled: (payload) => options.setRemoteAccessEnabled(payload.enabled),
     sshDiscoverHosts: () => options.sshConnectionManager.discoverHosts(),
     sshConnect: (payload) => options.sshConnectionManager.connect(payload),
@@ -400,12 +405,13 @@ export function createLocalIpcHandlers(
       // Diff before writing, then publish the same event remote-issued thread
       // commands send; the remote's debounced refresh reads the post-write
       // state.
-      const changedThreadIds = diffSyncedThreadIds(dbGetThreads(), threads);
+      const { changedThreadIds, viewedThreadIds } = diffSyncedThreads(dbGetThreads(), threads);
       dbSyncAll(projects, threads, viewJson);
       if (changedThreadIds.length > 0) {
         options.getRemoteAccessServer()?.publishSupervisorEvent({
           type: "remote-threads-changed",
           threadIds: changedThreadIds,
+          ...(viewedThreadIds.length > 0 ? { viewedThreadIds } : {}),
         });
       }
     },

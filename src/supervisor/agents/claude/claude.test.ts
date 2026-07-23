@@ -14,6 +14,17 @@ function oscNotify(body: string, code: 9 | 99 | 777 = 9): OscNotification {
   return { code, title: "", body, payload: undefined };
 }
 
+describe("createClaudeAdapter skill roots", () => {
+  it("links canonical projections starting with Claude 2.1.203", () => {
+    expect(createClaudeAdapter().skillSupport?.projectionRoots).toEqual([
+      expect.objectContaining({
+        id: "claude",
+        linkProjectionFromVersion: "2.1.203",
+      }),
+    ]);
+  });
+});
+
 describe("createClaudeAdapter handleOscTitle", () => {
   const adapter = createClaudeAdapter();
 

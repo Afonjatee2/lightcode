@@ -15,7 +15,8 @@ import {
 import { buildContextSizeCapabilities } from "../contextWindowLabel";
 import { getAgentProbeCwd, resolveProbeSpawnCwd } from "../probeCwd";
 
-// Kimi Code exposes three permission modes: manual (default), auto, and yolo.
+// Kimi Code exposes three permission modes: manual (the CLI default), auto,
+// and yolo. Poracode starts fresh threads in auto mode.
 //   • default/manual → no flag
 //   • auto           → `--auto`
 //   • yolo           → `--yolo` (bypass — auto-approve everything)
@@ -42,7 +43,7 @@ export const kimiDefaultCapabilities: AgentCapability = {
   liveInputMode: "terminal",
   presentationMode: "terminal",
   presentationModes: ["terminal", "gui"],
-  defaultApprovalPolicy: "default",
+  defaultApprovalPolicy: "auto",
   bypassPermissions: { approvalPolicy: "yolo" },
   settingDefs: [],
 };

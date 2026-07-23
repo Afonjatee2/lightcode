@@ -259,3 +259,12 @@ describe("createGeminiAdapter hook plugin support", () => {
     ).toBe(false);
   });
 });
+
+describe("createGeminiAdapter skill roots", () => {
+  it("declares Gemini's native shared .agents root", () => {
+    const support = createGeminiAdapter().skillSupport;
+
+    expect(support?.roots.map((root) => root.id)).toEqual(["gemini", "agents"]);
+    expect(support?.projectionRoots).toBeUndefined();
+  });
+});

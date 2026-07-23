@@ -613,21 +613,56 @@
   --tw-ring-offset-shadow: 0 0 #0000;
 }
 
-/* HeroUI toast: allow the close button (positioned at -top-1 -right-1) to
-   render outside the toast rect, and let long URLs/paths wrap inside. */
+/* Keep arbitrary toast content inside the viewport. HeroUI renders its Text
+   slots inline by default, so the description must be a block for max-height
+   and overflow scrolling to take effect. */
+.lc-toast-region {
+  width: min(32rem, calc(100vw - 2rem));
+  min-width: 0;
+  max-width: calc(100vw - 2rem);
+}
+
 .lc-toast {
+  --lc-toast-swipe-x: 0px;
+  --lc-toast-swipe-y: 0px;
+  --lc-toast-swipe-opacity: 1;
+
+  max-height: calc(100dvh - 2rem);
+  overflow: hidden;
   box-shadow:
     0 0 1px rgba(0, 0, 0, 0.1),
     0 2px 4px rgba(0, 0, 0, 0.05),
     0 12px 24px -4px rgba(0, 0, 0, 0.2),
     0 20px 48px -8px rgba(0, 0, 0, 0.3);
+  filter: opacity(var(--lc-toast-swipe-opacity));
+  /* Preserve upward finger drags that scroll long descriptions down; downward
+     and horizontal finger drags belong to swipe dismissal. */
+  touch-action: pan-down;
+  transform: translate3d(var(--lc-toast-swipe-x), var(--lc-toast-swipe-y), 0);
   transition:
     transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    filter 0.2s ease,
     box-shadow 0.2s ease;
 }
 
+.lc-toast[data-swipe-dragging="true"] {
+  transition: none;
+}
+
+.lc-toast[data-swipe-dismissing="true"] {
+  pointer-events: none;
+  transition:
+    transform 0.16s ease-in,
+    filter 0.16s ease-in;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lc-toast:hover {
+    transform: translate3d(var(--lc-toast-swipe-x), var(--lc-toast-swipe-y), 0) translateY(-2px);
+  }
+}
+
 .lc-toast:hover {
-  transform: translateY(-2px);
   box-shadow:
     0 0 1px rgba(0, 0, 0, 0.1),
     0 4px 8px rgba(0, 0, 0, 0.1),
@@ -652,6 +687,12 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
   text-overflow: ellipsis;
+}
+
+.lc-toast__description {
+  display: block;
+  max-height: max(4rem, min(22rem, calc(100dvh - 12rem)));
+  overflow-y: auto;
 }
 
 /* Keep variant icons tinted, but render the title in the default
@@ -798,6 +839,13 @@
 
 .poracode-menu-item[data-active="true"] {
   background-color: var(--default);
+}
+
+/* Custom virtualized model rows do not inherit HeroUI's press state. Give
+   touch and pointer presses a stronger fill before the selected model closes
+   the responsive menu. */
+.poracode-model-menu-listbox .poracode-menu-item:active {
+  background-color: var(--row-active);
 }
 
 .poracode-menu .list-box-item:has(.list-box-item__indicator) {

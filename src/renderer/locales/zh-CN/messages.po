@@ -639,11 +639,11 @@ msgid "Actions"
 msgstr "操作"
 
 #. placeholder {0}: thread.title
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Actions for {0}"
 msgstr "{0} 的操作"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Actions for {title}"
 msgstr "{title} 的操作"
 
@@ -818,6 +818,10 @@ msgstr "添加到收藏夹"
 #: src/mobile/views/DesktopsView.tsx
 msgid "Add to Home Screen"
 msgstr "添加到主屏幕"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
+msgid "Add to-do"
+msgstr "添加待办事项"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Advertise a custom base URL, e.g. a reverse proxy or tunnel. Leave empty for automatic."
@@ -1103,7 +1107,8 @@ msgstr "存档{0}"
 msgid "Archive All"
 msgstr "全部存档"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Archive all threads"
 msgstr "归档所有线程"
 
@@ -1116,7 +1121,8 @@ msgid "Archive thread"
 msgstr "归档线程"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Archive Thread"
 msgstr "存档线程"
@@ -1291,8 +1297,10 @@ msgid "Avatar color {color}"
 msgstr "头像颜色{color}"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/mobile/views/NotesView.tsx
 #: src/mobile/views/pr/PrPageHeader.tsx
 #: src/mobile/views/TerminalView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/composer/ComposerAddMenu.tsx
@@ -2048,10 +2056,11 @@ msgstr "关闭目标"
 msgid "Close group"
 msgstr "关闭组"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Close group actions"
 msgstr "关闭组操作"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/mobile/UserMessageActionsSheet.tsx
 #: src/mobile/views/GitActionSheet.tsx
 msgid "Close menu"
@@ -2136,7 +2145,7 @@ msgid "Close thread"
 msgstr "关闭线程"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Close thread actions"
 msgstr "关闭线程操作"
 
@@ -3152,7 +3161,8 @@ msgid "Delete thread"
 msgstr "删除线程"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Delete Thread"
 msgstr "删除线程"
@@ -3161,12 +3171,14 @@ msgstr "删除线程"
 msgid "Delete thread?"
 msgstr "删除线程？"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 msgid "Delete to-do"
 msgstr "删除待办事项"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorktreeGroup.tsx
 msgid "Delete Worktree"
 msgstr "删除工作树"
@@ -4066,6 +4078,7 @@ msgstr "文件太大无法显示（{0, plural, one {# 行已更改} other {# 行
 msgid "File uses an unsupported encoding."
 msgstr "文件使用不受支持的编码。"
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 msgid "Files"
@@ -4393,6 +4406,7 @@ msgid "Get task"
 msgstr "获取任务"
 
 #: src/mobile/settingsSections.ts
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
@@ -4491,6 +4505,11 @@ msgstr "在导航历史记录中前进"
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Goal"
 msgstr "目标"
+
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#~ msgid "Goals"
+#~ msgstr "目标"
 
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Goals set"
@@ -5343,7 +5362,8 @@ msgstr "由提供商托管"
 msgid "Manual order"
 msgstr "手动排序"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Mark all done"
 msgstr "全部标记为完成"
 
@@ -5365,7 +5385,8 @@ msgid "Mark done"
 msgstr "标记完成"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Mark Done"
 msgstr "标记完成"
@@ -5988,7 +6009,8 @@ msgid "New thread from this to-do"
 msgstr "基于此待办事项的新线程"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "New thread in worktree"
 msgstr "在 worktree 中新建线程"
 
@@ -6188,6 +6210,10 @@ msgstr "没有文件匹配“{0}”。"
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "No GitHub CLI accounts found. Sign in with <0>gh auth login</0>, or <1>paste a clone URL</1>."
 msgstr "未找到 GitHub CLI 帐户。使用<0>gh auth login</0>登录，或<1>粘贴克隆网址</1>。"
+
+#: src/mobile/views/DesktopGoalsPanel.tsx
+#~ msgid "No goal for this thread."
+#~ msgstr "此线程没有目标。"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "No history yet"
@@ -6452,10 +6478,16 @@ msgstr "未登录"
 msgid "Not supported"
 msgstr "不支持"
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 msgid "Notes"
 msgstr "注释"
+
+#: src/mobile/ThreadTitleRow.tsx
+#: src/mobile/views/NotesView.tsx
+msgid "Notes & to-dos"
+msgstr "笔记和待办事项"
 
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
 msgid "Nothing tracked yet. It'll appear here as you use it."
@@ -6793,12 +6825,14 @@ msgstr "打开 Tailscale"
 
 #: src/mobile/ThreadTitleRow.tsx
 #: src/mobile/views/TerminalView.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Open terminal"
 msgstr "打开终端"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Open terminal in worktree"
 msgstr "在 worktree 中打开终端"
 
@@ -7090,7 +7124,8 @@ msgid "Picker returned no attachment"
 msgstr "选择器未返回任何附件"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Pin to top"
 msgstr "固定到顶部"
@@ -7188,8 +7223,10 @@ msgstr "未启用端口转发"
 
 #: src/mobile/chrome.ts
 #: src/mobile/NarrowShell.tsx
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/mobile/WideShell.tsx
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 msgid "Ports"
 msgstr "端口"
 
@@ -7849,10 +7886,13 @@ msgid "Remove worktree?"
 msgstr "删除工作树？"
 
 #: src/mobile/ThreadTitleRow.tsx
+#: src/mobile/TodoActionsSheet.tsx
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/FilesView.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Rename"
 msgstr "重命名"
@@ -7992,6 +8032,10 @@ msgstr "调整 git 面板大小"
 msgid "Resize notes and to-dos"
 msgstr "调整笔记和待办事项的大小"
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+msgid "Resize right panel"
+msgstr "调整右侧面板大小"
+
 #: src/renderer/components/layout/SplitPaneContainer.tsx
 msgid "Resize row"
 msgstr "调整行大小"
@@ -8048,6 +8092,7 @@ msgstr "继续"
 #: src/mobile/views/TerminalView.tsx
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
+#: src/renderer/views/GitReviewOverlay/parts/GitStackedDiff.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Retry"
 msgstr "重试"
@@ -8184,6 +8229,8 @@ msgstr "右面板"
 msgid "Right-click to switch ring"
 msgstr "右键点击以切换环"
 
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
@@ -9185,6 +9232,7 @@ msgstr "以面板而非页面形式开始一个新线程"
 msgid "Start a new thread from the selected text"
 msgstr "从选定的文本开始一个新线程"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 msgid "Start a new thread from this to-do"
 msgstr "从此待办事项开始一个新线程"
@@ -9606,6 +9654,7 @@ msgid "Tell the target provider what to do next..."
 msgstr "告诉目标提供商下一步该做什么..."
 
 #: src/mobile/settingsSections.ts
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
@@ -10050,6 +10099,7 @@ msgstr "标题生成"
 msgid "Title, commit, and conflict models"
 msgstr "标题、提交和冲突模型"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
 msgid "To-dos"
 msgstr "待办事项"
@@ -10111,6 +10161,10 @@ msgstr "无法导入工具限制"
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Tool search"
 msgstr "工具搜索"
+
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+msgid "Tools"
+msgstr "工具"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Total installs"
@@ -10256,6 +10310,10 @@ msgstr "无法安装{0}挂钩。"
 #: src/renderer/actions/agentLoginActions.ts
 msgid "Unable to install {0}."
 msgstr "无法安装{0}。"
+
+#: src/renderer/views/GitReviewOverlay/parts/GitStackedDiff.tsx
+msgid "Unable to load diff."
+msgstr "无法加载差异。"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Unable to load remote access pairing."
@@ -10498,7 +10556,8 @@ msgstr "在以下分钟数后卸载空闲线程"
 msgid "Unload Thread"
 msgstr "卸载线程"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Unmark all done"
 msgstr "取消全部完成标记"
 
@@ -10507,7 +10566,8 @@ msgid "Unmark done"
 msgstr "取消标记完成"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Unmark Done"
 msgstr "取消标记完成"
@@ -10521,7 +10581,8 @@ msgid "Unphased:"
 msgstr "未分阶段："
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Unpin"
 msgstr "取消固定"
@@ -10645,6 +10706,7 @@ msgstr "URL 为必填项。"
 #: src/mobile/NarrowShell.tsx
 #: src/mobile/settingsSections.ts
 #: src/mobile/ThreadUsageIndicator.tsx
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/WideShell.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/providers/ProviderUsageRail.tsx

@@ -95,6 +95,14 @@ export function createGeminiAdapter(): AgentAdapter {
           projectPath: ".gemini/skills",
           globalOverride: { env: "GEMINI_CLI_HOME", path: ".gemini/skills" },
         },
+        {
+          // Gemini CLI treats `.agents/skills` as a native alias at both
+          // user and workspace scope.
+          id: "agents",
+          label: "Shared agent skills",
+          globalPath: ".agents/skills",
+          projectPath: ".agents/skills",
+        },
       ],
       invocation: "prompt",
       precedence: {

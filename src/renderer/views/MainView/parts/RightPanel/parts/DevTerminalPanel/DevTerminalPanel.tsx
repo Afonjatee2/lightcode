@@ -8,12 +8,18 @@ import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { closeAllPanels } from "@/renderer/actions/panelActions";
 import { clearEagerShellStart, wasShellStartedEagerly } from "@/renderer/utils/shellUtils";
 import type { TerminalSize } from "@/shared/contracts";
+import type { TerminalFeedListener } from "@/shared/remote/terminalFeed";
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { BottomTerminalLayout } from "./parts/BottomTerminalLayout";
 import { RightTerminalLayout } from "./parts/RightTerminalLayout";
 
-export function DevTerminalPanel(props: { hideHeader?: boolean }) {
-  const { hideHeader } = props;
+export function DevTerminalPanel(props: {
+  hideHeader?: boolean;
+  positionOverride?: "bottom" | "right";
+  onEmpty?: () => void;
+  watchTerminal?: (terminalId: string, listener: TerminalFeedListener) => () => void;
+}) {
+  const { hideHeader, onEmpty } = props;
   const { t } = useLingui();
   const projects = useAppStore((s) => s.projects);
   const tabs = useDevTerminalStore((s) => s.tabs);
@@ -28,7 +34,8 @@ export function DevTerminalPanel(props: { hideHeader?: boolean }) {
   const closeSplitAction = useDevTerminalStore((s) => s.closeSplit);
   const markTabActive = useDevTerminalStore((s) => s.markTabActive);
   const updateTabTitle = useDevTerminalStore((s) => s.updateTabTitle);
-  const terminalPosition = useSharedSettings((s) => s.terminalPosition);
+  const savedTerminalPosition = useSharedSettings((s) => s.terminalPosition);
+  const terminalPosition = props.positionOverride ?? savedTerminalPosition;
   const spawnedRef = useRef(new Set<string>());
 
   const projectTabs = tabs.filter((tab) => {
@@ -118,6 +125,7 @@ export function DevTerminalPanel(props: { hideHeader?: boolean }) {
     if (remainingInContext.length === 0) {
       if (!isBottom) closeAllPanels();
       useDevTerminalStore.getState().closePanel();
+      onEmpty?.();
     }
   }
 
@@ -205,6 +213,7 @@ export function DevTerminalPanel(props: { hideHeader?: boolean }) {
         getTabContextItems={getTabContextItems}
         handleTabContextAction={handleTabContextAction}
         onTerminalResize={handleTerminalResize}
+        {...(props.watchTerminal ? { watchTerminal: props.watchTerminal } : {})}
       />
     );
   }
@@ -225,6 +234,7 @@ export function DevTerminalPanel(props: { hideHeader?: boolean }) {
       handleCloseTab={handleCloseTab}
       handleSelectionChange={handleSelectionChange}
       onTerminalResize={handleTerminalResize}
+      {...(props.watchTerminal ? { watchTerminal: props.watchTerminal } : {})}
     />
   );
 }

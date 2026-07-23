@@ -50,6 +50,8 @@ interface ChatPaneProps {
   paneActionsOverride?: ChatPaneActions | undefined;
   checkpointActions?: CheckpointRevertActions | undefined;
   checkpointProjectLocation?: ProjectLocation | undefined;
+  initialScrollRevealDelayMs?: number | undefined;
+  onInitialScrollSettled?: (() => void) | undefined;
 }
 
 const EMPTY_COMPLETED_TURNS: NonNullable<
@@ -337,6 +339,9 @@ export function ChatPane(props: ChatPaneProps) {
             onVirtualizerLayoutChange={() =>
               scrollControlsRef.current?.beginVirtualizerLayoutChange()
             }
+            onLiveVirtualizerLayoutChange={() =>
+              scrollControlsRef.current?.beginLiveVirtualizerLayoutChange()
+            }
             registerVirtualScrollToBottom={(handler) => {
               virtualScrollToBottomRef.current = handler;
             }}
@@ -408,11 +413,16 @@ export function ChatPane(props: ChatPaneProps) {
             scrollRef={scrollRef}
             contentRef={contentRef}
             layoutChangeToken={layoutChangeToken}
+            tailEntryId={timelineEntries.at(-1)?.id ?? null}
             threadId={threadId}
             tailLoaderVisible={showTailLoader}
             initialScrollSettled={isInitialScrollSettled}
+            initialScrollRevealDelayMs={props.initialScrollRevealDelayMs ?? 0}
             virtualScrollToBottomRef={virtualScrollToBottomRef}
-            onInitialScrollSettled={() => setInitialScrollSettledThreadId(threadId)}
+            onInitialScrollSettled={() => {
+              setInitialScrollSettledThreadId(threadId);
+              props.onInitialScrollSettled?.();
+            }}
           />
           <SubAgentOverlay
             key={`subagent:${threadId}`}

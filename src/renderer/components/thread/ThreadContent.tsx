@@ -34,6 +34,8 @@ export function GuiThreadContent(
     runtimeDebugOpen: boolean;
     dockState?: ThreadDockState;
     hideComposer?: boolean;
+    initialScrollRevealDelayMs?: number;
+    onInitialScrollSettled?: () => void;
   },
 ) {
   const runtimeDebugOpen = import.meta.env.DEV && props.runtimeDebugOpen;
@@ -69,6 +71,12 @@ export function GuiThreadContent(
                 : {})}
               {...(props.canShowProjectEntryInExplorer !== undefined
                 ? { canShowProjectEntryInExplorer: props.canShowProjectEntryInExplorer }
+                : {})}
+              {...(props.initialScrollRevealDelayMs !== undefined
+                ? { initialScrollRevealDelayMs: props.initialScrollRevealDelayMs }
+                : {})}
+              {...(props.onInitialScrollSettled
+                ? { onInitialScrollSettled: props.onInitialScrollSettled }
                 : {})}
             />
           </div>

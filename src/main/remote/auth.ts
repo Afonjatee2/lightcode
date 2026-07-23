@@ -154,6 +154,10 @@ export class RemoteAuthStore {
     };
   }
 
+  revokePairingCredential(credential: string): boolean {
+    return this.pairingCredentials.delete(hashCredential(credential));
+  }
+
   exchangePairingCredential(input: {
     readonly credential: string;
     readonly scopes?: readonly RemoteAccessScope[];

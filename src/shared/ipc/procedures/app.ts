@@ -197,6 +197,10 @@ export const appProcedures = {
     "getRemoteAccessPairing",
     "main-local",
   ),
+  refreshRemoteAccessPairing: defineNoArgProcedure<RemoteAccessPairingInfo, "main-local">(
+    "refreshRemoteAccessPairing",
+    "main-local",
+  ),
   setRemoteAccessEnabled: definePayloadProcedure<
     z.infer<typeof setRemoteAccessEnabledPayloadSchema>,
     RemoteAccessPairingInfo,

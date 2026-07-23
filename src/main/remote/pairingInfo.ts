@@ -17,7 +17,7 @@ export function getRemoteAccessPairingInfo(
     localHttpBaseUrl: info.localHttpBaseUrl,
     ...(info.tailscaleHttpBaseUrl ? { tailscaleHttpBaseUrl: info.tailscaleHttpBaseUrl } : {}),
     wsBaseUrl: info.wsBaseUrl,
-    pairingUrl: server.issuePairingUrl("Settings QR"),
+    pairingUrl: info.pairingUrl,
     sessions: server.listAccessSessions(),
   };
 }

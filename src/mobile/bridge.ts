@@ -5,6 +5,7 @@ import type {
   InterruptThreadPayload,
   ProfileIdentity,
   ProfileStatsRequest,
+  ProjectNotes,
   ResizeTerminalPayload,
   ResolveThreadServerRequestPayload,
   SearchProjectFilesPayload,
@@ -213,6 +214,8 @@ const remoteBridge = {
   getProviderUsage: () => requireClient().providerUsage(),
   refreshProviderUsage: () => requireClient().providerUsage(),
   getUsageLoginState: () => Promise.resolve({ stored: {} }),
+  dbGetProjectNotes: (projectId: string) => requireClient().projectNotes(projectId),
+  dbSetProjectNotes: (notes: ProjectNotes) => requireClient().setProjectNotes(notes),
   refreshAgentStatuses: async (_wslDistros?: string[], _scope?: RefreshAgentScope) => {
     const statuses = await requireClient().agentStatuses();
     applyAgentStatuses(statuses);
@@ -384,6 +387,9 @@ export function installRemoteBridge(): void {
         return Reflect.get(target, prop, receiver) as unknown;
       }
       if (typeof prop !== "string") return undefined;
+      // Optional bridge metadata is genuinely unavailable in a browser. Do not
+      // expose the missing value as the generic unavailable-method fallback.
+      if (prop === "homeDir") return undefined;
       // Reused/mobile desktop-backed surfaces call bridge methods directly;
       // forward allowlisted git/gh/project-tree calls to the paired desktop.
       if (isGitRemoteProcedure(prop)) {

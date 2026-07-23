@@ -639,11 +639,11 @@ msgid "Actions"
 msgstr "Działania"
 
 #. placeholder {0}: thread.title
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Actions for {0}"
 msgstr "Akcje dla {0}"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Actions for {title}"
 msgstr "Akcje dla {title}"
 
@@ -818,6 +818,10 @@ msgstr "Dodaj do ulubionych"
 #: src/mobile/views/DesktopsView.tsx
 msgid "Add to Home Screen"
 msgstr "Dodaj do ekranu głównego"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
+msgid "Add to-do"
+msgstr "Dodaj zadanie"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Advertise a custom base URL, e.g. a reverse proxy or tunnel. Leave empty for automatic."
@@ -1103,7 +1107,8 @@ msgstr "Archiwum {0}"
 msgid "Archive All"
 msgstr "Archiwizuj wszystko"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Archive all threads"
 msgstr "Archiwizuj wszystkie wątki"
 
@@ -1116,7 +1121,8 @@ msgid "Archive thread"
 msgstr "Archiwizuj wątek"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Archive Thread"
 msgstr "Archiwum wątku"
@@ -1291,8 +1297,10 @@ msgid "Avatar color {color}"
 msgstr "Kolor awatara {color}"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/mobile/views/NotesView.tsx
 #: src/mobile/views/pr/PrPageHeader.tsx
 #: src/mobile/views/TerminalView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/composer/ComposerAddMenu.tsx
@@ -2048,10 +2056,11 @@ msgstr "Zamknij cel"
 msgid "Close group"
 msgstr "Zamknij grupę"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Close group actions"
 msgstr "Zamknij akcje grupy"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/mobile/UserMessageActionsSheet.tsx
 #: src/mobile/views/GitActionSheet.tsx
 msgid "Close menu"
@@ -2136,7 +2145,7 @@ msgid "Close thread"
 msgstr "Zamknij wątek"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Close thread actions"
 msgstr "Zamknij akcje wątku"
 
@@ -3152,7 +3161,8 @@ msgid "Delete thread"
 msgstr "Usuń wątek"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Delete Thread"
 msgstr "Usuń wątek"
@@ -3161,12 +3171,14 @@ msgstr "Usuń wątek"
 msgid "Delete thread?"
 msgstr "Usunąć wątek?"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 msgid "Delete to-do"
 msgstr "Usuń zadanie"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorktreeGroup.tsx
 msgid "Delete Worktree"
 msgstr "Usuń drzewo robocze"
@@ -4066,6 +4078,7 @@ msgstr "Plik zbyt duży, aby wyświetlić ({0, plural, one {zmieniono # wiersz} 
 msgid "File uses an unsupported encoding."
 msgstr "Plik używa nieobsługiwanego kodowania."
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 msgid "Files"
@@ -4393,6 +4406,7 @@ msgid "Get task"
 msgstr "Pobierz zadanie"
 
 #: src/mobile/settingsSections.ts
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
@@ -4491,6 +4505,11 @@ msgstr "Przejdź dalej w historii nawigacji"
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Goal"
 msgstr "Cel"
+
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#~ msgid "Goals"
+#~ msgstr "Cele"
 
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Goals set"
@@ -5343,7 +5362,8 @@ msgstr "Zarządzana przez dostawcę"
 msgid "Manual order"
 msgstr "Kolejność ręczna"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Mark all done"
 msgstr "Oznacz wszystkie jako ukończone"
 
@@ -5365,7 +5385,8 @@ msgid "Mark done"
 msgstr "Oznacz gotowe"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Mark Done"
 msgstr "Oznacz gotowe"
@@ -5989,7 +6010,8 @@ msgid "New thread from this to-do"
 msgstr "Nowy wątek z tego zadania"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "New thread in worktree"
 msgstr "Nowy wątek w worktree"
 
@@ -6189,6 +6211,10 @@ msgstr "Żadne pliki nie pasują do „{0}”."
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "No GitHub CLI accounts found. Sign in with <0>gh auth login</0>, or <1>paste a clone URL</1>."
 msgstr "Nie znaleziono kont GitHub CLI. Zaloguj się za pomocą <0>gh auth login</0> lub <1>wklej sklonowany adres URL</1>."
+
+#: src/mobile/views/DesktopGoalsPanel.tsx
+#~ msgid "No goal for this thread."
+#~ msgstr "Brak celu dla tego wątku."
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "No history yet"
@@ -6453,10 +6479,16 @@ msgstr "Niezalogowany"
 msgid "Not supported"
 msgstr "Nieobsługiwane"
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 msgid "Notes"
 msgstr "Notatki"
+
+#: src/mobile/ThreadTitleRow.tsx
+#: src/mobile/views/NotesView.tsx
+msgid "Notes & to-dos"
+msgstr "Notatki i zadania"
 
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
 msgid "Nothing tracked yet. It'll appear here as you use it."
@@ -6794,12 +6826,14 @@ msgstr "Otwórz Tailscale"
 
 #: src/mobile/ThreadTitleRow.tsx
 #: src/mobile/views/TerminalView.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Open terminal"
 msgstr "Otwórz terminal"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Open terminal in worktree"
 msgstr "Otwórz terminal w worktree"
 
@@ -7091,7 +7125,8 @@ msgid "Picker returned no attachment"
 msgstr "Selektor nie zwrócił żadnego załącznika"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Pin to top"
 msgstr "Przypnij do góry"
@@ -7189,8 +7224,10 @@ msgstr "Przekierowywanie portów nie jest włączone"
 
 #: src/mobile/chrome.ts
 #: src/mobile/NarrowShell.tsx
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/mobile/WideShell.tsx
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 msgid "Ports"
 msgstr "Porty"
 
@@ -7850,10 +7887,13 @@ msgid "Remove worktree?"
 msgstr "Usunąć drzewo robocze?"
 
 #: src/mobile/ThreadTitleRow.tsx
+#: src/mobile/TodoActionsSheet.tsx
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/FilesView.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Rename"
 msgstr "Zmień nazwę"
@@ -7993,6 +8033,10 @@ msgstr "Zmień rozmiar panelu git"
 msgid "Resize notes and to-dos"
 msgstr "Zmień rozmiar notatek i zadań"
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+msgid "Resize right panel"
+msgstr "Zmień rozmiar prawego panelu"
+
 #: src/renderer/components/layout/SplitPaneContainer.tsx
 msgid "Resize row"
 msgstr "Zmień rozmiar wiersza"
@@ -8049,6 +8093,7 @@ msgstr "Wznów"
 #: src/mobile/views/TerminalView.tsx
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
+#: src/renderer/views/GitReviewOverlay/parts/GitStackedDiff.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Retry"
 msgstr "Spróbuj ponownie"
@@ -8185,6 +8230,8 @@ msgstr "Prawy panel"
 msgid "Right-click to switch ring"
 msgstr "Kliknij prawym przyciskiem, aby przełączyć pierścień"
 
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
@@ -9186,6 +9233,7 @@ msgstr "Otwórz nowy wątek jako panel zamiast strony"
 msgid "Start a new thread from the selected text"
 msgstr "Rozpocznij nowy wątek od zaznaczonego tekstu"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 msgid "Start a new thread from this to-do"
 msgstr "Rozpocznij nowy wątek od tego zadania"
@@ -9607,6 +9655,7 @@ msgid "Tell the target provider what to do next..."
 msgstr "Powiedz dostawcy docelowemu, co ma dalej robić..."
 
 #: src/mobile/settingsSections.ts
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
@@ -10051,6 +10100,7 @@ msgstr "Generowanie tytułów"
 msgid "Title, commit, and conflict models"
 msgstr "Modele tytułów, commitów i konfliktów"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
 msgid "To-dos"
 msgstr "Zadania"
@@ -10112,6 +10162,10 @@ msgstr "Nie można zaimportować ograniczeń narzędzi"
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Tool search"
 msgstr "Wyszukiwanie narzędzi"
+
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+msgid "Tools"
+msgstr "Narzędzia"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Total installs"
@@ -10257,6 +10311,10 @@ msgstr "Nie można zainstalować haków {0}."
 #: src/renderer/actions/agentLoginActions.ts
 msgid "Unable to install {0}."
 msgstr "Nie można zainstalować {0}."
+
+#: src/renderer/views/GitReviewOverlay/parts/GitStackedDiff.tsx
+msgid "Unable to load diff."
+msgstr "Nie udało się wczytać różnic."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Unable to load remote access pairing."
@@ -10499,7 +10557,8 @@ msgstr "Zwolnij bezczynne wątki po (minutach)"
 msgid "Unload Thread"
 msgstr "Zwolnij wątek"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Unmark all done"
 msgstr "Odznacz wszystkie jako ukończone"
 
@@ -10508,7 +10567,8 @@ msgid "Unmark done"
 msgstr "Odznacz jako gotowe"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Unmark Done"
 msgstr "Odznacz jako gotowe"
@@ -10522,7 +10582,8 @@ msgid "Unphased:"
 msgstr "Bez fazy:"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Unpin"
 msgstr "Odepnij"
@@ -10646,6 +10707,7 @@ msgstr "Adres URL jest wymagany."
 #: src/mobile/NarrowShell.tsx
 #: src/mobile/settingsSections.ts
 #: src/mobile/ThreadUsageIndicator.tsx
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/WideShell.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/providers/ProviderUsageRail.tsx

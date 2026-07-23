@@ -30,7 +30,7 @@ export interface FilesPanelContext {
   rootLabel: string;
 }
 
-export type RightPanelTab = "git" | "files" | "terminal" | "browser" | "usage" | "notes";
+export type RightPanelTab = "git" | "files" | "terminal" | "browser" | "usage" | "notes" | "ports";
 
 interface PanelState {
   gitReviewContext: GitReviewContext | null;

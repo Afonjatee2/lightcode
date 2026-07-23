@@ -115,7 +115,9 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean }) {
   const resolvedFilesPanelContext = resolveFilesRootContext(rawFilesPanelContext, projects);
 
   const activeTab: RightPanelTab = props.includeTerminal
-    ? rightPanelTab
+    ? rightPanelTab === "ports"
+      ? "git"
+      : rightPanelTab
     : rightPanelTab === "files" ||
         rightPanelTab === "browser" ||
         rightPanelTab === "usage" ||

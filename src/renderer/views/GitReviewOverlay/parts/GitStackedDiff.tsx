@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DiffFile, DiffView, highlighter, setEnableFastDiffTemplate } from "@git-diff-view/react";
 import "@git-diff-view/react/styles/diff-view.css";
+import { Button } from "@heroui/react";
 
 setEnableFastDiffTemplate(true);
 
@@ -23,6 +24,7 @@ import { getFileIconUrl } from "@/renderer/components/common/fileIcons";
 import { readBridge } from "@/renderer/bridge";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { buildInWorker, diffFileFromBundle, extractDiffNames, getLang } from "./diffBuildClient";
+import { loadGitDiffForDisplay } from "./gitDiffLoader";
 import { handleKeyActivate } from "@/renderer/utils/a11y";
 import { openFileInEditor } from "@/renderer/utils/gitHelpers";
 import { ConfirmDialog } from "@/renderer/components/common/ConfirmDialog";
@@ -82,11 +84,13 @@ export function StackedFileCard(props: {
   const [revertOpen, setRevertOpen] = useState(false);
   const [diffFile, setDiffFile] = useState<DiffFile | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const loadedKeyRef = useRef<string | null>(null);
   const tooLarge = file.insertions + file.deletions > LARGE_DIFF_THRESHOLD;
 
   // Theme is intentionally excluded from the fetch key — DiffView re-styles without re-fetching.
-  const fetchKey = `${file.path}|${file.staged ? "s" : "u"}|${file.status}|${file.insertions}|${file.deletions}`;
+  const fetchKey = `${file.path}|${file.staged ? "s" : "u"}|${file.status}|${file.insertions}|${file.deletions}|${retryKey}`;
 
   useEffect(() => {
     if (!expanded || tooLarge) return;
@@ -95,21 +99,15 @@ export function StackedFileCard(props: {
     let cancelled = false;
 
     setLoading(true);
+    setLoadFailed(false);
 
     async function load() {
       try {
-        const [result, { oldContent, newContent }] = await Promise.all([
-          readBridge().getGitDiff({
-            projectLocation: project.location,
-            filePath: file.path,
-            staged: file.staged,
-          }),
-          readBridge().getGitFileContent({
-            projectLocation: project.location,
-            filePath: file.path,
-            staged: file.staged,
-          }),
-        ]);
+        const { result, oldContent, newContent } = await loadGitDiffForDisplay({
+          projectLocation: project.location,
+          filePath: file.path,
+          staged: file.staged,
+        });
         if (cancelled) return;
 
         const rawDiff = result.diff;
@@ -142,7 +140,7 @@ export function StackedFileCard(props: {
           setDiffFile(diffFileFromBundle(r.data, r.bundle));
         }
       } catch {
-        // Diff unavailable
+        if (!cancelled) setLoadFailed(true);
       }
       if (!cancelled) setLoading(false);
     }
@@ -152,6 +150,11 @@ export function StackedFileCard(props: {
       cancelled = true;
     };
   }, [expanded, tooLarge, fetchKey, file.path, file.staged, project.location, theme]);
+
+  function retryLoad() {
+    loadedKeyRef.current = null;
+    setRetryKey((key) => key + 1);
+  }
 
   async function handleStageToggle(e: React.MouseEvent) {
     e.stopPropagation();
@@ -342,7 +345,15 @@ export function StackedFileCard(props: {
                 </Trans>
               </div>
             )}
-            {!loading && !tooLarge && !diffFile && loadedKeyRef.current !== null && (
+            {!loading && loadFailed && (
+              <div className="flex items-center justify-between gap-3 px-4 py-3 text-xs text-muted">
+                <Trans>Unable to load diff.</Trans>
+                <Button size="sm" variant="tertiary" onPress={retryLoad}>
+                  <Trans>Retry</Trans>
+                </Button>
+              </div>
+            )}
+            {!loading && !loadFailed && !tooLarge && !diffFile && loadedKeyRef.current !== null && (
               <div className="px-4 py-3 text-xs text-muted">
                 <Trans>No changes to display</Trans>
               </div>

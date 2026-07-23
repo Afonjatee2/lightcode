@@ -30,6 +30,7 @@ import {
   runGitMergeToSource,
   runGitPullFromSource,
   runGitSyncCommand,
+  refreshGitStatusForWorktree,
   showGitActionError,
   showGitOperationFailure,
   type GitSyncCommand,
@@ -486,6 +487,9 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
           onComplete: onRefresh,
         });
         return;
+      }
+      if (worktreePath) {
+        await refreshGitStatusForWorktree(getWorktreeLocation(), worktreePath);
       }
       if (result.conflicting) {
         onRefresh();

@@ -9,6 +9,7 @@ import {
   toRuntimeChatItem,
   type CompletedTurnRecord,
   type OpenRuntimeRequest,
+  type RuntimeChatItem,
 } from "@/renderer/state/slices/runtimeEventSlice";
 import {
   collectRuntimeEventsFromSupervisoryMessage,
@@ -57,6 +58,12 @@ export function applyThreadSnapshot(
   options: { readonly fromServer: boolean } = { fromServer: true },
 ): void {
   const threadId = snapshot.thread.id;
+  // A delta can already be in the JS event queue when the foreground recovery
+  // snapshot resolves. Apply it before comparing/replacing the transcript so
+  // the decision observes every event received up to this point.
+  if (pendingRuntimeEvents.has(threadId)) {
+    flushPendingRuntimeEventsSync(threadId);
+  }
   const state = useAppStore.getState();
   syncThreadMetadataFromSnapshot(snapshot, options);
 
@@ -69,22 +76,20 @@ export function applyThreadSnapshot(
   const existingHasObservedLiveItems = existingIds.some(
     (itemId) => existingItems?.[itemId]?.observedLive === true,
   );
-  const shouldReplaceItems = shouldReplaceRuntimeItemsFromSnapshot({
-    existingCount: existingIds.length,
-    existingHasObservedLiveItems,
-    snapshotItemCount: snapshot.runtimeItems.length,
-    threadActive: isThreadTurnActive(snapshot.thread.status),
-    fromServer: options.fromServer,
-  });
+  const snapshotItems = snapshot.runtimeItems.map(toRuntimeChatItem);
+  const threadActive = isThreadTurnActive(snapshot.thread.status);
+  const shouldReplaceItems =
+    (threadActive &&
+      options.fromServer &&
+      snapshotMonotonicallyCoversExistingTail(existingIds, existingItems, snapshotItems)) ||
+    shouldReplaceRuntimeItemsFromSnapshot({
+      existingCount: existingIds.length,
+      existingHasObservedLiveItems,
+      snapshotItemCount: snapshot.runtimeItems.length,
+      threadActive,
+      fromServer: options.fromServer,
+    });
   if (shouldReplaceItems) {
-    // A runtime delta enqueued just before this snapshot resolved would
-    // otherwise apply AFTER the replace below and re-append text already in the
-    // snapshot (visible duplication). Flush (or drop) this thread's queued
-    // events first — mirrors dispatchRemoteSupervisorEvent's ordering guard.
-    if (pendingRuntimeEvents.has(threadId)) {
-      flushPendingRuntimeEventsSync(threadId);
-    }
-    const snapshotItems = snapshot.runtimeItems.map(toRuntimeChatItem);
     const firstSnapshotItemId = snapshotItems[0]?.id;
     const overlapIndex = firstSnapshotItemId ? existingIds.indexOf(firstSnapshotItemId) : -1;
     const preservedOlderItems =
@@ -93,7 +98,13 @@ export function applyThreadSnapshot(
             .slice(0, overlapIndex)
             .flatMap((itemId) => (existingItems?.[itemId] ? [existingItems[itemId]] : []))
         : [];
-    const items = [...preservedOlderItems, ...snapshotItems];
+    // Keep the session-local liveness marker for rows that were originally
+    // observed on this client. It is intentionally not persisted by the
+    // server, but replacing a catch-up snapshot should not erase it either.
+    const reconciledSnapshotItems = snapshotItems.map((item) =>
+      existingItems?.[item.id]?.observedLive ? { ...item, observedLive: true } : item,
+    );
+    const items = [...preservedOlderItems, ...reconciledSnapshotItems];
     useAppStore.setState((current) => ({
       runtimeItemIdsByThread: {
         ...current.runtimeItemIdsByThread,
@@ -124,6 +135,73 @@ export function applyThreadSnapshot(
   }
 
   syncRuntimeRequestsFromSnapshot(snapshot);
+}
+
+const RUNTIME_ITEM_STATE_RANK: Record<RuntimeChatItem["state"], number> = {
+  started: 0,
+  updated: 1,
+  completed: 2,
+};
+
+/**
+ * A fresh active-thread snapshot may safely replace the current tail when it
+ * contains every locally-known tail item in the same order and every streamed
+ * text bucket is equal to, or an append-only extension of, what is visible.
+ *
+ * This is the foreground catch-up case Safari needs: a long assistant response
+ * usually grows one existing item, so item-count-only freshness checks cannot
+ * distinguish a stale snapshot from one containing all output emitted while
+ * the page was suspended.
+ */
+function snapshotMonotonicallyCoversExistingTail(
+  existingIds: readonly string[],
+  existingItems: Record<string, RuntimeChatItem> | undefined,
+  snapshotItems: readonly RuntimeChatItem[],
+): boolean {
+  const firstSnapshotId = snapshotItems[0]?.id;
+  if (!firstSnapshotId || existingIds.length === 0 || !existingItems) return false;
+  const overlapIndex = existingIds.indexOf(firstSnapshotId);
+  if (overlapIndex < 0) return false;
+  const existingTailIds = existingIds.slice(overlapIndex);
+  if (existingTailIds.length > snapshotItems.length) return false;
+
+  return existingTailIds.every((itemId, index) => {
+    const existing = existingItems[itemId];
+    const incoming = snapshotItems[index];
+    if (!existing || !incoming || incoming.id !== itemId) return false;
+    if (incoming.type !== existing.type || incoming.parentItemId !== existing.parentItemId) {
+      return false;
+    }
+    if (RUNTIME_ITEM_STATE_RANK[incoming.state] < RUNTIME_ITEM_STATE_RANK[existing.state]) {
+      return false;
+    }
+    if (!snapshotValueMonotonicallyCovers(existing.payload, incoming.payload)) return false;
+    return Object.entries(existing.streams).every(([stream, text]) => {
+      const incomingText = incoming.streams[stream as keyof RuntimeChatItem["streams"]] ?? "";
+      return incomingText.startsWith(text ?? "");
+    });
+  });
+}
+
+function snapshotValueMonotonicallyCovers(existing: unknown, incoming: unknown): boolean {
+  if (Object.is(existing, incoming) || existing === undefined) return true;
+  if (Array.isArray(existing)) {
+    return (
+      Array.isArray(incoming) &&
+      existing.length === incoming.length &&
+      existing.every((value, index) => snapshotValueMonotonicallyCovers(value, incoming[index]))
+    );
+  }
+  if (!existing || typeof existing !== "object" || !incoming || typeof incoming !== "object") {
+    return false;
+  }
+  if (Array.isArray(incoming)) return false;
+  const incomingRecord = incoming as Record<string, unknown>;
+  return Object.entries(existing as Record<string, unknown>).every(
+    ([key, value]) =>
+      Object.hasOwn(incomingRecord, key) &&
+      snapshotValueMonotonicallyCovers(value, incomingRecord[key]),
+  );
 }
 
 function syncThreadMetadataFromSnapshot(

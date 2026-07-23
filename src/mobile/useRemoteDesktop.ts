@@ -45,6 +45,7 @@ import { applyDesktopSettings, resetDesktopSettings } from "./settingsSync";
 import { sortThreadsByRecency } from "./presentation";
 import {
   applyAgentStatuses,
+  applyProviderUsage,
   applyShellSnapshot,
   applyThreadSnapshot,
   resetRemoteStores,
@@ -69,6 +70,9 @@ import {
   type StoredDesktop,
 } from "./storage";
 import { deleteSshCredential, getSshCredential, setSshCredential } from "./sshVault";
+import { WIDE_SHELL_QUERY } from "./useMediaQuery";
+
+const NARROW_PWA_INITIAL_TIMELINE_ENTRY_COUNT = 20;
 
 export type ConnectionState =
   | "booting"
@@ -503,29 +507,28 @@ export function useRemoteDesktop() {
       if (desktop.desktopId !== activeDesktopIdRef.current) return null;
       applyShellSnapshot(next);
       shellSnapshotRef.current = next;
-      liveSocketSeqRef.current.set(
-        desktop.desktopId,
-        Math.max(liveSocketSeqRef.current.get(desktop.desktopId) ?? 0, next.snapshotSeq),
-      );
-      if (socketCoordinatorRef.current?.desktopId === desktop.desktopId) {
-        socketCoordinatorRef.current.coordinator.advanceLastSeenSeq(next.snapshotSeq);
-      }
       // Auxiliary data (agent statuses + remote-editable AI settings) is
       // independent of the thread list and streams as live events, so only
       // re-poll it on explicit/initial/reconnect refreshes. Never let either
       // failure hide threads. Older desktops without the settings endpoint just
       // fall back to cached values.
       if (includeAuxiliary) {
-        const [statuses, desktopSettings, environment] = await Promise.allSettled([
+        const [statuses, desktopSettings, environment, providerUsage] = await Promise.allSettled([
           client.agentStatuses(),
           client.settings(),
           // Refresh host platform for existing pairings that predate the field
           // (and keep it current if the user migrates the desktop OS).
           client.environment(),
+          // Usage events are intentionally omitted from the remote WebSocket,
+          // so cold/direct thread loads must hydrate the cache during session
+          // bootstrap instead of relying on a view effect that can run before
+          // the active bridge client exists.
+          client.providerUsage(),
         ]);
         if (desktop.desktopId !== activeDesktopIdRef.current) return null;
         if (statuses.status === "fulfilled") applyAgentStatuses(statuses.value);
         if (desktopSettings.status === "fulfilled") applyDesktopSettings(desktopSettings.value);
+        if (providerUsage.status === "fulfilled") applyProviderUsage(providerUsage.value);
         if (environment.status === "fulfilled" && environment.value.platform) {
           const platform = environment.value.platform;
           if (desktop.platform !== platform) {
@@ -544,6 +547,30 @@ export function useRemoteDesktop() {
       lastRefreshOkAtRef.current = Date.now();
       setConnection("online");
       setMessage("");
+      const threadId = selectedThreadIdRef.current ?? firstThreadIdByRecency(next.threads);
+      let replayCoveredThroughSeq: number | null = next.snapshotSeq;
+      if (options.refreshSelectedThread && threadId) {
+        const loaded = await loadThreadSnapshot(threadId, desktop, { preferCache: false });
+        if (desktop.desktopId !== activeDesktopIdRef.current) return null;
+        // A shell snapshot does not contain the selected transcript. Do not
+        // acknowledge its event cursor until fresh thread history has also
+        // landed; otherwise a failed history request makes queued chat deltas
+        // look covered even though they never reached the runtime store.
+        replayCoveredThroughSeq = loaded?.fromServer
+          ? Math.min(next.snapshotSeq, loaded.snapshot.snapshotSeq)
+          : options.resetLastSeenSeq
+            ? next.snapshotSeq
+            : null;
+      }
+      if (replayCoveredThroughSeq !== null) {
+        liveSocketSeqRef.current.set(
+          desktop.desktopId,
+          Math.max(liveSocketSeqRef.current.get(desktop.desktopId) ?? 0, replayCoveredThroughSeq),
+        );
+        if (socketCoordinatorRef.current?.desktopId === desktop.desktopId) {
+          socketCoordinatorRef.current.coordinator.advanceLastSeenSeq(replayCoveredThroughSeq);
+        }
+      }
       // The shell snapshot content is keyed by snapshotSeq: an unchanged seq
       // means nothing the snapshot carries has changed since the last persist,
       // so skip the Dexie write, the desktop-row bump, AND the reloadDesktops()
@@ -559,15 +586,22 @@ export function useRemoteDesktop() {
         // live connection offline (the server was clearly reachable — we just got
         // the snapshot from it).
         try {
-          await Promise.all([
-            saveShellSnapshot(desktop.desktopId, next),
-            options.resetLastSeenSeq
-              ? markDesktopConnected(desktop.desktopId, next.snapshotSeq, {
-                  resetLastSeenSeq: true,
-                })
-              : markDesktopConnected(desktop.desktopId, next.snapshotSeq),
-          ]);
-          persistedShellSeqRef.current.set(desktop.desktopId, next.snapshotSeq);
+          const markConnected =
+            replayCoveredThroughSeq === null
+              ? markDesktopConnected(desktop.desktopId)
+              : options.resetLastSeenSeq
+                ? markDesktopConnected(desktop.desktopId, replayCoveredThroughSeq, {
+                    resetLastSeenSeq: true,
+                  })
+                : markDesktopConnected(desktop.desktopId, replayCoveredThroughSeq);
+          await Promise.all([saveShellSnapshot(desktop.desktopId, next), markConnected]);
+          // Keep this refresh eligible for persistence retry when selected
+          // history failed. The shell blob itself may have saved, but its seq
+          // must not become the durable replay cursor until the transcript is
+          // covered too.
+          if (replayCoveredThroughSeq !== null) {
+            persistedShellSeqRef.current.set(desktop.desktopId, next.snapshotSeq);
+          }
         } catch (error) {
           setMessage(describeError(error, i18n._(msg`Couldn't cache offline data.`)));
         }
@@ -575,10 +609,6 @@ export function useRemoteDesktop() {
         // Forcing it would flip the user back to a stale desktop when a late
         // refresh of a previous desktop resolves after a switch.
         await reloadDesktops();
-      }
-      const threadId = selectedThreadIdRef.current ?? firstThreadIdByRecency(next.threads);
-      if (options.refreshSelectedThread && threadId) {
-        await loadThreadSnapshot(threadId, desktop, { preferCache: false });
       }
       return next;
     } catch (error) {
@@ -685,13 +715,28 @@ export function useRemoteDesktop() {
       applyThreadSnapshot(cached.snapshot, { fromServer: false });
     }
     try {
-      const next = await clientFor(desktop).threadHistory(threadId);
+      const client = clientFor(desktop);
+      const useNarrowPwaPage =
+        !isNativeApp() &&
+        typeof window.matchMedia === "function" &&
+        !window.matchMedia(WIDE_SHELL_QUERY).matches;
+      const next = useNarrowPwaPage
+        ? await client.threadHistory(threadId, {
+            targetTimelineEntryCount: NARROW_PWA_INITIAL_TIMELINE_ENTRY_COUNT,
+          })
+        : await client.threadHistory(threadId);
       // Bail if the active desktop changed while the fetch was in flight.
       if (desktop.desktopId !== activeDesktopIdRef.current) return latest;
       // Bail if the user opened another thread while the fetch was in flight.
       if (isStaleSelection()) return latest;
       latest = { snapshot: next, fromServer: true };
-      seedOlderThreadRuntimeItemsCursor(threadId, next.runtimeNextCursor ?? null);
+      const firstSnapshotItemId = next.runtimeItems[0]?.id;
+      const existingRuntimeItemIds = useAppStore.getState().runtimeItemIdsByThread[threadId] ?? [];
+      const tailOverlapsExistingTranscript =
+        firstSnapshotItemId !== undefined && existingRuntimeItemIds.includes(firstSnapshotItemId);
+      seedOlderThreadRuntimeItemsCursor(threadId, next.runtimeNextCursor ?? null, {
+        preserveExistingCursor: tailOverlapsExistingTranscript,
+      });
       setThreadSnapshot(next);
       // A fresh server history IS authoritative (fromServer defaults to true).
       applyThreadSnapshot(next, { fromServer: true });
@@ -720,10 +765,10 @@ export function useRemoteDesktop() {
     } catch (error) {
       setMessage(describeError(error, i18n._(msg`Unable to load thread.`)));
       downgradeConnectionOnError(error);
-      // Nothing painted at all (no cache, first open): one bounded retry so a
-      // single transient failure doesn't leave the thread blank until the user
-      // navigates away and back. Skipped when the user has moved on.
-      if (!options.retried && latest === null && selectedThreadIdRef.current === threadId) {
+      // One bounded retry even when cached history painted successfully: the
+      // cache may be exactly the partial transcript from before Safari was
+      // suspended. Skipped when the user has moved on.
+      if (!options.retried && selectedThreadIdRef.current === threadId) {
         window.setTimeout(() => {
           if (
             selectedThreadIdRef.current === threadId &&

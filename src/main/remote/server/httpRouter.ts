@@ -11,6 +11,7 @@ import {
   remotePushRegistrationSchema,
   remotePushUnregisterSchema,
   remoteRuntimeItemsPageRequestSchema,
+  remoteTimelineEntryCountSchema,
   remoteSettingsPatchSchema,
   remoteScheduleCommandSchema,
   remoteTokenExchangePayloadSchema,
@@ -23,6 +24,7 @@ import {
   interruptThreadPayloadSchema,
   profileIdentitySchema,
   profileStatsRequestSchema,
+  projectNotesSchema,
   emptyMcpLaunchSnapshot,
   remoteThreadCommandSchema,
   resizeTerminalPayloadSchema,
@@ -37,7 +39,10 @@ import {
   dbClaimRemoteCommand,
   dbCompleteRemoteCommand,
   dbFailRemoteCommand,
+  dbGetProject,
+  dbGetProjectNotes,
   dbGetThread,
+  dbSetProjectNotes,
 } from "../../db";
 import {
   getProfileCoreStats,
@@ -88,6 +93,17 @@ export function threadIdFromPath(pathname: string, suffix: string): string | nul
   try {
     const threadId = decodeURIComponent(raw);
     return threadId.includes("/") ? null : threadId;
+  } catch {
+    return null;
+  }
+}
+
+function projectNotesIdFromPath(pathname: string): string | null {
+  const match = /^\/api\/projects\/([^/]+)\/notes$/.exec(pathname);
+  if (!match?.[1]) return null;
+  try {
+    const projectId = decodeURIComponent(match[1]);
+    return projectId.includes("/") ? null : projectId;
   } catch {
     return null;
   }
@@ -337,7 +353,7 @@ export async function handleHttp(
       writeJson(
         res,
         200,
-        ctx.auth.exchangePairingCredential({
+        ctx.exchangePairingCredential({
           credential: payload.credential,
           ...(payload.scopes ? { scopes: payload.scopes } : {}),
           ...(payload.client ? { client: payload.client } : {}),
@@ -363,6 +379,32 @@ export async function handleHttp(
     if (req.method === "GET" && url.pathname === "/api/provider-usage") {
       ctx.security.requireBearer(req, ["session:read"]);
       writeJson(res, 200, await ctx.options.callSupervisor("getProviderUsage", {}));
+      return;
+    }
+    const notesProjectId = projectNotesIdFromPath(url.pathname);
+    if (notesProjectId && req.method === "GET") {
+      ctx.security.requireBearer(req, ["session:read"]);
+      if (!dbGetProject(notesProjectId)) {
+        throw new RemoteHttpError("project_not_found", "Project not found.", 404);
+      }
+      writeJson(res, 200, { notes: dbGetProjectNotes(notesProjectId) });
+      return;
+    }
+    if (notesProjectId && req.method === "POST") {
+      ctx.security.requireBearer(req, ["session:operate"]);
+      if (!dbGetProject(notesProjectId)) {
+        throw new RemoteHttpError("project_not_found", "Project not found.", 404);
+      }
+      const notes = projectNotesSchema.parse(await readJsonBody(req));
+      if (notes.projectId !== notesProjectId) {
+        throw new RemoteHttpError(
+          "project_notes_mismatch",
+          "Project notes do not match the requested project.",
+          400,
+        );
+      }
+      dbSetProjectNotes(notes);
+      writeJson(res, 200, {});
       return;
     }
     // Serves local images (chat attachments, markdown images) to paired
@@ -586,11 +628,19 @@ export async function handleHttp(
     const historyThreadId = threadIdFromPath(url.pathname, "/history");
     if (req.method === "GET" && historyThreadId) {
       ctx.security.requireBearer(req, ["session:read"]);
+      const targetTimelineEntryCount = url.searchParams.get("targetTimelineEntryCount");
       writeJson(
         res,
         200,
         await buildThreadSnapshot(ctx, historyThreadId, {
           runtimePage: url.searchParams.get("runtimePage") === "1",
+          ...(targetTimelineEntryCount !== null
+            ? {
+                targetTimelineEntryCount: remoteTimelineEntryCountSchema.parse(
+                  Number(targetTimelineEntryCount),
+                ),
+              }
+            : {}),
         }),
       );
       return;
@@ -649,7 +699,15 @@ export async function handleHttp(
           const rendererCommand =
             command.kind === "start" ? { ...command, launchRuntime: false } : command;
           ctx.options.dispatchThreadCommand?.(rendererCommand);
-          ctx.publishThreadsChanged([command.threadId]);
+          if (command.kind === "acknowledge") {
+            ctx.publishSupervisorEvent({
+              type: "remote-threads-changed",
+              threadIds: [command.threadId],
+              viewedThreadIds: [command.threadId],
+            });
+          } else {
+            ctx.publishThreadsChanged([command.threadId]);
+          }
         }
         return { ok: true };
       };

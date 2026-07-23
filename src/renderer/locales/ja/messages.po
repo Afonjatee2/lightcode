@@ -638,11 +638,11 @@ msgid "Actions"
 msgstr "アクション"
 
 #. placeholder {0}: thread.title
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Actions for {0}"
 msgstr "{0} のアクション"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Actions for {title}"
 msgstr "{title} のアクション"
 
@@ -817,6 +817,10 @@ msgstr "お気に入りに追加"
 #: src/mobile/views/DesktopsView.tsx
 msgid "Add to Home Screen"
 msgstr "ホーム画面に追加"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
+msgid "Add to-do"
+msgstr "タスクを追加"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Advertise a custom base URL, e.g. a reverse proxy or tunnel. Leave empty for automatic."
@@ -1102,7 +1106,8 @@ msgstr "アーカイブ{0}"
 msgid "Archive All"
 msgstr "すべてをアーカイブする"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Archive all threads"
 msgstr "すべてのスレッドをアーカイブ"
 
@@ -1115,7 +1120,8 @@ msgid "Archive thread"
 msgstr "スレッドをアーカイブ"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Archive Thread"
 msgstr "アーカイブスレッド"
@@ -1290,8 +1296,10 @@ msgid "Avatar color {color}"
 msgstr "アバターの色：{color}"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/mobile/views/NotesView.tsx
 #: src/mobile/views/pr/PrPageHeader.tsx
 #: src/mobile/views/TerminalView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/composer/ComposerAddMenu.tsx
@@ -2047,10 +2055,11 @@ msgstr "ゴールを閉じる"
 msgid "Close group"
 msgstr "グループを閉じる"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Close group actions"
 msgstr "グループのアクションを閉じる"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/mobile/UserMessageActionsSheet.tsx
 #: src/mobile/views/GitActionSheet.tsx
 msgid "Close menu"
@@ -2135,7 +2144,7 @@ msgid "Close thread"
 msgstr "スレッドを閉じる"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Close thread actions"
 msgstr "スレッドのアクションを閉じる"
 
@@ -3151,7 +3160,8 @@ msgid "Delete thread"
 msgstr "スレッドの削除"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Delete Thread"
 msgstr "スレッドの削除"
@@ -3160,12 +3170,14 @@ msgstr "スレッドの削除"
 msgid "Delete thread?"
 msgstr "スレッドを削除しますか?"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 msgid "Delete to-do"
 msgstr "To-Doを削除する"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorktreeGroup.tsx
 msgid "Delete Worktree"
 msgstr "ワークツリーの削除"
@@ -4065,6 +4077,7 @@ msgstr "ファイルが大きすぎて表示できません（{0, plural, one {#
 msgid "File uses an unsupported encoding."
 msgstr "ファイルはサポートされていないエンコーディングを使用しています。"
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 msgid "Files"
@@ -4392,6 +4405,7 @@ msgid "Get task"
 msgstr "タスクの取得"
 
 #: src/mobile/settingsSections.ts
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
@@ -4490,6 +4504,11 @@ msgstr "ナビゲーション履歴で進む"
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Goal"
 msgstr "目標"
+
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#~ msgid "Goals"
+#~ msgstr "目標"
 
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Goals set"
@@ -5342,7 +5361,8 @@ msgstr "プロバイダーが管理"
 msgid "Manual order"
 msgstr "手動並び替え"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Mark all done"
 msgstr "すべて完了にする"
 
@@ -5364,7 +5384,8 @@ msgid "Mark done"
 msgstr "完了マークを付ける"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Mark Done"
 msgstr "完了マークを付ける"
@@ -5987,7 +6008,8 @@ msgid "New thread from this to-do"
 msgstr "この ToDo からの新しいスレッド"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "New thread in worktree"
 msgstr "worktree で新規スレッド"
 
@@ -6187,6 +6209,10 @@ msgstr "「{0}」に一致するファイルはありません。"
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "No GitHub CLI accounts found. Sign in with <0>gh auth login</0>, or <1>paste a clone URL</1>."
 msgstr "GitHub CLI アカウントが見つかりません。 <0>gh auth login</0>でサインインするか、<1>クローン URL を貼り付け</1>ます。"
+
+#: src/mobile/views/DesktopGoalsPanel.tsx
+#~ msgid "No goal for this thread."
+#~ msgstr "このスレッドには目標がありません。"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "No history yet"
@@ -6451,10 +6477,16 @@ msgstr "サインインしていません"
 msgid "Not supported"
 msgstr "サポートされていません"
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 msgid "Notes"
 msgstr "注意事項"
+
+#: src/mobile/ThreadTitleRow.tsx
+#: src/mobile/views/NotesView.tsx
+msgid "Notes & to-dos"
+msgstr "メモとタスク"
 
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
 msgid "Nothing tracked yet. It'll appear here as you use it."
@@ -6792,12 +6824,14 @@ msgstr "Tailscaleを開く"
 
 #: src/mobile/ThreadTitleRow.tsx
 #: src/mobile/views/TerminalView.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Open terminal"
 msgstr "ターミナルを開く"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Open terminal in worktree"
 msgstr "worktree でターミナルを開く"
 
@@ -7089,7 +7123,8 @@ msgid "Picker returned no attachment"
 msgstr "ピッカーは添付ファイルを返しませんでした"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Pin to top"
 msgstr "トップにピン留めする"
@@ -7187,8 +7222,10 @@ msgstr "ポート転送が有効になっていません"
 
 #: src/mobile/chrome.ts
 #: src/mobile/NarrowShell.tsx
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/mobile/WideShell.tsx
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 msgid "Ports"
 msgstr "ポート"
 
@@ -7848,10 +7885,13 @@ msgid "Remove worktree?"
 msgstr "ワークツリーを削除しますか?"
 
 #: src/mobile/ThreadTitleRow.tsx
+#: src/mobile/TodoActionsSheet.tsx
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/FilesView.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Rename"
 msgstr "名前の変更"
@@ -7991,6 +8031,10 @@ msgstr "gitパネルのサイズを変更する"
 msgid "Resize notes and to-dos"
 msgstr "メモと ToDo のサイズを変更する"
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+msgid "Resize right panel"
+msgstr "右パネルのサイズを変更"
+
 #: src/renderer/components/layout/SplitPaneContainer.tsx
 msgid "Resize row"
 msgstr "行のサイズを変更する"
@@ -8047,6 +8091,7 @@ msgstr "再開"
 #: src/mobile/views/TerminalView.tsx
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
+#: src/renderer/views/GitReviewOverlay/parts/GitStackedDiff.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Retry"
 msgstr "再試行"
@@ -8183,6 +8228,8 @@ msgstr "右パネル"
 msgid "Right-click to switch ring"
 msgstr "右クリックでリングを切り替え"
 
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
@@ -9184,6 +9231,7 @@ msgstr "新しいスレッドをページではなくパネルとして開始す
 msgid "Start a new thread from the selected text"
 msgstr "選択したテキストから新しいスレッドを開始します"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 msgid "Start a new thread from this to-do"
 msgstr "この ToDo から新しいスレッドを開始します"
@@ -9605,6 +9653,7 @@ msgid "Tell the target provider what to do next..."
 msgstr "ターゲットプロバイダーに次に何をすべきかを伝えます..."
 
 #: src/mobile/settingsSections.ts
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
@@ -10049,6 +10098,7 @@ msgstr "タイトルの生成"
 msgid "Title, commit, and conflict models"
 msgstr "タイトル、コミット、競合用モデル"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
 msgid "To-dos"
 msgstr "やるべきこと"
@@ -10110,6 +10160,10 @@ msgstr "ツール制限はインポートできません"
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Tool search"
 msgstr "ツール検索"
+
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+msgid "Tools"
+msgstr "ツール"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Total installs"
@@ -10255,6 +10309,10 @@ msgstr "{0}フックをインストールできません。"
 #: src/renderer/actions/agentLoginActions.ts
 msgid "Unable to install {0}."
 msgstr "{0}をインストールできません。"
+
+#: src/renderer/views/GitReviewOverlay/parts/GitStackedDiff.tsx
+msgid "Unable to load diff."
+msgstr "差分を読み込めませんでした。"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Unable to load remote access pairing."
@@ -10497,7 +10555,8 @@ msgstr "アイドル状態のスレッドをアンロードするまでの時間
 msgid "Unload Thread"
 msgstr "スレッドをアンロード"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Unmark all done"
 msgstr "すべての完了を解除"
 
@@ -10506,7 +10565,8 @@ msgid "Unmark done"
 msgstr "完了のマークを外す"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Unmark Done"
 msgstr "完了のマークを外す"
@@ -10520,7 +10580,8 @@ msgid "Unphased:"
 msgstr "フェーズなし:"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Unpin"
 msgstr "固定を解除する"
@@ -10644,6 +10705,7 @@ msgstr "URLは必須です。"
 #: src/mobile/NarrowShell.tsx
 #: src/mobile/settingsSections.ts
 #: src/mobile/ThreadUsageIndicator.tsx
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/WideShell.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/providers/ProviderUsageRail.tsx

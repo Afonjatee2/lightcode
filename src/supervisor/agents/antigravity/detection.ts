@@ -32,7 +32,7 @@ export const defaultAntigravityCapabilities: AgentCapability = {
   liveInputMode: "terminal",
   presentationMode: "terminal",
   presentationModes: ["terminal"],
-  defaultApprovalPolicy: "default",
+  defaultApprovalPolicy: "yolo",
   bypassPermissions: { approvalPolicy: "yolo" },
   // No dedicated-server hosting path in any presentation.
   mcpScope: { terminal: "none", gui: "none" },

@@ -1,8 +1,20 @@
-import type { Thread } from "@/shared/contracts";
-import type { RemoteAgentStatuses, RemoteShellSnapshot } from "@/shared/remote";
+import type { ProviderUsageResponse, Thread } from "@/shared/contracts";
+import {
+  remoteThreadsChangedEventSchema,
+  type RemoteAgentStatuses,
+  type RemoteShellSnapshot,
+} from "@/shared/remote";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
+import { resetDevTerminalStore } from "@/renderer/state/devTerminalStore";
+import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
+import { resetGitReviewActionStore } from "@/renderer/state/gitReviewActionStore";
+import { resetGitStoreCache } from "@/renderer/state/gitStore";
+import { useNotesStore } from "@/renderer/state/notesStore";
+import { useProviderUsageStore } from "@/renderer/state/providerUsageStore";
+import { resetProjectTreeStore } from "@/renderer/state/projectTreeStore";
 import { useGitSummariesStore } from "./gitSummaries";
+import { useDesktopPanelStore } from "./desktopPanelStore";
 import { emitTerminalExited, emitTerminalReset } from "./terminalFeed";
 import { notifyLiveActivityThreadState } from "./push/liveActivityController";
 import {
@@ -80,7 +92,19 @@ export function applyShellSnapshot(snapshot: RemoteShellSnapshot): void {
 /** Drop everything tied to the previous desktop when switching/unpairing. */
 export function resetRemoteStores(): void {
   clearPendingRuntimeEvents();
+  // Renderer workspace stores are process-global because Electron has one
+  // local desktop. The PWA can switch among several desktops, so none of their
+  // cached notes, files, Git state, drafts, or terminal tabs may cross that
+  // identity boundary.
+  useNotesStore.getState().resetSession();
+  useFileEditorStore.getState().clearSession();
+  resetProjectTreeStore();
+  resetGitStoreCache();
+  resetGitReviewActionStore();
+  resetDevTerminalStore();
+  useDesktopPanelStore.getState().reset();
   useGitSummariesStore.getState().reset();
+  useProviderUsageStore.getState().setSnapshots([]);
   useAppStore.setState({
     projects: [],
     threads: [],
@@ -92,6 +116,10 @@ export function resetRemoteStores(): void {
     ...createInitialSubAgentOverlayState(),
     ...createInitialPendingSteerState(),
   });
+}
+
+export function applyProviderUsage(response: ProviderUsageResponse): void {
+  useProviderUsageStore.getState().setSnapshots(response.snapshots);
 }
 
 export function applyAgentStatuses(statuses: RemoteAgentStatuses): void {
@@ -133,5 +161,19 @@ const mobileDispatchHooks: RemoteDispatchHooks = {
 };
 
 export function dispatchRemoteSupervisorEvent(value: unknown): void {
+  const threadMetadataEvent = remoteThreadsChangedEventSchema.safeParse(value);
+  if (threadMetadataEvent.success && threadMetadataEvent.data.viewedThreadIds) {
+    const viewed = new Set(threadMetadataEvent.data.viewedThreadIds);
+    useAppStore.setState((current) => {
+      let changed = false;
+      const threads = current.threads.map((thread) => {
+        if (!viewed.has(thread.id) || thread.status !== "finished") return thread;
+        changed = true;
+        return { ...thread, status: "idle" as const };
+      });
+      return changed ? { threads } : {};
+    });
+    return;
+  }
   dispatchRemoteSupervisorEventCore(value, mobileDispatchHooks);
 }

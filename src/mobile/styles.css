@@ -91,6 +91,270 @@ body {
   overflow: hidden;
 }
 
+/* The standalone bootstrap pins <html> to physical 100lvh before styles load.
+   Body/root inherit that height; list tails and floating controls add their
+   own env(safe-area-inset-bottom) clearance below. */
+html[data-mobile-platform="ios"][data-mobile-standalone="true"] body {
+  height: 100%;
+  min-height: 100%;
+}
+
+html[data-mobile-platform="ios"][data-mobile-standalone="true"] #root {
+  position: static;
+  height: 100%;
+  min-height: 100%;
+}
+
+/* iOS Safari 26 floats its bottom toolbar over the in-flow document. Size the
+   browser-mode shell to the large viewport so its bottom-edge paint supplies
+   Safari's covered band. Floating Poracode controls stay aligned to the
+   visible toolbar edge; installed/native shells keep their existing geometry
+   because their display mode is not `browser`. */
+@media (display-mode: browser) {
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"] {
+    /* Safari reports a zero bottom safe-area inset in browser mode. The
+       large/small viewport range is the single real collapsible-toolbar band. */
+    --m-browser-toolbar-depth: calc(100lvh - 100svh);
+    /* Everything is anchored to the SMALL viewport (100svh): the region that
+       is always visible above Safari's expanded chrome. Paint must continue
+       below it — through the toolbar band and the physical chrome under
+       100lvh (collapsed-pill zone + home indicator, ~98pt total on iPhone 17)
+       — but no env() exposes that depth, and Safari's derived flat fill
+       visibly cuts a row list mid-toolbar. Three toolbar bands is the
+       smallest derived length that covers it on current iPhones.
+       overflow:hidden on the shells means the extension never creates
+       scrollable range. The SAME quantity offsets pinned controls and
+       trailing clearances from an extended surface's bottom back up to the
+       visible viewport bottom. */
+    --m-browser-band-paint: calc(3 * var(--m-browser-toolbar-depth));
+    --m-browser-toolbar-safe-area: calc(env(safe-area-inset-bottom) + var(--m-browser-band-paint));
+    --m-browser-edge-gap: 0.75rem;
+    --m-browser-list-tail: 1.5rem;
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"] #root {
+    bottom: auto;
+    height: 100lvh;
+  }
+
+  /* Fixed backdrops clip at Safari's layout-viewport line. Keep browser-mode
+     backdrops transparent so opening a composer or sheet preserves the
+     in-flow shell paint Safari samples for the covered bottom band. The layers
+     remain mounted and tappable to preserve outside-tap dismissal. */
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"] .m-compose-scrim {
+    background: transparent;
+  }
+
+  /* Responsive menu sheets portal into the mobile shell so they share the
+     page compositor with the composer. The backdrop and sheet both reach the
+     physical viewport bottom; browser-toolbar clearance belongs to the model
+     list's scroll content below, not to the sheet's outer geometry. */
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"] .m-shell > .m-sheet-backdrop {
+    position: absolute;
+    inset: 0 0 auto;
+    height: calc(100svh + var(--m-browser-band-paint));
+    background: transparent;
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell
+    > .m-sheet-backdrop
+    > .m-sheet:has(.poracode-model-menu-listbox) {
+    overflow: hidden;
+    height: auto;
+    max-height: calc(65svh + var(--m-browser-band-paint));
+    padding-bottom: 0;
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell
+    > .m-sheet-backdrop
+    > .m-sheet
+    .poracode-model-menu-listbox {
+    height: auto !important;
+    min-height: 0;
+    max-height: none !important;
+    flex: 1;
+    scroll-padding-bottom: calc(var(--m-browser-edge-gap) + var(--m-browser-toolbar-safe-area));
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell
+    > .m-sheet-backdrop
+    > .m-sheet[data-expanded]:has(.poracode-model-menu-listbox) {
+    height: calc(
+      100dvh - env(safe-area-inset-top) - var(--m-browser-edge-gap) + var(--m-browser-band-paint)
+    );
+    max-height: calc(
+      100dvh - env(safe-area-inset-top) - var(--m-browser-edge-gap) + var(--m-browser-band-paint)
+    );
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"] .m-home-compose-actions,
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell[data-chrome="home"]
+    .m-compose-dock {
+    bottom: calc(var(--m-browser-edge-gap) + var(--m-browser-toolbar-safe-area));
+  }
+
+  /* Keep the home document locked to the visible viewport. Safari collapses
+     its browser chrome and enables pull-to-refresh for document-level scrolls;
+     the inner thread list remains the sole vertical scroller so neither can
+     happen while normal list scrolling continues to work. The svh-anchored,
+     band-paint-extended in-flow document gives Safari real page paint beneath
+     its glass toolbar all the way to the physical screen edge. */
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]:has(
+    .m-shell[data-chrome="home"]
+  ),
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]:has(
+      .m-shell[data-chrome="home"]
+    )
+    body {
+    height: calc(100svh + var(--m-browser-band-paint));
+    overflow: hidden;
+    overscroll-behavior-y: none;
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]:has(
+      .m-shell[data-chrome="home"]
+    )
+    #root {
+    position: static;
+    height: calc(100svh + var(--m-browser-band-paint));
+    overflow: hidden;
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"] .m-shell[data-chrome="home"] {
+    height: 100%;
+    min-height: 0;
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell[data-chrome="home"]
+    > .m-main
+    > .m-threads
+    > .m-thread-list::after {
+    flex-basis: calc(
+      var(--m-floating-control-height) + var(--m-browser-list-tail) +
+        var(--m-browser-toolbar-safe-area)
+    );
+  }
+
+  /* Thread chrome: the transcript keeps its inner virtualized scroller (iOS
+     latches touch scrolls to it, so a document-scroll handoff can never
+     collapse the toolbar here). But Safari only composites DOCUMENT content
+     into the transparent slice beneath its toolbar — a fixed-position #root
+     is cut at the dynamic viewport and leaves a black band there. So the
+     thread shell leaves the fixed root and becomes in-flow document content
+     at 100lvh, with the interactive chrome pinned to the visible viewport. */
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]:has(
+    .m-shell[data-chrome="thread"]
+  ),
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]:has(
+      .m-shell[data-chrome="thread"]
+    )
+    body {
+    height: auto;
+    overflow: hidden;
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]:has(
+      .m-shell[data-chrome="thread"]
+    )
+    #root {
+    position: static;
+    height: auto;
+    overflow: visible;
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell[data-chrome="thread"] {
+    height: calc(100svh + var(--m-browser-band-paint));
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell[data-chrome="thread"]::before,
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell[data-chrome="thread"]
+    > .m-topbar,
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell[data-chrome="thread"]
+    .m-thread-bar,
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell[data-chrome="thread"]
+    .m-thread-compose-dock,
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell[data-chrome="thread"]
+    .m-thread-chips {
+    position: fixed;
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell[data-chrome="thread"]
+    .m-thread
+    .m-thread-content
+    [data-chat-virtual-size-box="true"] {
+    padding-bottom: calc(
+      var(--m-floating-control-height) + var(--m-browser-list-tail) +
+        var(--m-browser-toolbar-safe-area)
+    );
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell[data-chrome="thread"]
+    .m-thread
+    .m-thread-content
+    button.bottom-4:has(svg.lucide-arrow-down) {
+    bottom: calc(
+      var(--m-thread-pin-lift, 1.75rem) +
+        var(--m-thread-bubble-height, var(--m-floating-control-height)) +
+        var(--m-keyboard-offset, 0px) + var(--m-browser-toolbar-safe-area)
+    );
+  }
+
+  /* Subscreens use the same in-flow large-viewport shell as threads so
+     Safari can derive the covered bottom band from the app background. The
+     shell is a flex column, so the top bar stays in flow (a fixed topbar
+     would paint behind the positioned, opaque .m-main that follows it) and
+     .m-page below it remains the sole scroller. */
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]:has(
+    .m-shell[data-chrome="subscreen"]
+  ),
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]:has(
+      .m-shell[data-chrome="subscreen"]
+    )
+    body {
+    height: auto;
+    overflow: hidden;
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]:has(
+      .m-shell[data-chrome="subscreen"]
+    )
+    #root {
+    position: static;
+    height: auto;
+    overflow: visible;
+  }
+
+  /* Subscreens never document-scroll, so the toolbar never collapses and the
+     visible viewport is exactly 100dvh. Sizing the shell to it keeps
+     bottom-anchored page content (footers, action rows) above the toolbar;
+     the band beneath gets Safari's derived fill from the matching shell
+     background. */
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell[data-chrome="subscreen"] {
+    height: 100dvh;
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell[data-chrome="subscreen"]
+    > .m-main
+    > .m-page {
+    padding-bottom: var(--m-browser-edge-gap);
+  }
+}
+
 body {
   margin: 0;
 }
@@ -98,6 +362,15 @@ body {
 body.bg-background {
   background: #070709;
   background: var(--background, #070709);
+}
+
+/* iOS paints the status-bar/safe-area canvas from the document, outside the
+   narrow shell where the mobile token override lives. Match that outer canvas
+   to the default mobile theme without changing the wide desktop PWA. */
+html[data-theme="dark"][data-theme-preset="default"]:has(.m-shell:not(.m-shell--wide)),
+html[data-theme="dark"][data-theme-preset="default"]:has(.m-shell:not(.m-shell--wide)) body,
+html[data-theme="dark"][data-theme-preset="default"]:has(.m-shell:not(.m-shell--wide)) #root {
+  background: #000;
 }
 
 /* ── Shell ─────────────────────────────────────────────────────── */
@@ -110,10 +383,38 @@ body.bg-background {
   color: var(--foreground, inherit);
 }
 
+/* Phone PWA pages intentionally use the theme's base background (black in the
+   default dark theme). The desktop PWA gets its distinct, slightly raised
+   content surface from .m-wide-content below. Keep that split structural so
+   transparency added for desktop auxiliary panels cannot change phone pages. */
+.m-shell:not(.m-shell--wide) {
+  --content-background: var(--background);
+}
+
+html[data-theme="dark"][data-theme-preset="default"] .m-shell:not(.m-shell--wide) {
+  --background: #000;
+  --content-background: #000;
+}
+
+.m-shell:not(.m-shell--wide) .m-main {
+  background: var(--background, #070709);
+}
+
 .m-shell--wide {
   display: grid;
   grid-template-columns: var(--m-sidebar-width, clamp(248px, 20vw, 304px)) minmax(0, 1fr);
   grid-template-rows: 100%;
+  background: var(--background, #070709);
+}
+
+.m-wide-content {
+  container-name: m-wide-content;
+  container-type: inline-size;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  background: var(--content-background, #0b0b11);
+  overflow: hidden;
 }
 
 .m-main {
@@ -135,7 +436,7 @@ body.bg-background {
   min-height: 100%;
   align-items: center;
   justify-content: center;
-  background: var(--background, #070709);
+  background: transparent;
   padding-top: calc(0.75rem + env(safe-area-inset-top));
   padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
 }
@@ -153,27 +454,123 @@ body.bg-background {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  /* Clear the floating composer pill so the last rows stay reachable. */
-  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .m-main > .m-threads > .m-threads__picker {
   position: static;
 }
 
-/* App chrome — top bar, bottom tab bar, the threads list, and the wide-layout
-   sidebar — is tap-only: a long-press here opens our own actions sheet (or does
-   nothing), and must never start iOS text selection. Marking only the row
-   non-selectable isn't enough: WebKit then falls back to selecting the page's
-   *other* chrome text ("Select All" over the brand + tab labels), which is the
-   selection users still see. Disabling selection (and the callout) across the
-   whole chrome removes anything for that fallback to grab. Content surfaces
+/* The home list owns the full visual viewport. Its first items start below the
+   safe-area-aware header at rest, then scroll underneath that translucent
+   chrome instead of stopping at its bottom edge. Keeping the clearance on the
+   scroll content (rather than on .m-main) also preserves native iOS overscroll
+   and leaves the bottom composer as a true overlay over the continuing list. */
+.m-shell[data-chrome="home"] {
+  --m-home-header-clearance: calc(env(safe-area-inset-top) + var(--m-tap-min));
+  position: relative;
+}
+
+.m-shell[data-chrome="home"] > .m-topbar {
+  position: absolute;
+  z-index: 7;
+  inset: 0 0 auto;
+  background: color-mix(in oklab, var(--background) 78%, transparent);
+  backdrop-filter: saturate(140%) blur(16px);
+  -webkit-backdrop-filter: saturate(140%) blur(16px);
+}
+
+.m-shell[data-chrome="home"] > .m-main > .m-threads > .m-thread-list {
+  padding-top: calc(var(--m-home-header-clearance) + 0.125rem);
+  scroll-padding-top: var(--m-home-header-clearance);
+}
+
+/* WebKit can omit an overflow flexbox's trailing padding from its scrollable
+   extent. Model the composer/safe-area clearance as a real final flex item so
+   the last card always has enough scroll range to clear the floating chrome. */
+.m-shell[data-chrome="home"] > .m-main > .m-threads > .m-thread-list::after {
+  content: "";
+  display: block;
+  flex: 0 0 calc(var(--m-floating-control-height) + 1.5rem + env(safe-area-inset-bottom));
+}
+
+.m-shell[data-chrome="home"] > .m-main > .m-threads > .m-skeleton-list {
+  padding-top: calc(var(--m-home-header-clearance) + 0.5rem);
+}
+
+/* The thread screen mirrors the home depth treatment: the shell top bar and
+   the workspace sub-bar float as one translucent glass slab and the
+   transcript scrolls beneath them. Clearance lives on the scroller content
+   (not the pane) so native overscroll and the floating composer overlay keep
+   working exactly like the home list. */
+.m-shell[data-chrome="thread"] {
+  position: relative;
+  --m-thread-bar-height: 2.25rem;
+  --m-thread-chrome-clearance: calc(
+    env(safe-area-inset-top) + var(--m-tap-min) + var(--m-thread-bar-height)
+  );
+}
+
+/* One glass slab behind BOTH the top bar and the git sub-bar: the bars
+   themselves stay transparent so the pair reads as a single surface with a
+   single bottom edge instead of two stacked strips. */
+.m-shell[data-chrome="thread"]::before {
+  content: "";
+  position: absolute;
+  z-index: 6;
+  inset: 0 0 auto;
+  height: var(--m-thread-chrome-clearance);
+  pointer-events: none;
+  background: color-mix(in oklab, var(--background) 55%, transparent);
+  backdrop-filter: saturate(140%) blur(20px);
+  -webkit-backdrop-filter: saturate(140%) blur(20px);
+}
+
+.m-shell[data-chrome="thread"] > .m-topbar {
+  position: absolute;
+  z-index: 7;
+  inset: 0 0 auto;
+  background: transparent;
+}
+
+.m-shell[data-chrome="thread"] .m-thread-bar {
+  position: absolute;
+  z-index: 7;
+  inset: calc(env(safe-area-inset-top) + var(--m-tap-min)) 0 auto;
+  min-height: var(--m-thread-bar-height);
+  background: transparent;
+}
+
+.m-shell[data-chrome="thread"]
+  .m-thread:not(.m-thread--terminal)
+  .m-thread-content
+  [data-poracode-chat-scroller] {
+  padding-top: calc(var(--m-thread-chrome-clearance) + 0.375rem);
+  scroll-padding-top: var(--m-thread-chrome-clearance);
+}
+
+/* The terminal is an opaque surface that cannot ghost under the glass — its
+   column starts below the floating chrome instead. */
+.m-shell[data-chrome="thread"] .m-thread--terminal .m-thread-content {
+  padding-top: calc(var(--m-thread-chrome-clearance) + 0.375rem);
+}
+
+/* App chrome — top bar, bottom tab bar, the threads list, portaled sheets, and
+   the wide-layout sidebar — is tap-only: a long-press here opens our own actions
+   sheet (or does nothing), and must never start iOS text selection. Marking only
+   the row non-selectable isn't enough: WebKit then falls back to selecting the
+   page's *other* chrome text ("Select All" over the brand + tab labels), which is
+   the selection users still see. Disabling selection (and the callout) across
+   the whole chrome removes anything for that fallback to grab. Content surfaces
    (chat, diffs) live outside these and keep native selection. */
 .m-topbar,
 .m-compose-dock,
 .m-thread-compose-dock,
 .m-threads,
-.m-sidebar {
+.m-sidebar,
+.m-sheet-backdrop {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
@@ -554,11 +951,13 @@ body.bg-background {
 .m-files-action,
 .m-fab {
   box-sizing: border-box;
-  border: 1px solid var(--hairline, var(--border));
+  border: 1px solid color-mix(in oklab, var(--foreground) 5%, transparent);
   border-radius: var(--m-floating-control-radius);
   background: var(--m-glass-surface);
   pointer-events: auto;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+  box-shadow:
+    0 2px 8px rgb(0 0 0 / 0.28),
+    0 12px 32px rgb(0 0 0 / 0.32);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
@@ -621,7 +1020,18 @@ body.bg-background {
   min-height: 0;
   flex-direction: column;
   border-right: 1px solid var(--hairline, var(--border));
-  background: var(--background, #070709);
+  /* Solid frosted tone derived from the theme's sidebar color — a slight
+     foreground lift over `--sidebar-background` reads as frosted glass
+     without a decorative wash behind it. Bevel highlights match the
+     desktop app's glass fallback. */
+  background: color-mix(
+    in oklab,
+    var(--foreground, #fafafa) 1.5%,
+    var(--sidebar-background, #0e0e14)
+  );
+  box-shadow:
+    inset 1px 0 0 color-mix(in oklab, var(--foreground, #fafafa) 7%, transparent),
+    inset 0 1px 0 color-mix(in oklab, var(--foreground, #fafafa) 9%, transparent);
 }
 
 .m-sidebar__resize-handle {
@@ -689,6 +1099,8 @@ body.bg-background {
   display: flex;
   flex-direction: column;
   gap: 0.125rem;
+  max-height: 20rem;
+  overflow: hidden;
   padding-bottom: 0.375rem;
 }
 
@@ -760,11 +1172,14 @@ body.bg-background {
 }
 
 .m-detail {
+  position: relative;
   display: flex;
   min-width: 0;
   min-height: 0;
+  flex: 1;
   flex-direction: column;
-  background: var(--background, #070709);
+  /* Desktop app paints content panes one step above the window background. */
+  background: var(--content-background, #0b0b11);
 }
 
 .m-detail > .m-threads,
@@ -802,6 +1217,16 @@ body.bg-background {
   gap: 0.375rem;
   padding: 0.375rem 0.5rem;
   background: var(--background);
+}
+
+/* Inside the wide sidebar the pane behind is translucent glass. Any tint
+   here would stack on the glass and read as a different shade at rest, so
+   the sticky picker stays transparent and only blurs the rows that scroll
+   under it (like the desktop app's transparent overlay header). */
+.m-sidebar .m-threads__picker {
+  /* Fully transparent: any tint or backdrop-filter composites against the
+     sidebar's own glass layer and renders as a visibly darker strip. */
+  background: transparent;
 }
 
 .m-thread-search {
@@ -949,6 +1374,14 @@ body.bg-background {
 .m-compose-dock[data-expanded],
 .m-thread-compose-dock[data-expanded] {
   transform: translateY(calc(-1 * (var(--m-keyboard-offset, 0px) + var(--m-keyboard-gap, 0px))));
+}
+
+html[data-mobile-platform="ios"][data-mobile-standalone="true"]
+  :is(.m-compose-dock, .m-thread-compose-dock)[data-expanded] {
+  /* Installed PWAs have no Safari address pill between app content and the
+     keyboard accessory strip. Lift by the device's real home-indicator inset
+     instead of a fixed gap so the composer clears that strip on every iPhone. */
+  --m-keyboard-gap: env(safe-area-inset-bottom);
 }
 
 .m-compose-dock[data-expanded][data-android-runtime],
@@ -1245,6 +1678,15 @@ html:not([data-touch-device]) .m-compose-scrim {
     border-color 0.15s ease;
 }
 
+/* Keep compact composers quieter than the expanded card, then recover their
+   separation from the page with depth instead of outline. */
+:is(.m-compose-dock, .m-thread-compose-dock):not([data-expanded]) .m-compose-bubble {
+  border-color: color-mix(in oklab, var(--foreground) 5%, transparent);
+  box-shadow:
+    0 2px 8px rgb(0 0 0 / 0.28),
+    0 12px 32px rgb(0 0 0 / 0.32);
+}
+
 /* Bottom-anchor the composer inside the thread bubble. The shell's one-line
    compact box then rests against the bubble's stationary bottom edge for the
    whole collapse height tween, so the send — pinned absolute to the shell's
@@ -1271,6 +1713,22 @@ html:not([data-touch-device]) .m-compose-scrim {
      of expand/collapse stutter on large desktop windows). */
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+/* iOS keeps the layout viewport full-height while the keyboard reduces the
+   visual viewport. `--m-keyboard-offset` already removes that covered band,
+   so starting this cap from 100dvh double-counts the keyboard whenever Safari
+   also shrinks dvh. Use the stable large viewport as the iOS baseline: the
+   bubble can follow multiline input growth while remaining bounded above the
+   keyboard and safe-area chrome. Android keeps the dvh cap above because its
+   layout viewport genuinely resizes around the keyboard. */
+html[data-mobile-platform="ios"]
+  .m-compose-dock[data-expanded]:not([data-collapsing])
+  .m-compose-bubble,
+html[data-mobile-platform="ios"]
+  .m-thread-compose-dock[data-expanded]:not([data-collapsing])
+  .m-compose-bubble {
+  max-height: calc(100lvh - var(--m-keyboard-offset, 0px) - env(safe-area-inset-top) - 7.5rem);
 }
 
 /* The measured grow/shrink animation (useBubbleGrowAnimation) drives an
@@ -1456,12 +1914,18 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 }
 
 .m-compose-dock:not([data-expanded]) .m-compose-bubble [data-composer-input-anchor] {
+  height: var(--m-floating-control-line-height);
+  min-height: var(--m-floating-control-line-height);
   max-height: var(--m-floating-control-line-height);
+  overflow: hidden;
 }
 
 .m-compose-dock:not([data-expanded]) .m-compose-bubble .poracode-mention-input {
+  box-sizing: border-box;
+  height: var(--m-floating-control-line-height);
   min-height: var(--m-floating-control-line-height);
   max-height: var(--m-floating-control-line-height);
+  overflow: hidden;
   padding: 0 1rem;
   /* One line box exactly the collapsed pill's height: the half-leading centers
      the single line vertically regardless of font metrics. The old
@@ -1521,10 +1985,13 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   gap: 0.625rem;
   border: 1px solid var(--hairline, var(--border));
   border-radius: 0.625rem;
-  /* Same surface as the composer and chat bubbles (--surface-tertiary =
-     --composer-surface in the default dark theme) so the tappable cards read
-     as one family. */
-  background: var(--surface-tertiary, var(--surface, var(--content-background)));
+  /* Keep the cards in the composer/chat-bubble surface family, but step them
+     slightly darker so they sit back from the floating chrome. */
+  background: color-mix(
+    in oklab,
+    var(--surface-tertiary, var(--surface, var(--content-background))) 92%,
+    black
+  );
   padding: 0.5rem 0.625rem;
   color: inherit;
   cursor: pointer;
@@ -1673,11 +2140,12 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   opacity: 1;
 }
 
-/* Worktree / provider groups: a tappable header above indented child rows. */
+/* Worktree / provider groups keep mobile-sized cards and tap targets, but use
+   the Electron sidebar's tighter group rhythm and nested-rail geometry. */
 .m-thread-group {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0.125rem;
 }
 
 .m-thread-group__header {
@@ -1685,7 +2153,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   width: 100%;
   min-height: var(--m-tap-min);
   align-items: center;
-  gap: 0.375rem;
+  gap: 0.5rem;
   border-radius: 0.625rem;
   padding: 0.375rem 0.5rem;
   color: var(--muted);
@@ -1712,6 +2180,16 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
 .m-thread-group__header[data-collapsed="true"] .m-thread-group__chevron {
   transform: rotate(0deg);
+}
+
+/* Electron uses the worktree glyph itself as the leading group icon. Its tone
+   carries the expanded state while provider groups keep the disclosure arrow. */
+.m-thread-group__kind-icon {
+  transition: color 0.15s ease;
+}
+
+.m-thread-group__header:not([data-collapsed="true"]) .m-thread-group__kind-icon {
+  color: var(--foreground);
 }
 
 .m-thread-group__title {
@@ -1752,14 +2230,15 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   color: color-mix(in oklab, var(--foreground) 65%, transparent);
 }
 
-/* Left rail visually nests the child rows under their group header. */
+/* Match Electron's 14px dashed rail, with a little extra breathing room before
+   the PWA's bordered cards. */
 .m-thread-group__items {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
-  margin-left: 0.5rem;
-  border-left: 1px solid var(--hairline, var(--border));
-  padding-left: 0.625rem;
+  gap: 0.25rem;
+  margin-left: 0.875rem;
+  border-left: 1px dashed var(--border);
+  padding-left: 0.5rem;
 }
 
 /* Status is a single colored dot now (the word is dropped for header space).
@@ -2838,8 +3317,11 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   .m-thread-compose-dock:is(:not([data-expanded]), [data-collapsing])
   .poracode-composer-shell
   .poracode-mention-input {
+  box-sizing: border-box;
+  height: var(--m-floating-control-line-height);
   min-height: var(--m-floating-control-line-height);
   max-height: var(--m-floating-control-line-height);
+  overflow: hidden;
   padding: 0 1rem;
   /* Same single-line centering as the home bubble: a full-height line box
      instead of the font-metric-sensitive (height - 1lh)/2 padding calc. */
@@ -3091,6 +3573,270 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   overflow: hidden;
 }
 
+/* Desktop PWA: the routed thread stays mounted while this shell-owned tool
+   strip opens a resizable auxiliary panel beside it. */
+.m-desktop-tools {
+  position: relative;
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: none;
+  overflow: visible;
+}
+
+.m-desktop-tool-rail {
+  position: absolute;
+  z-index: 30;
+  top: calc(4.25rem + 20px);
+  right: 0.75rem;
+  display: flex;
+  width: 2.625rem;
+  flex: none;
+  align-items: center;
+  flex-direction: column;
+  gap: 0.125rem;
+  border: 1px solid color-mix(in oklab, var(--foreground) 8%, transparent);
+  border-radius: 1rem;
+  background: var(--m-glass-surface);
+  padding: 0.3125rem;
+  box-shadow:
+    0 2px 8px rgb(0 0 0 / 0.28),
+    0 12px 32px rgb(0 0 0 / 0.32);
+  backdrop-filter: saturate(140%) blur(16px);
+  -webkit-backdrop-filter: saturate(140%) blur(16px);
+  transform: translateX(0);
+  opacity: 1;
+  transition:
+    transform 180ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 140ms ease-out,
+    max-height 180ms cubic-bezier(0.32, 0.72, 0, 1),
+    background-color 140ms ease-out,
+    border-color 140ms ease-out,
+    box-shadow 140ms ease-out;
+}
+
+.m-desktop-tool-rail[data-hidden="true"] {
+  transform: translateX(0.5rem) scale(0.96);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Only compact the rail once it materially overlaps the fixed 1040px thread
+   column. Slight edge contact still leaves the full rail visible. */
+@container m-wide-content (max-width: 1080px) {
+  .m-desktop-tool-rail:not([data-hidden]) {
+    max-height: 2.625rem;
+    border-color: color-mix(in oklab, var(--foreground) 5%, transparent);
+    background: color-mix(in oklab, var(--m-glass-surface) 42%, transparent);
+    box-shadow:
+      0 2px 8px rgb(0 0 0 / 0.12),
+      0 10px 24px rgb(0 0 0 / 0.16);
+    backdrop-filter: saturate(115%) blur(10px);
+    -webkit-backdrop-filter: saturate(115%) blur(10px);
+    opacity: 0.72;
+  }
+
+  .m-desktop-tool-rail:not([data-hidden]):is(:hover, :focus-within) {
+    max-height: 20rem;
+    border-color: color-mix(in oklab, var(--foreground) 8%, transparent);
+    background: var(--m-glass-surface);
+    box-shadow:
+      0 2px 8px rgb(0 0 0 / 0.28),
+      0 12px 32px rgb(0 0 0 / 0.32);
+    opacity: 1;
+  }
+
+  .m-desktop-tool-rail:not([data-hidden]):is(:hover, :focus-within)
+    .m-desktop-tool-rail__collapsed {
+    opacity: 0;
+  }
+
+  .m-desktop-tool-rail:not([data-hidden]):is(:hover, :focus-within) .m-desktop-tool-rail__actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.m-desktop-tool-rail__collapsed {
+  position: absolute;
+  top: 0.3125rem;
+  left: 0.3125rem;
+  display: none;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transition: opacity 100ms ease-out;
+}
+
+.m-desktop-tool-rail__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  transition: opacity 100ms ease-out;
+}
+
+@container m-wide-content (max-width: 1080px) {
+  .m-desktop-tool-rail__collapsed {
+    display: flex;
+  }
+
+  .m-desktop-tool-rail__actions {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+.m-desktop-tool-rail__button {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.m-desktop-tool-rail__button:hover {
+  background: var(--row-hover);
+  color: var(--foreground);
+}
+
+.m-desktop-tool-rail__button[data-active="true"] {
+  background: var(--row-active, var(--row-hover));
+  color: var(--accent);
+}
+
+.m-desktop-tool-rail__button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.m-desktop-tool-rail__button:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 70%, transparent);
+  outline-offset: 1px;
+}
+
+.m-desktop-workspace__panel {
+  position: relative;
+  width: 0;
+  min-width: 0;
+  min-height: 0;
+  flex: none;
+  overflow: hidden;
+  border-left: 1px solid transparent;
+  background: transparent;
+  transition:
+    width 180ms cubic-bezier(0.32, 0.72, 0, 1),
+    min-width 180ms cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 180ms ease-out;
+  will-change: width, min-width;
+}
+
+.m-desktop-workspace__panel[data-open="true"] {
+  width: var(--m-desktop-panel-width, 26.25rem);
+  min-width: var(--m-desktop-panel-width, 26.25rem);
+  border-left-color: var(--hairline, var(--border));
+}
+
+.m-desktop-workspace__panel-inner {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: var(--m-desktop-panel-width, 26.25rem);
+  min-width: var(--m-desktop-panel-width, 26.25rem);
+  background: transparent;
+  opacity: 0;
+  transition: opacity 200ms ease-in;
+  will-change: opacity;
+}
+
+.m-desktop-workspace__panel[data-open="true"] .m-desktop-workspace__panel-inner {
+  opacity: 1;
+  transition-duration: 300ms;
+  transition-timing-function: ease-out;
+}
+
+.m-desktop-workspace__resize {
+  position: relative;
+  z-index: 20;
+  width: 0;
+  flex: none;
+  cursor: col-resize;
+  outline: none;
+}
+
+.m-desktop-workspace__resize::after {
+  position: absolute;
+  inset: 0 auto 0 -3px;
+  width: 6px;
+  content: "";
+}
+
+.m-desktop-workspace__resize:hover::after,
+.m-desktop-workspace__resize:focus-visible::after {
+  background: color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+/* GitView's phone drill-down normally covers the viewport. Inside the desktop
+   auxiliary panel it should cover only that panel's content layer. */
+.m-desktop-workspace__panel .m-git-diff {
+  position: absolute;
+}
+
+.m-desktop-workspace__panel .m-subscreen {
+  height: 100%;
+  background: transparent;
+  padding-bottom: 0;
+}
+
+.m-desktop-workspace__panel .m-subscreen > .m-page {
+  background: transparent;
+  overflow-y: auto;
+}
+
+.m-desktop-workspace__panel .m-fab {
+  position: absolute;
+}
+
+.m-desktop-workspace__panel [data-poracode-panel],
+.m-desktop-workspace__panel .poracode-overlay-surface {
+  background: transparent;
+}
+
+.m-desktop-workspace__panel .poracode-overlay-header {
+  height: 2.5rem;
+  gap: 0.375rem;
+  background: transparent;
+  padding-right: 0.5rem;
+  padding-left: 0.5rem;
+}
+
+.m-desktop-workspace__panel .poracode-overlay-header button {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: none;
+}
+
+.m-desktop-workspace__panel .poracode-overlay-header button svg {
+  display: block;
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+/* PWA pointer layouts raise icon-only buttons to the 34px desktop hit-target
+   floor. Center the actual target in the commit field instead of retaining the
+   24px-only top offset used by Electron. */
+.m-desktop-workspace__panel .lc-commit-field-action {
+  top: 50%;
+  margin-top: calc(var(--m-tap-min) / -2);
+}
+
 /* One tab's pane fills the body; the inactive tab stays mounted but hidden so
    switching preserves an open diff or edited file. */
 .m-ws-tab {
@@ -3141,10 +3887,10 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   padding-right: calc(var(--m-tap-min) + 0.5rem);
 }
 
-.m-workspace .lc-commit-generate {
+.m-workspace .lc-commit-field-action {
   top: 50%;
   right: 0;
-  margin-top: calc((var(--m-tap-min) / -2) - 2px);
+  margin-top: calc(var(--m-tap-min) / -2);
 }
 
 /* iOS-style segmented control switching Changes / Files. */
@@ -3257,6 +4003,34 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   transition:
     height 0.22s cubic-bezier(0.32, 0.72, 0, 1),
     max-height 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.m-shell > .m-sheet-backdrop > .m-sheet:has(.poracode-model-menu-listbox) {
+  overflow: hidden;
+  height: auto;
+  max-height: 65dvh;
+  padding-bottom: 0;
+}
+
+.m-shell > .m-sheet-backdrop > .m-sheet[data-expanded]:has(.poracode-model-menu-listbox) {
+  height: calc(100dvh - env(safe-area-inset-top) - 0.75rem);
+  max-height: calc(100dvh - env(safe-area-inset-top) - 0.75rem);
+}
+
+.m-shell > .m-sheet-backdrop > .m-sheet .poracode-model-menu-listbox {
+  height: auto !important;
+  min-height: 0;
+  max-height: none !important;
+  flex: 1;
+}
+
+.m-shell
+  > .m-sheet-backdrop
+  > .m-sheet
+  .poracode-model-menu-listbox
+  .poracode-model-menu-bottom-spacer {
+  box-sizing: content-box;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .m-sheet[data-expanded] {
@@ -3391,9 +4165,22 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   }
 
   /* The workspace overlay (Changes / Files) is fixed-position outside
-     .m-detail; cap its column the same way so file rows don't stretch across
-     ultrawide monitors. The diff drill-down anchors to the viewport (fixed)
-     and is unaffected. */
+     .m-detail; cap its chrome and content column the same way so neither the
+     controls nor file rows stretch across ultrawide monitors. The segmented
+     control keeps the same inset it has on mobile. The diff drill-down anchors
+     to the viewport (fixed) and is unaffected. */
+  .m-workspace > .m-git-head {
+    width: min(100%, 72rem);
+    align-self: center;
+  }
+
+  .m-workspace > .m-seg {
+    width: min(calc(100% - 1.5rem), calc(72rem - 1.5rem));
+    align-self: center;
+    margin-right: auto;
+    margin-left: auto;
+  }
+
   .m-ws-pane {
     width: min(100%, 72rem);
     align-self: center;
@@ -3577,6 +4364,44 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   flex-direction: column;
   gap: 0.375rem;
   overflow-y: auto;
+}
+
+/* Nested action pages slide horizontally without changing the sheet's height.
+   The main page stays in normal flow as the size anchor; the submenu overlays it. */
+.m-sheet-page-stack {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  width: 100%;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.m-sheet-page {
+  display: flex;
+  min-height: 0;
+  width: 100%;
+  flex-direction: column;
+  transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
+}
+
+.m-sheet-page--submenu {
+  position: absolute;
+  inset: 0;
+  background: var(--sidebar-background, var(--background));
+  pointer-events: none;
+  transform: translateX(100%);
+}
+
+.m-sheet-page-stack[data-page="submenu"] .m-sheet-page--main {
+  pointer-events: none;
+  transform: translateX(-100%);
+}
+
+.m-sheet-page-stack[data-page="submenu"] .m-sheet-page--submenu {
+  pointer-events: auto;
+  transform: translateX(0);
 }
 
 /* Reused desktop menu rows rendered inside a drawer (e.g. the branch selector's
@@ -3824,13 +4649,75 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
 /* Full-window overlay host above the app shell for the git panel and PR
    review. The reused desktop components fill .m-git-overlay__body. */
-.m-git-overlay {
+.m-git-overlay,
+.m-notes-screen {
   position: fixed;
   inset: 0;
   z-index: 50;
   display: flex;
   flex-direction: column;
   background: var(--background, #070709);
+}
+
+.m-notes-screen {
+  top: var(--m-visual-viewport-top, 0px);
+  bottom: var(--m-visual-viewport-bottom, 0px);
+  overflow: hidden;
+  transition: bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.m-notes-screen__body {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
+  overflow: hidden;
+}
+
+.m-notes-screen__body > * {
+  min-height: 0;
+  flex: 1;
+}
+
+/* The shared notes panel stays compact on desktop. On the phone, make each
+   checklist row and its controls comfortable touch targets; row actions move
+   to the long-press sheet, so hover-only buttons do not reserve scarce width. */
+.m-notes-screen .lc-notes-todo-row {
+  min-height: 3rem;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.m-notes-screen .lc-notes-todo-toggle {
+  width: 2rem;
+  height: 2rem;
+}
+
+.m-notes-screen .lc-notes-todo-check {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.m-notes-screen .lc-notes-todo-text,
+.m-notes-screen .lc-notes-todo-input {
+  min-height: 2.25rem;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+}
+
+.m-notes-screen .lc-notes-todo-text {
+  display: flex;
+  align-items: center;
+}
+
+.m-notes-screen .lc-notes-todo-actions {
+  display: none;
+}
+
+.m-notes-screen .lc-notes-todo-add-row {
+  min-height: var(--m-tap-min);
 }
 
 /* Cold-chunk Suspense fallback for the fullscreen screens (workspace,
@@ -4428,6 +5315,11 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   background: var(--background, #070709);
 }
 
+.m-shell:not(.m-shell--wide) .m-subscreen,
+.m-shell:not(.m-shell--wide) .m-subscreen > * {
+  background: var(--background, #070709);
+}
+
 .m-card {
   border: 1px solid var(--hairline, var(--border));
   border-radius: 0.625rem;
@@ -4696,9 +5588,9 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 /* Editable fields must stay selectable even inside the non-selectable chrome
    (the inline rename field in the thread actions sheet, the project picker):
    otherwise iOS won't let you place the cursor or select text to edit. */
-.m-shell textarea,
-.m-shell input,
-.m-shell [contenteditable="true"] {
+:is(.m-shell, .m-sheet-backdrop) textarea,
+:is(.m-shell, .m-sheet-backdrop) input,
+:is(.m-shell, .m-sheet-backdrop) [contenteditable="true"] {
   user-select: text;
   -webkit-user-select: text;
 }
@@ -4738,77 +5630,44 @@ html[data-mobile-platform="ios"]
 
 /* ── Native screen transitions (View Transitions API) ──────────────
  *
- * The phone layout navigates like a native app: the routed page slides while
- * the top bar and tab bar stay pinned. The router (router.tsx) tags each
- * navigation with a type — "push" (deeper), "pop" (back), or "fade" (tab /
- * sibling) — and only on the narrow layout, so this CSS only ever runs there.
- * Browsers without the API fall back to an instant swap.
+ * The phone layout navigates like a native app. The router (router.tsx) tags
+ * each navigation with a type — "push" (deeper), "pop" (back), or "fade"
+ * (tab / sibling) — and only on the narrow layout, so this CSS only ever runs
+ * there. Browsers without the API fall back to an instant swap.
  *
- * Naming an element pulls it into its own transition group: the page (.m-main)
- * gets the sliding animation below, while the chrome groups stay in place and
- * only cross-fade their contents (e.g. the title). Fullscreen routes
- * (workspace / PR / terminal) render their own full-window overlay instead of
- * .m-main, so they carry a second page name (m-screen) that shares the same
- * push/pop slide. .m-main and the fullscreen overlays never coexist in one DOM
- * state — a route renders one or the other — so the two names never collide;
- * across a navigation the old page's name and the new page's name differ, which
- * is exactly what lets them slide as a pair (old out, new in).
+ * Capture the entire ordinary phone shell as ONE transition image. The shell
+ * owns the route-aware header, routed Outlet, and floating composer controls;
+ * keeping them in one image guarantees Safari cannot combine the incoming
+ * thread header with the outgoing thread list while React commits the route.
+ * It also means the old page's layout is frozen before the new header exists,
+ * so the old list never receives the thread header's space and jumps downward.
  *
- * Navigations into/out of a fullscreen screen additionally carry the "screen"
- * type (router.tsx). It fixes two incoherencies of the split old page:
- * - Layering: on pop, spec group order appends the new page's groups AFTER the
- *   old m-screen, which would paint the revealed page ON TOP of the outgoing
- *   slide. The m-screen group is explicitly z-indexed above the page groups.
- * - Schedules: the old page's topbar and root snapshots would run their
- *   default 0.25s cross-fades on their own clock under the 0.32s slide — the
- *   title and floating chrome visibly dissolve before the screen covers them.
- *   The "screen" rules hold them steady instead: on push the old page sits
- *   (with only .m-main's parallax) until covered; on pop the revealed page is
- *   fully painted from the first frame beneath the departing screen. */
-.m-topbar {
-  view-transition-name: m-topbar;
-}
-
-.m-main {
-  view-transition-name: m-main;
-}
-
-/* Fullscreen chrome keeps .m-main mounted (stable Outlet position — see
-   NarrowShell in RootLayout.tsx) but the visible page is the fixed m-screen
-   overlay rendered inside it. Drop the page name so the m-main group doesn't
-   also participate in the transition (matching the old DOM shape, where the
-   fullscreen state had no .m-main at all): on push only the old page's m-main
-   slides out under the incoming screen, and on pop the returning page's m-main
-   is a new-only group that slides back in. */
-.m-shell[data-chrome="fullscreen"] .m-main {
-  view-transition-name: none;
+ * Fullscreen routes (workspace / PR / terminal) disable the shell image and
+ * render an m-screen overlay instead. m-page and m-screen share the same slide
+ * schedule, with the screen group explicitly layered above the ordinary page. */
+.m-shell:not(.m-shell--wide):not([data-chrome="fullscreen"]) {
+  view-transition-name: m-page;
 }
 
 /* Fullscreen chrome also keeps the top bar mounted (NarrowShell renders it in
    every layout). The opaque z-50 overlay covers it; `visibility: hidden` (not
    display: none) removes it from hit-testing/a11y while PRESERVING its layout
    height, so .m-main — and the thread page snapshotted inside it on a pop —
-   never shifts up into the status-bar safe zone. Dropping its transition name
-   keeps the m-topbar group old-/new-only across a screen push/pop, exactly as
-   when the bar was unmounted, so the underlying header holds steady beneath
-   the sliding screen instead of cross-fading with a hidden counterpart. */
+   never shifts up into the status-bar safe zone. */
 .m-shell[data-chrome="fullscreen"] .m-topbar {
   visibility: hidden;
-  view-transition-name: none;
 }
 
 /* During a push from a thread into a fullscreen workspace, Android WebView can
-   drop the old-only m-topbar transition image before the m-screen slide ends.
-   RootLayout renders this frozen copy as the fullscreen state's new m-topbar
-   image, so the browser has a paired header snapshot to hold for the whole
-   transition while the real fullscreen top bar remains hidden. */
+   drop the underlying header before the m-screen slide ends. RootLayout keeps
+   this frozen copy visible beneath the opaque fullscreen overlay for the whole
+   transition. */
 .m-shell[data-chrome="fullscreen"] .m-topbar.m-topbar--transition-hold {
   position: fixed;
   inset: 0 0 auto;
   z-index: 1;
   visibility: visible;
   pointer-events: none;
-  view-transition-name: m-topbar;
 }
 
 /* Fullscreen overlay routes (workspace / PR / terminal) slide like a nested
@@ -4817,6 +5676,7 @@ html[data-mobile-platform="ios"]
    screen), so this shared name is safe. */
 .m-workspace,
 .m-git-overlay,
+.m-notes-screen,
 .m-screen-loading {
   view-transition-name: m-screen;
 }
@@ -4830,7 +5690,7 @@ html[data-mobile-platform="ios"]
 }
 
 /* iOS-style easing, matched to the bottom-sheet timing. */
-::view-transition-group(m-main),
+::view-transition-group(m-page),
 ::view-transition-group(m-screen) {
   animation-duration: 0.32s;
   animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
@@ -4838,49 +5698,30 @@ html[data-mobile-platform="ios"]
 
 /* PUSH — the incoming page slides in from the right over the outgoing one, which
    drifts left with a subtle parallax. */
-html:active-view-transition-type(push)::view-transition-old(m-main),
+html:active-view-transition-type(push)::view-transition-old(m-page),
 html:active-view-transition-type(push)::view-transition-old(m-screen) {
   animation: m-vt-out-left 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
-html:active-view-transition-type(push)::view-transition-new(m-main),
+html:active-view-transition-type(push)::view-transition-new(m-page),
 html:active-view-transition-type(push)::view-transition-new(m-screen) {
   animation: m-vt-in-right 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 /* POP — the outgoing page slides off to the right, revealing the previous one
    underneath (which un-parallaxes back into place). */
-html:active-view-transition-type(pop)::view-transition-old(m-main),
+html:active-view-transition-type(pop)::view-transition-old(m-page),
 html:active-view-transition-type(pop)::view-transition-old(m-screen) {
   z-index: 1;
   animation: m-vt-out-right 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
-html:active-view-transition-type(pop)::view-transition-new(m-main),
+html:active-view-transition-type(pop)::view-transition-new(m-page),
 html:active-view-transition-type(pop)::view-transition-new(m-screen) {
   animation: m-vt-in-left 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
-/* SCREEN (both directions) — the top bar must simply sit still under the
-   sliding screen: on push it is an old-only group (the fullscreen state drops
-   its name), on pop a new-only group, and a singleton image otherwise gets the
-   UA's default cross-fade (fade-out for old, fade-in for new) on its own 0.25s
-   clock — which reads as the header dissolving while the screen is still
-   mid-slide. Pin BOTH images with a single-type selector (no chained
-   :active-view-transition-type, which is the fragile part on older WebViews)
-   so the header holds until the z-1 m-screen group covers or reveals it.
-   Android WebView can discard an old-only image with `animation: none`, so use
-   an explicit no-op animation that lasts as long as the screen slide. */
-html:active-view-transition-type(screen)::view-transition-old(m-topbar),
-html:active-view-transition-type(screen)::view-transition-new(m-topbar) {
-  animation: m-vt-hold 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
-}
-
-/* SCREEN PUSH — hold the old page steady (no topbar/root fades) while the
-   screen slides in over it; the new root is the empty shell behind the lifted
-   screen, so keep it hidden rather than letting it cross-fade the old chrome
-   away mid-slide. */
-html:active-view-transition-type(screen):active-view-transition-type(
-  push
-)::view-transition-old(m-topbar),
+/* SCREEN PUSH — hold the old root steady while the screen slides in over it;
+   the new root is the empty shell behind the lifted screen, so keep it hidden
+   rather than letting it cross-fade the old chrome away mid-slide. */
 html:active-view-transition-type(screen):active-view-transition-type(
   push
 )::view-transition-old(root) {
@@ -4895,9 +5736,6 @@ html:active-view-transition-type(screen):active-view-transition-type(
 /* SCREEN POP — the revealed page paints fully from the first frame beneath the
    departing screen (no fade-in), and the old root (the empty shell behind the
    lifted screen) stays out of the blend. */
-html:active-view-transition-type(screen):active-view-transition-type(
-  pop
-)::view-transition-new(m-topbar),
 html:active-view-transition-type(screen):active-view-transition-type(
   pop
 )::view-transition-new(root) {
@@ -4963,6 +5801,10 @@ html:active-view-transition-type(screen):active-view-transition-type(
   .m-sheet-backdrop[data-closing] .m-sheet,
   .m-sheet-backdrop[data-closing] .m-drawer {
     animation: none;
+  }
+
+  .m-sheet-page {
+    transition: none;
   }
 
   /* The router already skips view transitions under reduced motion; this guards

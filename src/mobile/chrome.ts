@@ -18,6 +18,7 @@ export function getChrome(pathname: string): Chrome {
   if (pathname.startsWith("/thread/")) return { layout: "thread" };
   if (
     pathname.startsWith("/workspace/") ||
+    pathname.startsWith("/notes/") ||
     pathname.startsWith("/pr/") ||
     pathname.startsWith("/terminal/")
   ) {

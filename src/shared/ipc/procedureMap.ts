@@ -89,6 +89,7 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "setKeybindings",
   "setGlobalShortcutsSuspended",
   "getRemoteAccessPairing",
+  "refreshRemoteAccessPairing",
   "setRemoteAccessEnabled",
   "revokeRemoteAccessSession",
   "getRemoteAccessTailscaleStatus",

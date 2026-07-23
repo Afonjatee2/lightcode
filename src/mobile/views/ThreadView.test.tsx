@@ -21,6 +21,10 @@ const fixtures = vi.hoisted(() => ({
     composerPlaceholder?: string;
     submitOnEnter?: boolean;
   }>,
+  guiThreadProps: [] as Array<{
+    initialScrollRevealDelayMs?: number;
+    onInitialScrollSettled?: () => void;
+  }>,
   desktopPointer: false,
   keyboardOffset: 0,
   agentStatuses: [] as AgentStatus[],
@@ -106,7 +110,13 @@ vi.mock("@/renderer/components/thread/ThreadComposerSection", () => ({
 }));
 
 vi.mock("@/renderer/components/thread/ThreadContent", () => ({
-  GuiThreadContent: () => <div data-testid="gui-thread-content" />,
+  GuiThreadContent: (props: {
+    initialScrollRevealDelayMs?: number;
+    onInitialScrollSettled?: () => void;
+  }) => {
+    fixtures.guiThreadProps.push(props);
+    return <div data-testid="gui-thread-content" />;
+  },
 }));
 
 vi.mock("@/renderer/components/thread/useThreadDockState", () => ({
@@ -165,6 +175,7 @@ describe("mobile ThreadView", () => {
     bridgeMock.subagentUnsubscribe.mockClear();
     toastDanger.mockClear();
     fixtures.composerProps.length = 0;
+    fixtures.guiThreadProps.length = 0;
     fixtures.desktopPointer = false;
     fixtures.keyboardOffset = 0;
     fixtures.agentStatuses = [];
@@ -174,6 +185,7 @@ describe("mobile ThreadView", () => {
       runtimeRequestsByThread: {},
       runtimeStructuralVersionByThread: {},
       openSubAgentByThread: {},
+      pendingComposerFocusThreadId: null,
     });
   });
 
@@ -186,15 +198,37 @@ describe("mobile ThreadView", () => {
       onSubmitInput: () => Promise.resolve(),
     };
 
-    const { unmount } = render(<ThreadView {...props} />);
+    const { container, unmount } = render(<ThreadView {...props} />);
     expect(fixtures.composerProps.at(-1)?.submitOnEnter).toBe(false);
     expect(fixtures.composerProps.at(-1)?.autoFocusComposer).toBe(false);
+    expect(container.querySelector(".m-thread-compose-dock")).not.toHaveAttribute("data-expanded");
     unmount();
 
     fixtures.desktopPointer = true;
-    render(<ThreadView {...props} />);
+    const desktopView = render(<ThreadView {...props} />);
     expect(fixtures.composerProps.at(-1)?.submitOnEnter).toBe(true);
     expect(fixtures.composerProps.at(-1)?.autoFocusComposer).toBe(true);
+    expect(desktopView.container.querySelector(".m-thread-compose-dock")).toHaveAttribute(
+      "data-expanded",
+    );
+  });
+
+  it("requests composer focus when the desktop PWA switches threads in place", () => {
+    fixtures.desktopPointer = true;
+    const firstThread = makeTerminalThread();
+    const props = {
+      thread: firstThread,
+      terminalScrollback: "",
+      onThreadAction: () => undefined,
+      onSubmitInput: () => Promise.resolve(),
+    };
+    const view = render(<ThreadView {...props} />);
+    useAppStore.getState().clearComposerFocusRequest(firstThread.id);
+
+    const nextThread = { ...firstThread, id: "thread-2", title: "Next thread" };
+    view.rerender(<ThreadView {...props} thread={nextThread} />);
+
+    expect(useAppStore.getState().pendingComposerFocusThreadId).toBe(nextThread.id);
   });
 
   it("mounts the subagent overlay for terminal threads", async () => {
@@ -330,6 +364,30 @@ describe("mobile ThreadView", () => {
     );
 
     expect(fixtures.composerProps.at(-1)?.composerPlaceholder).toBe("Follow up...");
+  });
+
+  it("mounts GUI history only after the remote snapshot is ready", () => {
+    const thread = { ...makeTerminalThread(), presentationMode: "gui" } as Thread;
+    const props = {
+      thread,
+      terminalScrollback: "",
+      loading: true,
+      onThreadAction: () => undefined,
+      onSubmitInput: () => Promise.resolve(),
+    };
+    const view = render(<ThreadView {...props} />);
+
+    expect(screen.queryByTestId("gui-thread-content")).toBeNull();
+
+    view.rerender(<ThreadView {...props} loading={false} />);
+
+    expect(screen.getByTestId("gui-thread-content")).toBeInTheDocument();
+    expect(fixtures.guiThreadProps.at(-1)?.initialScrollRevealDelayMs).toBe(50);
+    expect(view.container.querySelector(".m-thread-content")).toHaveClass("invisible");
+
+    act(() => fixtures.guiThreadProps.at(-1)?.onInitialScrollSettled?.());
+
+    expect(view.container.querySelector(".m-thread-content")).not.toHaveClass("invisible");
   });
 
   it("shows model and effort text with the compact active-thread icons", () => {

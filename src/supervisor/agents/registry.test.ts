@@ -39,6 +39,21 @@ const EXPECTED_SUBAGENT_APPROVAL_POLICY: Record<(typeof EXPECTED_BUILT_IN_ORDER)
     factory: "auto-high",
   };
 
+const EXPECTED_DEFAULT_APPROVAL_POLICY: Record<(typeof EXPECTED_BUILT_IN_ORDER)[number], string> = {
+  claude: "auto",
+  copilot: "never",
+  codex: "on-request",
+  gemini: "never",
+  qwen: "auto",
+  grok: "bypassPermissions",
+  kimi: "auto",
+  antigravity: "yolo",
+  commandcode: "yolo",
+  cursor: "never",
+  opencode: "yolo",
+  factory: "auto-high",
+};
+
 function detectionProviderKinds(): string[] {
   return readdirSync(import.meta.dirname, { withFileTypes: true })
     .filter(
@@ -63,6 +78,20 @@ describe("built-in agent registry", () => {
 
   it("registers every kind exactly once", () => {
     expect(new Set(kinds).size).toBe(kinds.length);
+  });
+
+  it.each(adapters.map((adapter) => [adapter.kind, adapter] as const))(
+    "uses an automatic or bypass permission default for %s",
+    (kind, adapter) => {
+      expect(adapter.capabilities.defaultApprovalPolicy).toBe(
+        EXPECTED_DEFAULT_APPROVAL_POLICY[kind as keyof typeof EXPECTED_DEFAULT_APPROVAL_POLICY],
+      );
+    },
+  );
+
+  it("defaults Codex to the Auto-review UI preset", () => {
+    const codex = adapters.find((adapter) => adapter.kind === "codex");
+    expect(codex?.capabilities.defaultApprovalsReviewer).toBe("auto_review");
   });
 
   it.each(adapters.map((adapter) => [adapter.kind, adapter] as const))(

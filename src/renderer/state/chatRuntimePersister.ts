@@ -20,9 +20,30 @@ const pendingOlderRuntimePages = new Map<string, Promise<boolean>>();
 const retainedThreadRuntimeCounts = new Map<string, number>();
 const inactiveThreadRuntimeLru = new Set<string>();
 
-/** Seed the older-page cursor when a remote thread snapshot supplies its tail. */
-export function seedOlderThreadRuntimeItemsCursor(threadId: string, cursor: number | null): void {
-  olderRuntimePageCursorByThread.set(threadId, cursor);
+/**
+ * Seed the older-page cursor when a remote thread snapshot supplies its tail.
+ * A remote snapshot is already the thread's authoritative hydration, so mark
+ * it hydrated before ChatPane mounts; otherwise the PWA bridge's intentional
+ * empty initial-DB response would overwrite this cursor with `null`.
+ *
+ * Preserve a cursor that has already moved farther back only when the caller
+ * confirms the refreshed tail overlaps the transcript currently in memory.
+ * A disjoint authoritative tail replaced that transcript, so its cursor must
+ * replace the old one as well or pagination skips the missing middle pages.
+ */
+export function seedOlderThreadRuntimeItemsCursor(
+  threadId: string,
+  cursor: number | null,
+  options: { readonly preserveExistingCursor?: boolean } = {},
+): void {
+  hydratedThreadRuntimeIds.add(threadId);
+  const currentCursor = olderRuntimePageCursorByThread.get(threadId);
+  if (options.preserveExistingCursor !== true || currentCursor === undefined || cursor === null) {
+    olderRuntimePageCursorByThread.set(threadId, cursor);
+    return;
+  }
+  if (currentCursor === null) return;
+  olderRuntimePageCursorByThread.set(threadId, Math.min(currentCursor, cursor));
 }
 
 export function hasHydratedThreadRuntimeItems(threadId: string): boolean {

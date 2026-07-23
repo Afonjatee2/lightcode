@@ -21,6 +21,7 @@ import {
   DesktopsRoute,
   MoreRoute,
   NewThreadRoute,
+  NotesRoute,
   PortsRoute,
   ProjectsRoute,
   SettingsListRoute,
@@ -69,6 +70,12 @@ const threadRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/thread/$threadId",
   component: ThreadRoute,
+});
+
+const notesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/notes/$threadId",
+  component: NotesRoute,
 });
 
 const newRoute = createRoute({
@@ -216,6 +223,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   threadsRoute,
   threadRoute,
+  notesRoute,
   newRoute,
   desktopsRoute,
   moreRoute,

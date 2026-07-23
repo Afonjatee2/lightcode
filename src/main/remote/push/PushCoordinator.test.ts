@@ -16,7 +16,7 @@ function threadState(
   threadId: string,
   status: ThreadStatus,
   attention: ThreadAttention = "none",
-): SupervisorEvent {
+): Extract<SupervisorEvent, { type: "thread-state" }> {
   return { type: "thread-state", threadId, status, attention, canResumeWithConfig: false };
 }
 
@@ -172,6 +172,33 @@ describe("PushCoordinator", () => {
       title: "Release check",
       body: "Finished",
     });
+  });
+
+  it("updates iOS activity state without alerting for a user-forced turn close", async () => {
+    vi.useFakeTimers();
+    store.upsert({
+      deviceId: "device-0001",
+      platform: "ios",
+      activityTokens: { a: "tok-a" },
+      deviceToken: "dev-1",
+    });
+    const coordinator = makeCoordinator();
+
+    coordinator.handleSupervisorEvent(threadState("thread-1", "working"));
+    await vi.runAllTimersAsync();
+    sendPush.mockClear();
+
+    coordinator.handleSupervisorEvent({
+      ...threadState("thread-1", "needs_reply", "needs_reply"),
+      forceCloseActiveTurn: true,
+    });
+    await vi.advanceTimersByTimeAsync(3_000);
+
+    const calls = sendPush.mock.calls;
+    expect(calls.some(([input]) => input.pushType === "alert")).toBe(false);
+    const activity = calls.find(([input]) => input.pushType === "liveactivity");
+    expect(activity).toBeDefined();
+    expect((activity![0].payload as ApsPayload).aps.alert).toBeUndefined();
   });
 
   it("redacts titles and project names when the setting is on", async () => {
@@ -362,6 +389,34 @@ describe("PushCoordinator", () => {
 
     coordinator.handleSupervisorEvent(threadState("thread-1", "idle"));
     await tick();
+    expect(androidCalls()).toHaveLength(0);
+  });
+
+  it("android: cancels a queued running notification when the user stops or steers", async () => {
+    vi.useFakeTimers();
+    store.upsert({ deviceId: "device-0001", platform: "android", deviceToken: "fcm-1" });
+    const coordinator = makeCoordinator();
+
+    coordinator.handleSupervisorEvent(threadState("thread-1", "working"));
+    coordinator.handleSupervisorEvent({
+      ...threadState("thread-1", "idle"),
+      forceCloseActiveTurn: true,
+    });
+    await vi.advanceTimersByTimeAsync(3_000);
+
+    expect(androidCalls()).toHaveLength(0);
+  });
+
+  it("android: suppresses an immediate status alert for a user-forced turn close", async () => {
+    store.upsert({ deviceId: "device-0001", platform: "android", deviceToken: "fcm-1" });
+    const coordinator = makeCoordinator();
+
+    coordinator.handleSupervisorEvent({
+      ...threadState("thread-1", "needs_reply", "needs_reply"),
+      forceCloseActiveTurn: true,
+    });
+    await tick();
+
     expect(androidCalls()).toHaveLength(0);
   });
 

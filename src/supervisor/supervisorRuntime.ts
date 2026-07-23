@@ -166,7 +166,6 @@ export class SupervisorRuntime {
       getAgentStatusService: () => this.agentStatusService,
     });
     this.agentRegistryService.refreshAgentRegistryAdapters();
-    this.skillsService = new SkillsService({ adapters: this.adapters });
     mkdirSync(paths.cacheDir, { recursive: true });
     mkdirSync(this.logsDir, { recursive: true });
 
@@ -187,6 +186,11 @@ export class SupervisorRuntime {
       settingsPath: this.settingsPath,
       statusCachePath: paths.statusCachePath,
       emit,
+    });
+    this.skillsService = new SkillsService({
+      adapters: this.adapters,
+      resolveAgentVersion: (kind, wslDistro) =>
+        this.agentStatusService.getCachedVersion(kind, wslDistro),
     });
 
     // Boot the CLI hook plugin coordinator BEFORE the thread session manager so

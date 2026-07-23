@@ -4,7 +4,11 @@ import { Trans } from "@lingui/react/macro";
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { msg } from "@/shared/messages";
 import { openGitReviewForWorktree } from "@/renderer/actions/gitActions";
-import { runGitPullFromSource, showGitActionError } from "@/renderer/actions/gitCommandRunner";
+import {
+  refreshGitStatusForWorktree,
+  runGitPullFromSource,
+  showGitActionError,
+} from "@/renderer/actions/gitCommandRunner";
 import { Button } from "@/renderer/components/common/Button";
 import { useAppStore } from "@/renderer/state/appStore";
 import {
@@ -37,6 +41,10 @@ export function PullFromSourceDialog() {
         sourceBranch: activeDialog.sourceBranch,
         preserveLocalChanges: true,
       });
+      await refreshGitStatusForWorktree(
+        buildWorktreeLocation(activeProject.location, activeDialog.worktreePath),
+        activeDialog.worktreePath,
+      );
       useGitReviewActionStore
         .getState()
         .patch(gitReviewActionStoreKey(activeDialog.projectId, activeDialog.worktreePath), {

@@ -11,6 +11,7 @@ import type {
 import { friendlyError, msg } from "@/shared/messages";
 import { readBridge } from "@/renderer/bridge";
 import { captureRendererException } from "@/renderer/diagnostics/sentry";
+import { useGitStore } from "@/renderer/state/gitStore";
 
 export type GitSyncCommand = "pull" | "pullRebase" | "push" | "sync" | "syncRebase";
 export type SyncAction = "push" | "pull" | "sync";
@@ -76,6 +77,24 @@ export async function runGitPullFromSource(
   payload: GitPullFromSourcePayload,
 ): Promise<GitPullFromSourceResult> {
   return readBridge().gitPullFromSource(payload);
+}
+
+/**
+ * Refresh one worktree directly after a renderer-initiated Git mutation.
+ * Remote PWA clients do not receive the desktop's noisy `git-changed` watcher
+ * event, so conflict controls and diffs must not rely on that event to replace
+ * their cached pre-operation status.
+ */
+export async function refreshGitStatusForWorktree(
+  worktreeLocation: ProjectLocation,
+  worktreePath: string,
+): Promise<void> {
+  try {
+    const status = await readBridge().getGitStatus({ projectLocation: worktreeLocation });
+    useGitStore.getState().setWorktreeStatus(worktreePath, status);
+  } catch (error) {
+    console.warn(`[git] worktree status refresh failed path=${worktreePath}`, error);
+  }
 }
 
 function buildGitSyncPayload(projectLocation: ProjectLocation, remote?: string): GitSyncPayload {

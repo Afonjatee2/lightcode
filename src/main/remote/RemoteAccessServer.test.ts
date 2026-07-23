@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   Experiment,
   Project,
+  ProjectNotes,
   ScheduledTask,
   ScheduledTaskInput,
   Thread,
@@ -30,6 +31,8 @@ import {
   dbDeleteProject,
   dbDeleteThread,
   dbFailRemoteCommand,
+  dbGetProject,
+  dbGetProjectNotes,
   dbGetThreadCompletedTurns,
   dbGetProjects,
   dbGetThread,
@@ -41,6 +44,7 @@ import {
   dbGetThreads,
   dbReplaceThreadRuntimeSnapshot,
   dbSetState,
+  dbSetProjectNotes,
   dbUpsertProject,
   dbUpsertThread,
 } from "../db";
@@ -69,6 +73,8 @@ vi.mock("../db", () => {
     dbCompleteRemoteCommand: vi.fn<(...args: unknown[]) => void>(),
     dbFailRemoteCommand: vi.fn<(...args: unknown[]) => void>(),
     dbDeleteThread: vi.fn<(threadId: string) => void>(),
+    dbGetProject: vi.fn<(projectId: string) => unknown>(() => null),
+    dbGetProjectNotes: vi.fn<(projectId: string) => unknown>(() => null),
     dbGetProjects: vi.fn<() => unknown[]>(() => []),
     dbGetThreadCompletedTurns: vi.fn<() => unknown[]>(() => []),
     dbGetThreadContextUsage: vi.fn<() => null>(() => null),
@@ -88,6 +94,7 @@ vi.mock("../db", () => {
     dbSetState: vi.fn<(key: string, value: string) => void>((key, value) => {
       appState.set(key, value);
     }),
+    dbSetProjectNotes: vi.fn<(notes: unknown) => void>(),
     dbGetAllUsageEvents: vi.fn<() => unknown[]>(() => []),
     getProfileDataGeneration: vi.fn<() => number>(() => profileDataGeneration),
     bumpProfileDataGeneration: vi.fn<() => void>(() => {
@@ -133,6 +140,8 @@ afterEach(async () => {
   vi.mocked(dbFailRemoteCommand).mockReset();
   vi.mocked(dbDeleteThread).mockReset();
   vi.mocked(dbGetThreadCompletedTurns).mockReset().mockReturnValue([]);
+  vi.mocked(dbGetProject).mockReset().mockReturnValue(null);
+  vi.mocked(dbGetProjectNotes).mockReset().mockReturnValue(null);
   vi.mocked(dbGetProjects).mockReset().mockReturnValue([]);
   vi.mocked(dbGetThreadContextUsage).mockReset().mockReturnValue(null);
   vi.mocked(dbGetLatestThreadRuntimeAnchorItemId).mockReset().mockReturnValue(null);
@@ -148,6 +157,7 @@ afterEach(async () => {
   vi.mocked(dbUpsertThread).mockReset();
   dbSetState("poracode-experiments-v1", "");
   vi.mocked(dbSetState).mockClear();
+  vi.mocked(dbSetProjectNotes).mockReset();
 });
 
 function createTestProject(overrides: Partial<Project> = {}): Project {
@@ -675,6 +685,64 @@ describe("RemoteAccessServer", () => {
     expect(dbApplyThreadRuntimeEvents).toHaveBeenCalledTimes(1);
   });
 
+  it("rotates the desktop pairing code after exchange and rejects replay", async () => {
+    const onPairingChanged = vi.fn<() => void>();
+    const server = new RemoteAccessServer({
+      appVersion: "1.0.0",
+      identity: { desktopId: "desktop-test", label: "Test Desktop" },
+      host: "127.0.0.1",
+      port: 0,
+      callSupervisor: vi.fn<RemoteAccessServerOptions["callSupervisor"]>(async () => "" as never),
+      onPairingChanged,
+    });
+    servers.push(server);
+    const info = await server.start();
+    const originalCredential = new URLSearchParams(new URL(info.pairingUrl).hash.slice(1)).get(
+      "token",
+    );
+    expect(originalCredential).toBeTruthy();
+
+    const firstExchange = await fetch(new URL("/oauth/token", info.httpBaseUrl), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        grantType: "pairing-token",
+        credential: originalCredential,
+      }),
+    });
+    expect(firstExchange.status).toBe(200);
+
+    const rotatedInfo = server.getInfo();
+    expect(rotatedInfo).not.toBeNull();
+    const rotatedCredential = new URLSearchParams(
+      new URL(rotatedInfo!.pairingUrl).hash.slice(1),
+    ).get("token");
+    expect(rotatedCredential).toBeTruthy();
+    expect(rotatedCredential).not.toBe(originalCredential);
+    expect(onPairingChanged).toHaveBeenCalledTimes(1);
+
+    const replay = await fetch(new URL("/oauth/token", info.httpBaseUrl), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        grantType: "pairing-token",
+        credential: originalCredential,
+      }),
+    });
+    expect(replay.status).toBe(401);
+
+    const nextDevice = await fetch(new URL("/oauth/token", info.httpBaseUrl), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        grantType: "pairing-token",
+        credential: rotatedCredential,
+      }),
+    });
+    expect(nextDevice.status).toBe(200);
+    expect(onPairingChanged).toHaveBeenCalledTimes(2);
+  });
+
   it("serves descriptor, snapshot, and websocket supervisor events", async () => {
     const callSupervisor = vi.fn<RemoteAccessServerOptions["callSupervisor"]>(
       async () => "" as never,
@@ -824,6 +892,31 @@ describe("RemoteAccessServer", () => {
       runtimeItems: tailPage.items,
       runtimeNextCursor: 41,
     });
+    expect(dbGetThreadRuntimeItemsPage).toHaveBeenLastCalledWith(
+      "thread-paged",
+      undefined,
+      500,
+      40,
+    );
+
+    const narrowTailResponse = await fetch(
+      new URL(
+        "/api/threads/thread-paged/history?runtimePage=1&targetTimelineEntryCount=20",
+        info.httpBaseUrl,
+      ),
+      { headers },
+    );
+    expect(narrowTailResponse.status).toBe(200);
+    await expect(narrowTailResponse.json()).resolves.toMatchObject({
+      runtimeItems: tailPage.items,
+      runtimeNextCursor: 41,
+    });
+    expect(dbGetThreadRuntimeItemsPage).toHaveBeenLastCalledWith(
+      "thread-paged",
+      undefined,
+      500,
+      20,
+    );
 
     const olderResponse = await fetch(
       new URL(
@@ -835,6 +928,29 @@ describe("RemoteAccessServer", () => {
     expect(olderResponse.status).toBe(200);
     await expect(olderResponse.json()).resolves.toEqual(tailPage);
     expect(dbGetThreadRuntimeItemsPage).toHaveBeenLastCalledWith("thread-paged", 41, 500, 40);
+  });
+
+  it("re-reads thread state after asynchronous terminal snapshot calls", async () => {
+    const working = createTestThread({ id: "thread-race", status: "working" });
+    const idle = createTestThread({ id: "thread-race", status: "idle" });
+    vi.mocked(dbGetThread).mockReturnValueOnce(working).mockReturnValue(idle);
+
+    const server = new RemoteAccessServer({
+      appVersion: "1.0.0",
+      identity: { desktopId: "desktop-test", label: "Test Desktop" },
+      host: "127.0.0.1",
+      port: 0,
+      callSupervisor: async () => null as never,
+    });
+    servers.push(server);
+    const info = await server.start();
+    const token = await issueAccessToken(info, ["session:read"]);
+    const response = await fetch(new URL("/api/threads/thread-race/history", info.httpBaseUrl), {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ thread: { status: "idle" } });
   });
 
   it("builds shell snapshots from aggregated runtime summaries", async () => {
@@ -2455,6 +2571,7 @@ describe("RemoteAccessServer", () => {
     servers.push(server);
     const info = await server.start();
     const token = await issueAccessToken(info, ["session:operate"]);
+    const publishSpy = vi.spyOn(server, "publishSupervisorEvent");
 
     const response = await fetch(new URL("/api/threads/thread-1/command", info.httpBaseUrl), {
       method: "POST",
@@ -2468,6 +2585,11 @@ describe("RemoteAccessServer", () => {
     expect(response.status).toBe(200);
     expect(db.threads()[0]?.status).toBe("idle");
     expect(dispatched).toEqual([{ kind: "acknowledge", threadId: "thread-1" }]);
+    expect(publishSpy).toHaveBeenCalledWith({
+      type: "remote-threads-changed",
+      threadIds: ["thread-1"],
+      viewedThreadIds: ["thread-1"],
+    });
   });
 
   it("rejects destructive remote commands for experiment candidates before persistence", async () => {
@@ -3466,6 +3588,74 @@ describe("RemoteAccessServer", () => {
     expect(stored.enabledMcpServers).toEqual({ browser: true, crossagents: true });
   });
 
+  it("serves and updates project notes with read and operate scopes", async () => {
+    const project = createTestProject();
+    const notes: ProjectNotes = {
+      projectId: project.id,
+      doc: { type: "doc", content: [] },
+      todos: [
+        {
+          id: "todo-1",
+          text: "Review the panel",
+          done: false,
+          createdAt: "2026-07-23T00:00:00.000Z",
+        },
+      ],
+      updatedAt: "2026-07-23T00:00:00.000Z",
+    };
+    vi.mocked(dbGetProject).mockReturnValue(project);
+    vi.mocked(dbGetProjectNotes).mockReturnValue(notes);
+
+    const server = new RemoteAccessServer({
+      appVersion: "1.0.0",
+      identity: { desktopId: "desktop-test", label: "Test Desktop" },
+      host: "127.0.0.1",
+      port: 0,
+      callSupervisor: vi.fn<RemoteAccessServerOptions["callSupervisor"]>(async () => "" as never),
+    });
+    servers.push(server);
+    const info = await server.start();
+
+    const readToken = await issueAccessToken(info, ["session:read"]);
+    const readHeaders = {
+      authorization: `Bearer ${readToken}`,
+      "content-type": "application/json",
+    };
+    const getResponse = await fetch(
+      new URL(`/api/projects/${project.id}/notes`, info.httpBaseUrl),
+      { headers: readHeaders },
+    );
+    expect(getResponse.status).toBe(200);
+    await expect(getResponse.json()).resolves.toEqual({ notes });
+
+    const deniedWrite = await fetch(
+      new URL(`/api/projects/${project.id}/notes`, info.httpBaseUrl),
+      {
+        method: "POST",
+        headers: readHeaders,
+        body: JSON.stringify(notes),
+      },
+    );
+    expect(deniedWrite.status).toBe(403);
+
+    const operateToken = await issueAccessToken({ ...info, pairingUrl: server.issuePairingUrl() }, [
+      "session:operate",
+    ]);
+    const writeResponse = await fetch(
+      new URL(`/api/projects/${project.id}/notes`, info.httpBaseUrl),
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${operateToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(notes),
+      },
+    );
+    expect(writeResponse.status).toBe(200);
+    expect(dbSetProjectNotes).toHaveBeenCalledWith(notes);
+  });
+
   it("lists and modifies device schedules with read and operate scopes", async () => {
     let stored: ScheduledTask[] = [];
     const input: ScheduledTaskInput = {
@@ -4083,8 +4273,8 @@ describe("RemoteAccessServer", () => {
     expect(forbidden.status).toBe(403);
     expect(pushRegistrations.upsert).not.toHaveBeenCalled();
 
-    // session:operate → happy path (consumes the startup pairing credential).
-    const token = await issueAccessToken(info, ["session:read", "session:operate"]);
+    // session:operate → happy path (consumes the automatically rotated credential).
+    const token = await issueAccessToken(server.getInfo()!, ["session:read", "session:operate"]);
     const configResponse = await fetch(new URL("/api/push/config", info.httpBaseUrl), {
       headers: { authorization: `Bearer ${token}` },
     });

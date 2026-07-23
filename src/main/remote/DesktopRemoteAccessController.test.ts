@@ -206,6 +206,7 @@ function deferredTailscaleProbe(): {
 function createController(
   devServerUrl?: string,
   channel: DesktopRemoteAccessControllerOptions["channel"] = "stable",
+  notifyRemoteAccessPairingChanged?: DesktopRemoteAccessControllerOptions["notifyRemoteAccessPairingChanged"],
 ) {
   const callSupervisor = vi.fn<() => Promise<Record<string, never>>>(
     async () => ({}),
@@ -225,6 +226,9 @@ function createController(
     getBrowserPanelManager: () => null,
     notifySharedSettingsChanged:
       vi.fn<DesktopRemoteAccessControllerOptions["notifySharedSettingsChanged"]>(),
+    notifyRemoteAccessPairingChanged:
+      notifyRemoteAccessPairingChanged ??
+      vi.fn<DesktopRemoteAccessControllerOptions["notifyRemoteAccessPairingChanged"]>(),
     reportError: vi.fn<DesktopRemoteAccessControllerOptions["reportError"]>(),
     scheduleService: {} as never,
   });
@@ -306,6 +310,22 @@ describe("DesktopRemoteAccessController", () => {
       "https://app.poracode.com",
       "https://app-nightly.poracode.com",
     ]);
+  });
+
+  it("publishes the rotated pairing state from the server", async () => {
+    const notifyRemoteAccessPairingChanged =
+      vi.fn<DesktopRemoteAccessControllerOptions["notifyRemoteAccessPairingChanged"]>();
+    const controller = createController(undefined, "stable", notifyRemoteAccessPairingChanged);
+    await controller.setEnabled(true);
+
+    h.servers[0]?.options.onPairingChanged?.();
+
+    expect(notifyRemoteAccessPairingChanged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "ready",
+        pairingUrl: h.defaultInfo.pairingUrl,
+      }),
+    );
   });
 
   it("coalesces enable calls while a server start is in flight", async () => {

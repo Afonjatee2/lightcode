@@ -12,6 +12,7 @@ import {
   runGitMergeToSource,
   runGitPullFromSource,
   runGitSyncCommand,
+  refreshGitStatusForWorktree,
   showGitActionError,
   showGitOperationFailure,
 } from "./gitCommandRunner";
@@ -189,6 +190,7 @@ export function gitPullFromSource(projectId: string, worktreePath: string): void
         });
         return;
       }
+      await refreshGitStatusForWorktree(worktreeLocation, worktreePath);
       if (result.conflicting) {
         openGitReviewForWorktree(projectId, worktreePath);
         return;

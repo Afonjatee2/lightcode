@@ -173,8 +173,9 @@ export class PushCoordinator {
     const causedEnd = hadAnyActive && !hasAnyActive;
 
     const changed = status !== prevStatus;
+    const suppressNotification = event.forceCloseActiveTurn === true;
     const attentionAlert =
-      changed && ATTENTION_STATUSES.has(status)
+      changed && !suppressNotification && ATTENTION_STATUSES.has(status)
         ? this.alertContent(event.threadId, status)
         : undefined;
     const urgent = causedStart || causedEnd || attentionAlert !== undefined;
@@ -186,13 +187,18 @@ export class PushCoordinator {
     }
 
     // iOS: ordinary alert pushes on attention / terminal transitions.
-    if (changed && ALERT_STATUSES.has(status)) {
+    if (changed && !suppressNotification && ALERT_STATUSES.has(status)) {
       void this.sendAlertPushes(event.threadId, status).catch(() => {});
     }
 
     // Android: per-thread replaceable status notification (no Live Activity).
     if (changed) {
-      this.handleAndroidTransition(event.threadId, status, event.errorMessage);
+      this.handleAndroidTransition(
+        event.threadId,
+        status,
+        event.errorMessage,
+        suppressNotification,
+      );
     }
   }
 
@@ -207,9 +213,13 @@ export class PushCoordinator {
     threadId: string,
     status: ThreadStatus,
     errorMessage: string | undefined,
+    suppressNotification: boolean,
   ): void {
     const spec = androidStatusFor(status, errorMessage);
-    if (!spec) return;
+    if (suppressNotification || !spec) {
+      this.clearAndroidTimersForThread(threadId);
+      return;
+    }
     const payload = buildAndroidStatusPayload({
       title: this.androidTitle(threadId),
       body: spec.body,
@@ -224,6 +234,14 @@ export class PushCoordinator {
         void this.sendAndroidPush(reg.deviceId, token, payload, spec.priority).catch(() => {});
       } else {
         this.scheduleAndroidPush(reg.deviceId, threadId, token, payload, spec.priority);
+      }
+    }
+  }
+
+  private clearAndroidTimersForThread(threadId: string): void {
+    for (const reg of this.options.store.list()) {
+      if (reg.platform === "android") {
+        this.clearAndroidTimer(reg.deviceId, threadId);
       }
     }
   }

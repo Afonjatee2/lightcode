@@ -20,6 +20,7 @@ import { useMobileApp, useRemote } from "./remoteContext";
 import {
   buildFilesTarget,
   buildGitTarget,
+  openWorktreeDraft,
   preselectWorktreeDraft,
   runThreadAction,
 } from "./navHelpers";
@@ -36,7 +37,8 @@ import { EmptyState } from "./components";
 import { isDesktopSettingsSection } from "./settingsSections";
 import type { MobileSshPairRequest } from "./views/DesktopsView";
 import { useGitSummaryHydration } from "./useGitSummaryHydration";
-import { useMediaQuery, WIDE_SHELL_QUERY } from "./useMediaQuery";
+import { DESKTOP_RIGHT_PANEL_QUERY, useMediaQuery, WIDE_SHELL_QUERY } from "./useMediaQuery";
+import { useDesktopPanelStore } from "./desktopPanelStore";
 import { DesktopsView } from "./views/DesktopsView";
 import { ManageProjectsView } from "./views/ManageProjectsView";
 import { MoreView } from "./views/MoreView";
@@ -64,6 +66,9 @@ const WorkspaceView = lazy(() =>
 const TerminalView = lazy(() =>
   import("./views/TerminalView").then((module) => ({ default: module.TerminalView })),
 );
+const NotesView = lazy(() =>
+  import("./views/NotesView").then((module) => ({ default: module.NotesView })),
+);
 const SettingsView = lazy(() =>
   import("./views/SettingsView").then((module) => ({ default: module.SettingsView })),
 );
@@ -78,6 +83,7 @@ const UsagePanel = lazy(() =>
 // Typed route APIs (params/search) — decoupled from the route consts so this
 // file never imports router.tsx (which imports these components).
 const threadRouteApi = getRouteApi("/thread/$threadId");
+const notesRouteApi = getRouteApi("/notes/$threadId");
 const settingsSectionRouteApi = getRouteApi("/settings/$section");
 const workspaceRouteApi = getRouteApi("/workspace/$threadId");
 const terminalRouteApi = getRouteApi("/terminal/$projectId");
@@ -132,6 +138,7 @@ function FullscreenLazyRoute(props: { readonly children: ReactNode }) {
 function ThreadDetail(props: { readonly thread: Thread | null; readonly hideHeader: boolean }) {
   const remote = useRemote();
   const navigate = useNavigate();
+  const useRightPanel = useMediaQuery(DESKTOP_RIGHT_PANEL_QUERY);
   const thread = props.thread;
   const threadId = thread?.id ?? null;
   // Ensure the displayed thread is actually OPEN, not just rendered: the wide
@@ -186,6 +193,10 @@ function ThreadDetail(props: { readonly thread: Thread | null; readonly hideHead
         }
         onSubmitInput={(prompt, segments) => remote.sendPrompt(prompt, segments)}
         onOpenWorkspace={(tab) => {
+          if (useRightPanel) {
+            useDesktopPanelStore.getState().show(tab === "changes" ? "git" : "files", thread.id);
+            return;
+          }
           void navigate({
             to: "/workspace/$threadId",
             params: { threadId: thread.id },
@@ -193,6 +204,10 @@ function ThreadDetail(props: { readonly thread: Thread | null; readonly hideHead
           });
         }}
         onOpenWorkspaceFile={(path, lineNumber) => {
+          if (useRightPanel) {
+            useDesktopPanelStore.getState().showFile(thread.id, path, lineNumber);
+            return;
+          }
           void navigate({
             to: "/workspace/$threadId",
             params: { threadId: thread.id },
@@ -204,6 +219,10 @@ function ThreadDetail(props: { readonly thread: Thread | null; readonly hideHead
           });
         }}
         onOpenWorkspaceFolder={(path) => {
+          if (useRightPanel) {
+            useDesktopPanelStore.getState().showFolder(thread.id, path);
+            return;
+          }
           void navigate({
             to: "/workspace/$threadId",
             params: { threadId: thread.id },
@@ -211,6 +230,10 @@ function ThreadDetail(props: { readonly thread: Thread | null; readonly hideHead
           });
         }}
         onOpenTerminal={() => {
+          if (useRightPanel) {
+            useDesktopPanelStore.getState().show("terminal", thread.id);
+            return;
+          }
           void navigate({
             to: "/terminal/$projectId",
             params: { projectId: thread.projectId },
@@ -220,9 +243,23 @@ function ThreadDetail(props: { readonly thread: Thread | null; readonly hideHead
             },
           });
         }}
+        onOpenNotes={() => {
+          if (useRightPanel) {
+            useDesktopPanelStore.getState().show("notes", thread.id);
+            return;
+          }
+          void navigate({
+            to: "/notes/$threadId",
+            params: { threadId: thread.id },
+          });
+        }}
         onNewThreadInWorktree={(input) => {
-          preselectWorktreeDraft(input);
-          void navigate({ to: "/new" });
+          if (props.hideHeader) {
+            preselectWorktreeDraft(input);
+            void navigate({ to: "/threads" });
+            return;
+          }
+          void openWorktreeDraft(input, () => navigate({ to: "/new" }));
         }}
         onDeleteWorktreeGroup={(input) => {
           void remote.deleteWorktreeGroup(input);
@@ -246,7 +283,11 @@ export function ThreadsRoute() {
   const isWide = useMediaQuery(WIDE_SHELL_QUERY);
   // The home composer's expand state (kept here so the list's empty-state
   // "New thread" button grows the same bubble as a tap on it).
-  const [composeExpanded, setComposeExpanded] = useState(false);
+  const hasPendingWorktreeDraft = useAppStore(
+    (state) => Object.keys(state.pendingDraftWorktreeSelections).length > 0,
+  );
+  const [composeExpanded, setComposeExpanded] = useState(hasPendingWorktreeDraft);
+  const [restoreWorktreeSelectionToken, setRestoreWorktreeSelectionToken] = useState(0);
   const readyToCompose = remote.connection === "online" && remote.projects.length > 0;
   const needsDesktop = remote.connection !== "online";
   const setupKind: MobileSetupKind | null = readyToCompose
@@ -272,6 +313,12 @@ export function ThreadsRoute() {
   useEffect(() => {
     if (!isWide) useAppStore.getState().openHome();
   }, [isWide]);
+
+  // Worktree actions from another narrow route return here with a one-shot
+  // target already queued. Reveal the inline composer that will consume it.
+  useEffect(() => {
+    if (hasPendingWorktreeDraft) setComposeExpanded(true);
+  }, [hasPendingWorktreeDraft]);
 
   // Once a desktop is connected, warm the fullscreen chunks after first paint
   // so their push transition normally captures real content. Disconnected
@@ -322,7 +369,7 @@ export function ThreadsRoute() {
         onNew={() => setComposeExpanded(true)}
         onNewThreadInWorktree={(input) => {
           preselectWorktreeDraft(input);
-          void navigate({ to: "/new" });
+          setComposeExpanded(true);
         }}
         onOpenTerminal={(input) =>
           void navigate({
@@ -351,7 +398,11 @@ export function ThreadsRoute() {
         <Suspense fallback={null}>
           <QuickCompose
             expanded={composeExpanded}
-            onExpandedChange={setComposeExpanded}
+            restoreWorktreeSelectionToken={restoreWorktreeSelectionToken}
+            onExpandedChange={(expanded) => {
+              if (!expanded) setRestoreWorktreeSelectionToken((token) => token + 1);
+              setComposeExpanded(expanded);
+            }}
             onStarted={(threadId) => {
               setComposeExpanded(false);
               void navigate({ to: "/thread/$threadId", params: { threadId } });
@@ -619,6 +670,8 @@ export function WorkspaceRoute() {
   const { tab, file, folder, line } = workspaceRouteApi.useSearch();
   const remote = useRemote();
   const navigate = useNavigate();
+  const isWide = useMediaQuery(WIDE_SHELL_QUERY);
+  const useRightPanel = useMediaQuery(DESKTOP_RIGHT_PANEL_QUERY);
   const { t } = useLingui();
   const thread = remote.threads.find((entry) => entry.id === threadId) ?? null;
   const project = thread
@@ -639,7 +692,23 @@ export function WorkspaceRoute() {
     if (remote.booted && !hasTarget) void navigate({ to: "/threads" });
   }, [remote.booted, hasTarget, navigate]);
 
+  useEffect(() => {
+    if (!useRightPanel || !hasTarget) return;
+    const panel = useDesktopPanelStore.getState();
+    if (file) panel.showFile(threadId, file, line);
+    else if (folder) panel.showFolder(threadId, folder);
+    else panel.show(tab === "changes" ? "git" : "files", threadId);
+    void navigate({
+      to: "/thread/$threadId",
+      params: { threadId },
+      replace: true,
+    });
+  }, [file, folder, hasTarget, line, navigate, tab, threadId, useRightPanel]);
+
   if (!filesTarget) return null;
+  if (useRightPanel) {
+    return null;
+  }
   // The workspace belongs to a thread; closing returns there deterministically
   // (robust even on a fresh load with no back-history).
   return (
@@ -666,12 +735,17 @@ export function WorkspaceRoute() {
             });
             return;
           }
-          preselectWorktreeDraft({
+          const input = {
             projectId: filesTarget.project.id,
             worktreePath,
             worktreeBranch,
-          });
-          void navigate({ to: "/new" });
+          };
+          if (!isWide) {
+            preselectWorktreeDraft(input);
+            void navigate({ to: "/threads" });
+            return;
+          }
+          void openWorktreeDraft(input, () => navigate({ to: "/new" }));
         }}
         onLaunchConflictResolverThread={(input) => {
           remote
@@ -688,6 +762,51 @@ export function WorkspaceRoute() {
               toast.danger(error instanceof Error ? error.message : t`Unable to start the thread.`);
             });
         }}
+      />
+    </FullscreenLazyRoute>
+  );
+}
+
+export function NotesRoute() {
+  const { threadId } = notesRouteApi.useParams();
+  const remote = useRemote();
+  const navigate = useNavigate();
+  const useRightPanel = useMediaQuery(DESKTOP_RIGHT_PANEL_QUERY);
+  const thread = remote.threads.find((entry) => entry.id === threadId) ?? null;
+  const project = thread
+    ? (remote.projects.find((entry) => entry.id === thread.projectId) ?? null)
+    : null;
+
+  useEffect(() => {
+    if (remote.booted && !project) {
+      void navigate({ to: "/threads", replace: true });
+    }
+  }, [navigate, project, remote.booted]);
+
+  useEffect(() => {
+    if (!useRightPanel || !project) return;
+    useDesktopPanelStore.getState().show("notes", threadId);
+    void navigate({
+      to: "/thread/$threadId",
+      params: { threadId },
+      replace: true,
+    });
+  }, [navigate, project, threadId, useRightPanel]);
+
+  if (!project || useRightPanel) return null;
+
+  return (
+    <FullscreenLazyRoute>
+      <NotesView
+        key={project.id}
+        projectId={project.id}
+        projectName={project.name}
+        onClose={() =>
+          void navigate({
+            to: "/thread/$threadId",
+            params: { threadId },
+          })
+        }
       />
     </FullscreenLazyRoute>
   );

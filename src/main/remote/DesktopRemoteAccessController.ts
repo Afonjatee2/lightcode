@@ -69,6 +69,7 @@ export interface DesktopRemoteAccessControllerOptions {
   readonly dispatchThreadCommand: NonNullable<RemoteAccessServerOptions["dispatchThreadCommand"]>;
   readonly getBrowserPanelManager: () => BrowserPanelManager | null;
   readonly notifySharedSettingsChanged: (settings: SharedSettings) => void;
+  readonly notifyRemoteAccessPairingChanged: (info: RemoteAccessPairingInfo) => void;
   readonly reportError: (error: unknown, tags?: PoracodeDiagnosticTags) => void;
   readonly scheduleService: ScheduleService;
 }
@@ -347,6 +348,9 @@ export function createDesktopRemoteAccessController(
           webPublicKey: createWebPushPublicKeyResolver(pushGatewayOptions),
           upsert: (registration) => pushStore.upsert(registration),
           remove: (deviceId) => pushStore.remove(deviceId),
+        },
+        onPairingChanged: () => {
+          options.notifyRemoteAccessPairingChanged(getRemoteAccessPairingInfo(server));
         },
       });
       attempt.server = server;

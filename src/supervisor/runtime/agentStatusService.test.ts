@@ -210,6 +210,19 @@ HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\{333}
     expect(detectInstall).toHaveBeenCalledTimes(1);
   });
 
+  it("exposes cached native and WSL versions for projection compatibility checks", async () => {
+    const detectInstall = vi
+      .fn<AgentAdapter["detectInstall"]>()
+      .mockResolvedValue({ ...makeStatus(), version: "2.1.203" });
+    const { service } = makeService(detectInstall);
+
+    expect(service.getCachedVersion("codex")).toBeUndefined();
+    await service.refreshAgentStatuses({ wslDistros: ["Ubuntu"] });
+
+    expect(service.getCachedVersion("codex")).toBe("2.1.203");
+    expect(service.getCachedVersion("codex", "Ubuntu")).toBe("2.1.203");
+  });
+
   it("scoped refresh probes only the requested adapter and merges into the cache", async () => {
     const codexStatus: AgentStatus = { ...makeStatus(), kind: "codex", label: "Codex" };
     const claudeStatus: AgentStatus = { ...makeStatus(), kind: "claude", label: "Claude" };

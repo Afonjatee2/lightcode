@@ -73,6 +73,7 @@ interface MessageListProps {
   scrollContentRef?: RefObject<HTMLDivElement | null>;
   onContentHeightChange?: () => void;
   onVirtualizerLayoutChange?: () => void;
+  onLiveVirtualizerLayoutChange?: () => void;
   registerVirtualScrollToBottom?: (handler: (() => void) | null) => void;
   scrollClassName?: string;
   scrollStyle?: CSSProperties;
@@ -128,6 +129,7 @@ export function MessageList({
   scrollContentRef,
   onContentHeightChange,
   onVirtualizerLayoutChange,
+  onLiveVirtualizerLayoutChange,
   registerVirtualScrollToBottom,
   scrollClassName,
   scrollStyle,
@@ -290,15 +292,19 @@ export function MessageList({
   const lastLiveIndex = useAppStore(liveTailSelector);
 
   const remeasureRowElement = useCallback(
-    (itemKey: string, element: HTMLDivElement | null) => {
+    (itemKey: string, element: HTMLDivElement | null, liveStreamGrowth = false) => {
       if (!element) return;
-      onVirtualizerLayoutChange?.();
+      if (liveStreamGrowth) {
+        onLiveVirtualizerLayoutChange?.();
+      } else {
+        onVirtualizerLayoutChange?.();
+      }
       listRef.current?.setItemSize(itemKey, {
         height: element.offsetHeight,
         width: element.offsetWidth,
       });
     },
-    [onVirtualizerLayoutChange],
+    [onLiveVirtualizerLayoutChange, onVirtualizerLayoutChange],
   );
 
   const performRevert = useCallback(
@@ -468,7 +474,11 @@ type VirtualChatListRowProps = {
   index: number;
   isLastEntry: boolean;
   isTurnActive: boolean;
-  remeasureElement: (itemKey: string, element: HTMLDivElement | null) => void;
+  remeasureElement: (
+    itemKey: string,
+    element: HTMLDivElement | null,
+    liveStreamGrowth?: boolean,
+  ) => void;
   onVirtualizerLayoutChange?: () => void;
   suppressInlineTurnAnchorId: string | null;
   canRevertCheckpoints: boolean;
@@ -501,9 +511,11 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
     if (liveMeasureRafRef.current !== null) return;
     liveMeasureRafRef.current = requestAnimationFrame(() => {
       liveMeasureRafRef.current = null;
-      remeasureRow();
+      const element = rowElementRef.current;
+      if (!element) return;
+      remeasureElement(entry.id, element, true);
     });
-  }, [remeasureRow]);
+  }, [entry.id, remeasureElement]);
   useLayoutEffect(() => {
     if (!isLastEntry) return;
     return useAppStore.subscribe(
@@ -553,6 +565,13 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
     completedTurn !== undefined &&
     completedTurn.anchorItemId !== null &&
     completedTurn.anchorItemId !== suppressInlineTurnAnchorId;
+  const inlineTurnVisibleRef = useRef(false);
+  useLayoutEffect(() => {
+    if (inlineTurnVisibleRef.current === showInlineTurn) return;
+    inlineTurnVisibleRef.current = showInlineTurn;
+    onVirtualizerLayoutChange?.();
+    scheduleLiveMeasure();
+  }, [onVirtualizerLayoutChange, scheduleLiveMeasure, showInlineTurn]);
 
   return (
     <div

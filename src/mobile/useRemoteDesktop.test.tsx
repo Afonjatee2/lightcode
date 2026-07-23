@@ -9,6 +9,7 @@ import type { StoredDesktop } from "./storage";
 type ClientMock = {
   snapshot: Mock<(...a: unknown[]) => Promise<unknown>>;
   agentStatuses: Mock<(...a: unknown[]) => Promise<unknown>>;
+  providerUsage: Mock<(...a: unknown[]) => Promise<unknown>>;
   settings: Mock<(...a: unknown[]) => Promise<unknown>>;
   threadHistory: Mock<(...a: unknown[]) => Promise<unknown>>;
   environment: Mock<(...a: unknown[]) => Promise<unknown>>;
@@ -56,9 +57,11 @@ const h = vi.hoisted(() => {
     applyShellSnapshot: vi.fn<(...a: unknown[]) => void>(),
     applyThreadSnapshot: vi.fn<(...a: unknown[]) => void>(),
     applyAgentStatuses: vi.fn<(...a: unknown[]) => void>(),
+    applyProviderUsage: vi.fn<(...a: unknown[]) => void>(),
     applyDesktopSettings: vi.fn<(...a: unknown[]) => void>(),
     resetDesktopSettings: vi.fn<(...a: unknown[]) => void>(),
     resetRemoteStores: vi.fn<(...a: unknown[]) => void>(),
+    seedOlderThreadRuntimeItemsCursor: vi.fn<(...a: unknown[]) => void>(),
     // pwaInstall.isNativeApp / push registration spies
     isNativeApp: true,
     deviceId: "device-1",
@@ -128,6 +131,10 @@ function clientFor(desktopId: string): ClientMock {
         wsl: [],
         updatedAt: "",
       })),
+      providerUsage: vi.fn<() => Promise<unknown>>(async () => ({
+        snapshots: [],
+        fromCache: true,
+      })),
       settings: vi.fn<() => Promise<unknown>>(async () => ({})),
       threadHistory: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({
         snapshotSeq: 1,
@@ -175,6 +182,7 @@ vi.mock("./remoteClient", () => ({
     }
     snapshot = (...a: unknown[]) => this.#c().snapshot(...a);
     agentStatuses = (...a: unknown[]) => this.#c().agentStatuses(...a);
+    providerUsage = (...a: unknown[]) => this.#c().providerUsage(...a);
     settings = (...a: unknown[]) => this.#c().settings(...a);
     threadHistory = (...a: unknown[]) => this.#c().threadHistory(...a);
     environment = (...a: unknown[]) => this.#c().environment(...a);
@@ -200,7 +208,7 @@ vi.mock("./storage", () => ({
     async (id: string, tid: string) => h.storedThread.get(`${id}:${tid}`),
   ),
   saveShellSnapshot: (...a: [string, unknown]) => h.saveShellSnapshot(...a),
-  markDesktopConnected: (...a: [string, number, { resetLastSeenSeq?: boolean }?]) =>
+  markDesktopConnected: (...a: [string, number?, { resetLastSeenSeq?: boolean }?]) =>
     h.markDesktopConnected(...a),
   saveThreadSnapshot: (...a: [string, string, unknown]) => h.saveThreadSnapshot(...a),
   saveDesktop: vi.fn<() => Promise<StoredDesktop>>(async () => {
@@ -221,8 +229,13 @@ vi.mock("./storeSync", () => ({
   applyShellSnapshot: (...a: unknown[]) => h.applyShellSnapshot(...a),
   applyThreadSnapshot: (...a: unknown[]) => h.applyThreadSnapshot(...a),
   applyAgentStatuses: (...a: unknown[]) => h.applyAgentStatuses(...a),
+  applyProviderUsage: (...a: unknown[]) => h.applyProviderUsage(...a),
   dispatchRemoteSupervisorEvent: vi.fn<(...a: unknown[]) => void>(),
   resetRemoteStores: (...a: unknown[]) => h.resetRemoteStores(...a),
+}));
+
+vi.mock("@/renderer/state/chatRuntimePersister", () => ({
+  seedOlderThreadRuntimeItemsCursor: (...a: unknown[]) => h.seedOlderThreadRuntimeItemsCursor(...a),
 }));
 
 vi.mock("./settingsSync", () => ({
@@ -333,9 +346,11 @@ describe("useRemoteDesktop", () => {
       h.applyShellSnapshot,
       h.applyThreadSnapshot,
       h.applyAgentStatuses,
+      h.applyProviderUsage,
       h.applyDesktopSettings,
       h.resetDesktopSettings,
       h.resetRemoteStores,
+      h.seedOlderThreadRuntimeItemsCursor,
       h.setActiveDesktopId,
       h.forgetDesktop,
       h.unregisterPush,
@@ -460,6 +475,26 @@ describe("useRemoteDesktop", () => {
     await waitFor(() => expect(h.applyDesktopSettings).toHaveBeenCalledWith(remoteSettings));
   });
 
+  it("hydrates provider usage during cold session bootstrap", async () => {
+    const desktop = makeDesktop("d1");
+    const usage = {
+      snapshots: [
+        {
+          providerId: "codex",
+          status: "ok",
+          windows: [],
+          fetchedAt: 1,
+        },
+      ],
+      fromCache: true,
+    };
+    clientFor("d1").providerUsage.mockResolvedValue(usage);
+
+    await mountWith([desktop], "d1");
+
+    await waitFor(() => expect(h.applyProviderUsage).toHaveBeenCalledWith(usage));
+  });
+
   it("opens a persisted new thread without waiting for the provider launch to finish", async () => {
     const desktop = makeDesktop("d1");
     const client = clientFor("d1");
@@ -482,6 +517,7 @@ describe("useRemoteDesktop", () => {
     });
     const view = await mountWith([desktop], "d1");
     client.agentStatuses.mockClear();
+    client.providerUsage.mockClear();
     client.settings.mockClear();
     client.environment.mockClear();
 
@@ -509,6 +545,7 @@ describe("useRemoteDesktop", () => {
       expect.objectContaining({ threadId: createdThreadId, projectId: "p", prompt: "Fix it" }),
     );
     expect(client.agentStatuses).not.toHaveBeenCalled();
+    expect(client.providerUsage).not.toHaveBeenCalled();
     expect(client.settings).not.toHaveBeenCalled();
     expect(client.environment).not.toHaveBeenCalled();
 
@@ -684,6 +721,94 @@ describe("useRemoteDesktop", () => {
     expect(client.sendThreadCommand).not.toHaveBeenCalled();
   });
 
+  it("requests 20 initial timeline entries on a narrow browser PWA", async () => {
+    const desktop = makeDesktop("d1");
+    const client = clientFor("d1");
+    h.isNativeApp = false;
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn<(query: string) => MediaQueryList>(
+        (query) => ({ matches: query !== "(min-width: 768px)" }) as MediaQueryList,
+      ),
+    );
+    const view = await mountWith([desktop], "d1");
+    client.threadHistory.mockClear();
+
+    await act(async () => {
+      await view.result.current.openThread({ id: "t1", done: false } as never);
+    });
+
+    expect(client.threadHistory).toHaveBeenCalledWith("t1", {
+      targetTimelineEntryCount: 20,
+    });
+  });
+
+  it("keeps the default initial timeline size on a wide browser PWA", async () => {
+    const desktop = makeDesktop("d1");
+    const client = clientFor("d1");
+    h.isNativeApp = false;
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn<() => MediaQueryList>(() => ({ matches: true }) as MediaQueryList),
+    );
+    const view = await mountWith([desktop], "d1");
+    client.threadHistory.mockClear();
+
+    await act(async () => {
+      await view.result.current.openThread({ id: "t1", done: false } as never);
+    });
+
+    expect(client.threadHistory).toHaveBeenCalledWith("t1");
+  });
+
+  it("preserves an advanced page cursor when a fresh tail overlaps local history", async () => {
+    const desktop = makeDesktop("d1");
+    const client = clientFor("d1");
+    useAppStore.setState({ runtimeItemIdsByThread: { t1: ["shared-tail-start"] } });
+    client.threadHistory.mockResolvedValueOnce({
+      snapshotSeq: 2,
+      thread: { id: "t1", status: "idle", presentationMode: "gui" },
+      runtimeItems: [{ id: "shared-tail-start" }],
+      runtimeNextCursor: 80,
+      completedTurns: [],
+      contextUsage: null,
+      updatedAt: "",
+    });
+    const view = await mountWith([desktop], "d1");
+
+    await act(async () => {
+      await view.result.current.openThread({ id: "t1", done: false } as never);
+    });
+
+    expect(h.seedOlderThreadRuntimeItemsCursor).toHaveBeenCalledWith("t1", 80, {
+      preserveExistingCursor: true,
+    });
+  });
+
+  it("replaces the page cursor when a fresh tail is disjoint from local history", async () => {
+    const desktop = makeDesktop("d1");
+    const client = clientFor("d1");
+    useAppStore.setState({ runtimeItemIdsByThread: { t1: ["cached-tail-start"] } });
+    client.threadHistory.mockResolvedValueOnce({
+      snapshotSeq: 2,
+      thread: { id: "t1", status: "idle", presentationMode: "gui" },
+      runtimeItems: [{ id: "fresh-tail-start" }],
+      runtimeNextCursor: 120,
+      completedTurns: [],
+      contextUsage: null,
+      updatedAt: "",
+    });
+    const view = await mountWith([desktop], "d1");
+
+    await act(async () => {
+      await view.result.current.openThread({ id: "t1", done: false } as never);
+    });
+
+    expect(h.seedOlderThreadRuntimeItemsCursor).toHaveBeenCalledWith("t1", 120, {
+      preserveExistingCursor: false,
+    });
+  });
+
   it("[#4] forgetting a NON-active desktop does not reset the active session", async () => {
     const dA = makeDesktop("A");
     const dB = makeDesktop("B");
@@ -795,6 +920,39 @@ describe("useRemoteDesktop", () => {
       await view.result.current.refresh(d, { refreshSelectedThread: true });
     });
     expect(client.threadHistory).toHaveBeenCalled();
+  });
+
+  it("does not acknowledge a shell cursor until selected thread recovery succeeds", async () => {
+    const d = makeDesktop("d1");
+    const client = clientFor("d1");
+    client.snapshot.mockResolvedValue(snapshotFor("d1", ["selected"]));
+    const view = await mountWith([d], "d1");
+    await act(async () => {
+      await view.result.current.openThread({ id: "selected", done: false } as never);
+    });
+
+    client.snapshot.mockResolvedValue({ ...snapshotFor("d1", ["selected"]), snapshotSeq: 9 });
+    client.threadHistory.mockRejectedValueOnce(new Error("history unavailable"));
+    h.markDesktopConnected.mockClear();
+    await act(async () => {
+      await view.result.current.refresh(d, { refreshSelectedThread: true });
+    });
+
+    expect(h.markDesktopConnected).toHaveBeenLastCalledWith("d1");
+
+    client.threadHistory.mockResolvedValueOnce({
+      snapshotSeq: 9,
+      thread: { id: "selected", status: "working", presentationMode: "gui" },
+      runtimeItems: [],
+      completedTurns: [],
+      contextUsage: null,
+      updatedAt: "",
+    });
+    await act(async () => {
+      await view.result.current.refresh(d, { refreshSelectedThread: true });
+    });
+
+    expect(h.markDesktopConnected).toHaveBeenLastCalledWith("d1", 9);
   });
 
   it("[#8] skips shell-snapshot persistence when snapshotSeq has not advanced", async () => {

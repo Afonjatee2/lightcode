@@ -17,6 +17,7 @@ export function NewThreadView(props: {
   readonly project: Project | null;
   readonly setupKind?: MobileSetupKind;
   readonly onSetupAction?: (kind: MobileSetupKind) => void;
+  readonly restoreWorktreeSelectionToken?: number;
   readonly onStart: (project: Project, input: DraftStartInput) => void | Promise<void>;
 }) {
   const project = props.project;
@@ -83,6 +84,9 @@ export function NewThreadView(props: {
         project={project}
         agentStatuses={agentStatuses}
         submitOnEnter={submitOnEnter}
+        {...(props.restoreWorktreeSelectionToken !== undefined
+          ? { restoreWorktreeSelectionToken: props.restoreWorktreeSelectionToken }
+          : {})}
         {...(project.lastDraftConfig ? { lastDraftConfig: project.lastDraftConfig } : {})}
         onStart={(input) => props.onStart(project, input)}
       />

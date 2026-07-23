@@ -31,6 +31,15 @@ import { CodexStdioTransport } from "./stdioTransport";
 import { CodexSubAgentRouter } from "./subAgentRouting";
 import type { StructuredSessionUpdate } from "../base";
 
+describe("createCodexAdapter skill roots", () => {
+  it("declares Codex's native shared .agents root", () => {
+    const support = createCodexAdapter().skillSupport;
+
+    expect(support?.roots.map((root) => root.id)).toEqual(["codex", "agents"]);
+    expect(support?.projectionRoots).toBeUndefined();
+  });
+});
+
 describe("deriveCodexStructuredState", () => {
   it("maps active approval state to needs_approval", () => {
     expect(

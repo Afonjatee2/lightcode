@@ -184,6 +184,27 @@ describe("ToolCallGroup", () => {
     expect(screen.queryByText("-0")).not.toBeInTheDocument();
   });
 
+  it("shows combined diff counts for edits in a mixed group header", () => {
+    const threadId = "thread-1";
+    const items = [
+      makeReasoningItem("reasoning-1", "Planning the edits."),
+      makeFileChangeItem("file-1", { added: 4, removed: 2 }, "src/one.ts"),
+      makeCommandItem("cmd-1", "pnpm run test"),
+      makeFileChangeItem("file-2", { added: 5, removed: 3 }, "src/two.ts"),
+      makeFileChangeItem("file-3", { added: 2, removed: 1 }, "src/three.ts"),
+    ];
+    seedThread(threadId, items);
+
+    renderToolCallGroup(
+      threadId,
+      items.map((item) => item.id),
+    );
+
+    const heading = screen.getByRole("button", { name: /3 edits/i });
+    expect(within(heading).getByText("+11")).toHaveClass("text-success");
+    expect(within(heading).getByText("-6")).toHaveClass("text-danger");
+  });
+
   it("summarizes same-file edit groups with the file path and total diff", () => {
     const threadId = "thread-1";
     const items = [

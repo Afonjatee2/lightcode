@@ -251,11 +251,13 @@ export const remoteProjectsChangedEventSchema = z.object({
 export type RemoteProjectsChangedEvent = z.infer<typeof remoteProjectsChangedEventSchema>;
 
 /** Broadcast after durable thread metadata changes so remote clients refresh
- * the shell snapshot. The payload intentionally carries ids only; clients
- * already have a snapshot endpoint for current thread/project/runtime state. */
+ * the shell snapshot. `viewedThreadIds` is the explicit-read signal: unlike a
+ * normal persisted `idle` status, it authorizes clients to clear a locally
+ * derived `finished` badge. */
 export const remoteThreadsChangedEventSchema = z.object({
   type: z.literal("remote-threads-changed"),
   threadIds: z.array(z.string().min(1)),
+  viewedThreadIds: z.array(z.string().min(1)).optional(),
 });
 export type RemoteThreadsChangedEvent = z.infer<typeof remoteThreadsChangedEventSchema>;
 
@@ -519,11 +521,13 @@ export const remoteThreadSnapshotSchema = z.object({
 });
 export type RemoteThreadSnapshot = z.infer<typeof remoteThreadSnapshotSchema>;
 
+export const remoteTimelineEntryCountSchema = z.number().int().min(1).max(100);
+
 export const remoteRuntimeItemsPageRequestSchema = z.object({
   threadId: z.string().min(1),
   beforePosition: z.number().int().nonnegative().optional(),
   limit: z.number().int().min(1).max(500),
-  targetTimelineEntryCount: z.number().int().min(1).max(100).optional(),
+  targetTimelineEntryCount: remoteTimelineEntryCountSchema.optional(),
 });
 export type RemoteRuntimeItemsPageRequest = z.infer<typeof remoteRuntimeItemsPageRequestSchema>;
 

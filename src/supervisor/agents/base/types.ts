@@ -122,6 +122,14 @@ export interface StructuredSessionHandle {
     segments?: PromptSegment[],
     options?: StartTurnOptions,
   ): Promise<void>;
+  /**
+   * Best-effort provider preparation immediately before the shared runtime
+   * interrupts an in-flight turn for steering. Providers can preserve work
+   * that should survive the turn boundary (for example, by backgrounding
+   * foreground tasks). The runtime still owns the interrupt, watchdog, staged
+   * prompt, and fresh `startTurn` accounting.
+   */
+  prepareSteerInterrupt?(): Promise<void>;
   interruptTurn?(): Promise<void>;
   /**
    * Close the provider's current canonical turn locally before a forced
@@ -575,6 +583,11 @@ export interface AgentSkillRootSpec {
     readonly env: string;
     readonly path: string;
   };
+  /**
+   * Minimum provider version that can follow a linked skill directory at this
+   * projection root. Older or unknown versions receive a copied projection.
+   */
+  readonly linkProjectionFromVersion?: string;
 }
 
 export interface AgentSkillSupport {

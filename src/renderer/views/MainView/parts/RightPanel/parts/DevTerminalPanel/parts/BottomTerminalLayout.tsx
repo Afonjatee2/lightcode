@@ -2,6 +2,7 @@ import { Columns2, PanelBottomClose, Plus, Trash2 } from "lucide-react";
 import { Tabs } from "@heroui/react";
 import { useLingui } from "@lingui/react/macro";
 import type { Project, TerminalSize } from "@/shared/contracts";
+import type { TerminalFeedListener } from "@/shared/remote/terminalFeed";
 import { useDevTerminalStore, type DevTerminalTab } from "@/renderer/state/devTerminalStore";
 import { ContextMenu } from "@/renderer/components/common/ContextMenu";
 import { PanelHeaderProjectName } from "@/renderer/components/layout/PanelHeaderProjectName";
@@ -30,6 +31,7 @@ export function BottomTerminalLayout(props: {
   ) => { id: string; label: string; icon: React.ReactNode }[];
   handleTabContextAction: (tab: DevTerminalTab, key: string) => void;
   onTerminalResize?: (terminalId: string, size: TerminalSize) => void;
+  watchTerminal?: (terminalId: string, listener: TerminalFeedListener) => () => void;
 }) {
   const { t } = useLingui();
   const {
@@ -49,6 +51,7 @@ export function BottomTerminalLayout(props: {
     getTabContextItems,
     handleTabContextAction,
     onTerminalResize,
+    watchTerminal,
   } = props;
 
   // Build flat entries: primary tabs + their split children
@@ -144,6 +147,7 @@ export function BottomTerminalLayout(props: {
           focusRequestId={focusRequestId}
           markTabActive={markTabActive}
           updateTabTitle={updateTabTitle}
+          {...(watchTerminal ? { watchTerminal } : {})}
           {...(onTerminalResize ? { onTerminalResize } : {})}
         />
         {emptyState}

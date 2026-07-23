@@ -9,6 +9,7 @@ import {
   PanelRightClose,
   PictureInPicture2,
   TerminalSquare,
+  Waypoints,
 } from "lucide-react";
 import { useLingui } from "@lingui/react/macro";
 import { PanelHeaderProjectName } from "@/renderer/components/layout/PanelHeaderProjectName";
@@ -30,6 +31,7 @@ export function UnifiedRightPanel(props: {
   browserContent: ReactNode;
   usageContent?: ReactNode;
   notesContent?: ReactNode;
+  portsContent?: ReactNode;
   /** Tab-specific action buttons rendered in the header when the usage tab is active. */
   usageHeaderActions?: ReactNode;
   showTerminalTab?: boolean;
@@ -37,6 +39,8 @@ export function UnifiedRightPanel(props: {
   showGitTab?: boolean;
   showUsageTab?: boolean;
   showNotesTab?: boolean;
+  showPortsTab?: boolean;
+  showBrowserTab?: boolean;
   projectName: string | undefined;
   onExpandGitToOverlay?: () => void;
   onExpandFilesToOverlay?: () => void;
@@ -48,6 +52,7 @@ export function UnifiedRightPanel(props: {
   onOpenBrowser?: () => void;
   onOpenUsage?: () => void;
   onOpenNotes?: () => void;
+  onOpenPorts?: () => void;
   onClose: () => void;
 }) {
   const {
@@ -59,12 +64,15 @@ export function UnifiedRightPanel(props: {
     browserContent,
     usageContent,
     notesContent,
+    portsContent,
     usageHeaderActions,
     showTerminalTab = true,
     showFilesTab = true,
     showGitTab = true,
     showUsageTab = true,
     showNotesTab = true,
+    showPortsTab = false,
+    showBrowserTab = true,
     projectName,
     onExpandGitToOverlay,
     onExpandFilesToOverlay,
@@ -76,6 +84,7 @@ export function UnifiedRightPanel(props: {
     onOpenBrowser,
     onOpenUsage,
     onOpenNotes,
+    onOpenPorts,
     onClose,
   } = props;
   const { t } = useLingui();
@@ -92,6 +101,64 @@ export function UnifiedRightPanel(props: {
   };
 
   const dragCtl = "poracode-overlay-header__controls";
+  const tabs = [
+    {
+      id: "terminal",
+      label: t`Terminal`,
+      icon: TerminalSquare,
+      content: terminalContent,
+      visible: showTerminalTab,
+      onOpen: onOpenTerminal,
+    },
+    {
+      id: "files",
+      label: t`Files`,
+      icon: FolderOpen,
+      content: filesContent,
+      visible: showFilesTab,
+      onOpen: onOpenFiles,
+    },
+    {
+      id: "git",
+      label: t`Git`,
+      icon: FileDiff,
+      content: gitContent,
+      visible: showGitTab,
+      onOpen: onOpenGit,
+    },
+    {
+      id: "usage",
+      label: t`Usage`,
+      icon: Gauge,
+      content: usageContent,
+      visible: showUsageTab,
+      onOpen: onOpenUsage,
+    },
+    {
+      id: "notes",
+      label: t`Notes`,
+      icon: NotebookPen,
+      content: notesContent,
+      visible: showNotesTab,
+      onOpen: onOpenNotes,
+    },
+    {
+      id: "ports",
+      label: t`Ports`,
+      icon: Waypoints,
+      content: portsContent,
+      visible: showPortsTab,
+      onOpen: onOpenPorts,
+    },
+    {
+      id: "browser",
+      label: t`Browser`,
+      icon: Globe,
+      content: browserContent,
+      visible: showBrowserTab,
+      onOpen: onOpenBrowser,
+    },
+  ] as const;
 
   return (
     <div
@@ -114,7 +181,7 @@ export function UnifiedRightPanel(props: {
             title={t`Maximize`}
             onClick={onExpandGitToOverlay}
           >
-            <Maximize2 className="size-3" />
+            <Maximize2 className="size-3.5" />
           </button>
         )}
         {activeTab === "files" && onExpandFilesToOverlay && (
@@ -124,7 +191,7 @@ export function UnifiedRightPanel(props: {
             title={t`Maximize`}
             onClick={onExpandFilesToOverlay}
           >
-            <Maximize2 className="size-3" />
+            <Maximize2 className="size-3.5" />
           </button>
         )}
         {activeTab === "browser" && onExpandBrowserToOverlay && (
@@ -134,7 +201,7 @@ export function UnifiedRightPanel(props: {
             title={t`Maximize`}
             onClick={onExpandBrowserToOverlay}
           >
-            <Maximize2 className="size-3" />
+            <Maximize2 className="size-3.5" />
           </button>
         )}
         {activeTab === "browser" && onExtractBrowserToWindow && (
@@ -144,119 +211,52 @@ export function UnifiedRightPanel(props: {
             title={t`Move browser to window`}
             onClick={onExtractBrowserToWindow}
           >
-            <PictureInPicture2 className="size-3" />
+            <PictureInPicture2 className="size-3.5" />
           </button>
         )}
         {activeTab === "usage" ? usageHeaderActions : null}
         <div className="mx-0.5 h-3 w-px bg-border" />
-        {showTerminalTab ? (
-          <button
-            type="button"
-            className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "terminal")}`}
-            title={t`Terminal`}
-            onClick={() => {
-              if (onOpenTerminal) onOpenTerminal();
-              else onTabChange("terminal");
-            }}
-          >
-            <TerminalSquare className="size-3.5" />
-          </button>
-        ) : null}
-        {showFilesTab ? (
-          <button
-            type="button"
-            className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "files")}`}
-            title={t`Files`}
-            onClick={() => {
-              if (onOpenFiles) onOpenFiles();
-              else onTabChange("files");
-            }}
-          >
-            <FolderOpen className="size-3.5" />
-          </button>
-        ) : null}
-        {showGitTab ? (
-          <button
-            type="button"
-            className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "git")}`}
-            title={t`Git`}
-            onClick={() => {
-              if (onOpenGit) onOpenGit();
-              else onTabChange("git");
-            }}
-          >
-            <FileDiff className="size-3.5" />
-          </button>
-        ) : null}
-        {showUsageTab ? (
-          <button
-            type="button"
-            className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "usage")}`}
-            title={t`Usage`}
-            onClick={() => {
-              if (onOpenUsage) onOpenUsage();
-              else onTabChange("usage");
-            }}
-          >
-            <Gauge className="size-3.5" />
-          </button>
-        ) : null}
-        {showNotesTab ? (
-          <button
-            type="button"
-            className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "notes")}`}
-            title={t`Notes`}
-            onClick={() => {
-              if (onOpenNotes) onOpenNotes();
-              else onTabChange("notes");
-            }}
-          >
-            <NotebookPen className="size-3.5" />
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "browser")}`}
-          title={t`Browser`}
-          onClick={() => {
-            if (onOpenBrowser) onOpenBrowser();
-            else onTabChange("browser");
-          }}
-        >
-          <Globe className="size-3.5" />
-        </button>
+        {tabs.map((tab) => {
+          if (!tab.visible) return null;
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === tab.id)}`}
+              title={tab.label}
+              onClick={() => {
+                if (tab.onOpen) tab.onOpen();
+                else onTabChange(tab.id);
+              }}
+            >
+              <Icon className="size-4" />
+            </button>
+          );
+        })}
         <button
           type="button"
           className={`${dragCtl} ${panelHeaderIconButtonClass}`}
           title={t`Hide panel`}
           onClick={onClose}
         >
-          <PanelRightClose className="size-3.5" />
+          <PanelRightClose className="size-4" />
         </button>
       </div>
 
       {/* Content — stacked layers cross-fade on tab change */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        {showTerminalTab ? (
-          <div className="absolute inset-0 overflow-hidden" style={tabLayerStyle("terminal")}>
-            {terminalContent}
-          </div>
-        ) : null}
-        <div className="absolute inset-0 overflow-hidden" style={tabLayerStyle("git")}>
-          {gitContent}
-        </div>
-        <div className="absolute inset-0 overflow-hidden" style={tabLayerStyle("files")}>
-          {filesContent}
-        </div>
-        <div className="absolute inset-0 overflow-hidden" style={tabLayerStyle("browser")}>
-          {browserContent}
-        </div>
-        <div className="absolute inset-0 overflow-hidden" style={tabLayerStyle("usage")}>
-          {usageContent}
-        </div>
-        <div className="absolute inset-0 overflow-hidden" style={tabLayerStyle("notes")}>
-          {notesContent}
-        </div>
+        {tabs.map((tab) =>
+          tab.visible ? (
+            <div
+              key={tab.id}
+              className="absolute inset-0 flex min-h-0 flex-col overflow-hidden"
+              style={tabLayerStyle(tab.id)}
+            >
+              {tab.content}
+            </div>
+          ) : null,
+        )}
       </div>
     </div>
   );

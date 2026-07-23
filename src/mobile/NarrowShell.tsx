@@ -131,12 +131,13 @@ export function NarrowShell(props: {
   // remounts) the routed subtree when the chrome flips between fullscreen and
   // the regular shell. A positional remount would wipe the thread composer's
   // state and hand the view transition a half-mounted page to snapshot.
-  // Fullscreen routes (workspace, PR review, terminal) render their own chrome
-  // as fixed overlays. The shell's top bar stays MOUNTED for them too — the
-  // opaque z-50 overlay covers it, and styles.css hides it with
-  // `visibility: hidden` (which keeps its layout height, so .m-main and the
-  // page beneath never reflow into the status-bar safe zone) and drops the
-  // m-topbar/m-main view-transition-names via [data-chrome="fullscreen"].
+  // For ordinary routes styles.css captures this whole shell as one transition
+  // image, so the header and routed page cannot be composited from different
+  // route states. Fullscreen routes (workspace, PR review, terminal) render
+  // their own fixed overlay and opt the shell out of that transition group.
+  // The shell's top bar stays MOUNTED for them too — the opaque z-50 overlay
+  // covers it, and `visibility: hidden` keeps its layout height so .m-main and
+  // the page beneath never reflow into the status-bar safe zone.
   return (
     <div className="m-shell" ref={shellRef} data-chrome={chrome.layout}>
       <header className="m-topbar" data-chrome-layout={chrome.layout}>
@@ -163,12 +164,18 @@ export function NarrowShell(props: {
                 }
                 onNewThreadInWorktree={(input) => {
                   preselectWorktreeDraft(input);
-                  void navigate({ to: "/new" });
+                  void navigate({ to: "/threads" });
                 }}
                 onDeleteWorktreeGroup={(input) => {
                   void remote.deleteWorktreeGroup(input);
                   void navigate({ to: "/threads" });
                 }}
+                onOpenNotes={() =>
+                  void navigate({
+                    to: "/notes/$threadId",
+                    params: { threadId: headerThread.id },
+                  })
+                }
                 onOpenTerminal={() =>
                   void navigate({
                     to: "/terminal/$projectId",
@@ -234,6 +241,7 @@ export function NarrowShell(props: {
             onAction={() => undefined}
             onNewThreadInWorktree={() => undefined}
             onDeleteWorktreeGroup={() => undefined}
+            onOpenNotes={() => undefined}
             onOpenTerminal={() => undefined}
           />
           <ThreadUsageIndicator thread={visibleHeldThreadHeader.thread} />

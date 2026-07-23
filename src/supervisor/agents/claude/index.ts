@@ -274,6 +274,7 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
           projectPath: ".claude/skills",
           ...(options.configDir ? { globalBasePath: options.configDir } : {}),
           globalOverride: { env: "CLAUDE_CONFIG_DIR", path: "skills" },
+          linkProjectionFromVersion: "2.1.203",
         },
       ],
       invocation: "slash",

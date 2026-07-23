@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { runGitSyncCommand, showGitActionError } from "./gitCommandRunner";
+import type { GitStatusResult } from "@/shared/contracts";
+import {
+  refreshGitStatusForWorktree,
+  runGitSyncCommand,
+  showGitActionError,
+} from "./gitCommandRunner";
 
 const bridgeMock = vi.hoisted(() => ({
   gitPull: vi.fn<() => Promise<void>>(),
@@ -7,7 +12,12 @@ const bridgeMock = vi.hoisted(() => ({
   gitPush: vi.fn<() => Promise<void>>(),
   gitSync: vi.fn<() => Promise<void>>(),
   gitSyncRebase: vi.fn<() => Promise<void>>(),
+  getGitStatus: vi.fn<() => Promise<GitStatusResult>>(),
 }));
+
+const setWorktreeStatusMock = vi.hoisted(() =>
+  vi.fn<(worktreePath: string, status: GitStatusResult) => void>(),
+);
 
 const toastMock = vi.hoisted(() => ({
   danger: vi.fn<(message: string) => void>(),
@@ -25,6 +35,12 @@ vi.mock("@/renderer/bridge", () => ({
 
 vi.mock("@/renderer/diagnostics/sentry", () => ({
   captureRendererException: captureRendererExceptionMock,
+}));
+
+vi.mock("@/renderer/state/gitStore", () => ({
+  useGitStore: {
+    getState: () => ({ setWorktreeStatus: setWorktreeStatusMock }),
+  },
 }));
 
 const projectLocation = { kind: "posix" as const, path: "/repo" };
@@ -62,6 +78,41 @@ describe("gitCommandRunner", () => {
     expect(captureRendererExceptionMock).toHaveBeenCalledWith(error, {
       featureArea: "git",
     });
+  });
+
+  it("refreshes the cached worktree status after a remote git mutation", async () => {
+    const worktreeLocation = { kind: "posix" as const, path: "/repo-worktree" };
+    const conflictStatus: GitStatusResult = {
+      isRepo: true,
+      branch: "feature",
+      tracking: "",
+      hasRemote: true,
+      remoteInfo: null,
+      ahead: 0,
+      behind: 0,
+      staged: [],
+      unstaged: [],
+      totalInsertions: 1,
+      totalDeletions: 1,
+      mergeInProgress: true,
+      conflictFiles: [
+        {
+          path: "src/conflict.ts",
+          status: "UU",
+          staged: false,
+          insertions: 1,
+          deletions: 1,
+        },
+      ],
+    };
+    bridgeMock.getGitStatus.mockResolvedValueOnce(conflictStatus);
+
+    await refreshGitStatusForWorktree(worktreeLocation, "/repo-worktree");
+
+    expect(bridgeMock.getGitStatus).toHaveBeenCalledWith({
+      projectLocation: worktreeLocation,
+    });
+    expect(setWorktreeStatusMock).toHaveBeenCalledWith("/repo-worktree", conflictStatus);
   });
 });
 // @vitest-environment node

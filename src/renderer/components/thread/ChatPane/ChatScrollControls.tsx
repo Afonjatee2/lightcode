@@ -41,6 +41,7 @@ const PIN_HOLDOFF_MS = 150;
 
 export type ChatScrollControlsHandle = {
   beginVirtualizerLayoutChange(): void;
+  beginLiveVirtualizerLayoutChange(): void;
   disableStickToBottom(): void;
   isStickToBottom(): boolean;
   markUserScrollIntent(): void;
@@ -62,9 +63,11 @@ export const ChatScrollControls = forwardRef<
     scrollRef: React.RefObject<HTMLDivElement | null>;
     contentRef: React.RefObject<HTMLDivElement | null>;
     layoutChangeToken: string | null | undefined;
+    tailEntryId: string | null;
     threadId: string;
     tailLoaderVisible: boolean;
     initialScrollSettled: boolean;
+    initialScrollRevealDelayMs: number;
     virtualScrollToBottomRef: React.RefObject<(() => void) | null>;
     onInitialScrollSettled: () => void;
   }
@@ -74,9 +77,11 @@ export const ChatScrollControls = forwardRef<
     scrollRef,
     contentRef,
     layoutChangeToken,
+    tailEntryId,
     threadId,
     tailLoaderVisible,
     initialScrollSettled,
+    initialScrollRevealDelayMs,
     virtualScrollToBottomRef,
     onInitialScrollSettled,
   } = props;
@@ -90,9 +95,11 @@ export const ChatScrollControls = forwardRef<
   const initialSettleRafRef = useRef<number | null>(null);
   const initialSettleSecondRafRef = useRef<number | null>(null);
   const initialSettleRevealRafRef = useRef<number | null>(null);
+  const initialSettleRevealTimeoutRef = useRef<number | null>(null);
   const explicitPinRafRef = useRef<number | null>(null);
   const explicitPinSecondRafRef = useRef<number | null>(null);
   const virtualizerLayoutChangeUntilRef = useRef(0);
+  const initialRevealLayoutChangeUntilRef = useRef(0);
   const userScrollIntentUntilRef = useRef(0);
   const programmaticScrollTopRef = useRef<number | null>(null);
   const programmaticScrollUntilRef = useRef(0);
@@ -101,19 +108,34 @@ export const ChatScrollControls = forwardRef<
   const lastPinnedScrollHeightRef = useRef(0);
   const lastSeenScrollHeightRef = useRef(0);
   const lastSeenClientHeightRef = useRef(0);
+  const previousInitialScrollSettledRef = useRef(initialScrollSettled);
   const disableStickToBottomRef = useRef<() => void>(() => undefined);
   const pinHoldoffUntilRef = useRef(0);
   const [showScrollDown, setShowScrollDown] = useState(false);
 
   function cancelVirtualizerLayoutChange() {
     virtualizerLayoutChangeUntilRef.current = 0;
+    initialRevealLayoutChangeUntilRef.current = 0;
   }
 
-  function beginVirtualizerLayoutChange() {
+  function markVirtualizerLayoutChange(extendInitialReveal: boolean) {
     // LegendList applies measured sizes and visible-content compensation over
     // multiple animation frames. A short deadline is more robust than counting
     // paints because its MVCP recalculation can itself be deferred by rAF.
-    virtualizerLayoutChangeUntilRef.current = performance.now() + VIRTUALIZER_LAYOUT_SETTLE_MS;
+    const settleUntil = performance.now() + VIRTUALIZER_LAYOUT_SETTLE_MS;
+    virtualizerLayoutChangeUntilRef.current = settleUntil;
+    if (extendInitialReveal) initialRevealLayoutChangeUntilRef.current = settleUntil;
+  }
+
+  function beginVirtualizerLayoutChange() {
+    markVirtualizerLayoutChange(true);
+  }
+
+  function beginLiveVirtualizerLayoutChange() {
+    // Streaming rows can grow continuously. Their LegendList compensation
+    // still needs the scroll-safety guard above, but must not keep the initial
+    // transcript hidden until the stream ends.
+    markVirtualizerLayoutChange(false);
   }
 
   function syncBottomStateFromLayout() {
@@ -372,6 +394,10 @@ export const ChatScrollControls = forwardRef<
       cancelAnimationFrame(initialSettleRevealRafRef.current);
       initialSettleRevealRafRef.current = null;
     }
+    if (initialSettleRevealTimeoutRef.current !== null) {
+      window.clearTimeout(initialSettleRevealTimeoutRef.current);
+      initialSettleRevealTimeoutRef.current = null;
+    }
   }
 
   function cancelScheduledExplicitPin() {
@@ -420,14 +446,57 @@ export const ChatScrollControls = forwardRef<
         // measured tail moves into its final position.
         initialSettleRevealRafRef.current = requestAnimationFrame(() => {
           initialSettleRevealRafRef.current = null;
-          // The hidden settle passes above already reconciled LegendList.
-          // Finish with a direct DOM pin only: another scrollToEnd here
-          // schedules a deferred virtualizer offset that can overwrite the
-          // correct pin on the first visible paint. The separate open-storm
-          // coalescing window remains active after reveal, but must not keep
-          // otherwise-ready chat content invisible.
-          scrollToBottom();
-          onInitialScrollSettled();
+          const revealSettledTranscript = (forceBottomPin: boolean) => {
+            initialSettleRevealTimeoutRef.current = null;
+            // The hidden settle passes above already reconciled LegendList.
+            // Finish with a direct DOM pin only: another scrollToEnd here
+            // schedules a deferred virtualizer offset that can overwrite the
+            // correct pin on the first visible paint.
+            if (forceBottomPin) {
+              const el = scrollRef.current;
+              if (el) {
+                // The delayed PWA transcript is still hidden and cannot have
+                // meaningful user scroll intent. LegendList can nevertheless
+                // emit an upward anchor-adjustment scroll and arm the normal
+                // anti-drag holdoff. Clear that synthetic state and make the
+                // final pre-reveal pin unconditional.
+                userScrollIntentUntilRef.current = 0;
+                pinHoldoffUntilRef.current = 0;
+                writeBottomPin(el);
+              }
+            } else {
+              scrollToBottom();
+            }
+            onInitialScrollSettled();
+          };
+          if (initialScrollRevealDelayMs > 0) {
+            const revealAfterLatestVirtualizerSettle = () => {
+              const remainingMs =
+                initialRevealLayoutChangeUntilRef.current +
+                initialScrollRevealDelayMs -
+                performance.now();
+              if (remainingMs > 0) {
+                // A later LegendList measurement can extend the deadline after
+                // this timer was armed. Re-check at every wake-up so reveal is
+                // always delayMs after the final initial-layout signal. Live
+                // stream growth uses a separate scroll-safety deadline.
+                initialSettleRevealTimeoutRef.current = window.setTimeout(
+                  revealAfterLatestVirtualizerSettle,
+                  remainingMs,
+                );
+                return;
+              }
+              revealSettledTranscript(true);
+            };
+            // The opt-in mobile delay begins after the virtualizer's actual
+            // layout-settle deadline, not merely after the rAF that requested
+            // scrollToEnd. Safari/LegendList can apply its measured anchor
+            // later inside this window.
+            revealAfterLatestVirtualizerSettle();
+          } else {
+            // Desktop preserves its existing immediate post-settle reveal.
+            revealSettledTranscript(false);
+          }
         });
       });
     });
@@ -435,6 +504,7 @@ export const ChatScrollControls = forwardRef<
 
   useImperativeHandle(ref, () => ({
     beginVirtualizerLayoutChange,
+    beginLiveVirtualizerLayoutChange,
     disableStickToBottom,
     isStickToBottom: () => stickToBottomRef.current,
     markUserScrollIntent,
@@ -628,9 +698,20 @@ export const ChatScrollControls = forwardRef<
   });
 
   useLayoutEffect(() => {
+    const becameSettled = initialScrollSettled && !previousInitialScrollSettledRef.current;
+    previousInitialScrollSettledRef.current = initialScrollSettled;
+    // The delayed PWA path already force-pinned immediately before revealing.
+    // Re-running scrollToEnd because the reveal state changed would let
+    // LegendList apply another deferred anchor offset to the visible viewport.
+    if (becameSettled && initialScrollRevealDelayMs > 0) return;
     syncPinnedContentChange();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- pinning is keyed to loader visibility changes; the effect event reads latest layout refs.
-  }, [tailLoaderVisible, initialScrollSettled]);
+    // The submit signal can arrive before the optimistic user row is mounted.
+    // Keying this settle to the tail entry as well re-pins after that row
+    // actually changes the virtualized content height. Manual scrollback stays
+    // untouched because syncPinnedContentChange only follows an active sticky
+    // bottom anchor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pinning is keyed to tail/loader visibility changes; the effect event reads latest layout refs.
+  }, [tailEntryId, tailLoaderVisible, initialScrollSettled]);
 
   // When a panel/divider drag ends, the coalesced in-drag syncs above skipped
   // the full settle pass. Run it once now so the final bottom-pin / scroll-down
