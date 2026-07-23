@@ -45,12 +45,14 @@ const EXPECTED_DEFAULT_APPROVAL_POLICY: Record<(typeof EXPECTED_BUILT_IN_ORDER)[
   codex: "on-request",
   gemini: "never",
   qwen: "auto",
+  qoder: "default",
   grok: "bypassPermissions",
   kimi: "auto",
   antigravity: "yolo",
   commandcode: "yolo",
   cursor: "never",
   opencode: "yolo",
+  pi: "never",
   factory: "auto-high",
 };
 
