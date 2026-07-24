@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, type ClipboardEvent, type KeyboardEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, toast } from "@heroui/react";
-import { Send } from "lucide-react";
+import { FileSpreadsheet, Send } from "lucide-react";
 import { submitConsultation } from "@/renderer/actions/consultationActions";
 import { AttachmentBar } from "@/renderer/components/composer/AttachmentBar";
 import { ComposerAddMenu } from "@/renderer/components/composer/ComposerAddMenu";
@@ -22,6 +22,7 @@ import {
 } from "./campaignComposerDrop";
 import { routeCampaignComposerMessage } from "./campaignThreadComposerRouting";
 import { useAppStore } from "@/renderer/state/appStore";
+import { isMediaPlanFilename } from "./mediaPlanAttachment";
 
 const submittingThreads = new Set<string>();
 
@@ -31,6 +32,11 @@ export interface CampaignThreadComposerProps {
   campaignGroupId: string;
   defaultProvider: string;
   suggestedQuestions?: readonly string[];
+  onAnalyzeMediaPlan?: (input: {
+    filePath: string;
+    filename: string;
+    campaignGroupId: string;
+  }) => void;
 }
 
 export function CampaignThreadComposer(props: CampaignThreadComposerProps) {
@@ -196,6 +202,31 @@ export function CampaignThreadComposer(props: CampaignThreadComposerProps) {
           }}
           onPreviewPdf={(att) => openPdfPreview(att.path)}
           layout="flush"
+          leading={
+            props.onAnalyzeMediaPlan
+              ? attachments.attachments
+                  .filter((attachment) => isMediaPlanFilename(attachment.name))
+                  .map((attachment) => (
+                    <Button
+                      key={`analyze-${attachment.id}`}
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-[var(--cockpit-accent)]"
+                      data-testid={`composer-analyze-${attachment.name}`}
+                      onPress={() =>
+                        props.onAnalyzeMediaPlan?.({
+                          filePath: attachment.path,
+                          filename: attachment.name,
+                          campaignGroupId: props.campaignGroupId,
+                        })
+                      }
+                    >
+                      <FileSpreadsheet className="size-3.5" aria-hidden />
+                      <Trans>Compare to published plan</Trans>
+                    </Button>
+                  ))
+              : undefined
+          }
         />
         <div className="flex items-end gap-2">
           <ComposerAddMenu mcpServers={[]} showFileOption onPickFiles={handlePickFiles} />

@@ -951,6 +951,14 @@ msgstr "Dodaj do ekranu głównego"
 msgid "Add to-do"
 msgstr "Dodaj zadanie"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "added"
+msgstr "dodano"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Added"
+msgstr "Dodano"
+
 #: src/renderer/views/MainView/parts/CampaignModeGate.tsx
 msgid "Advanced Mode (Code)"
 msgstr "Tryb zaawansowany (Kod)"
@@ -1076,6 +1084,7 @@ msgstr "Alerty, gdy wątki wymagają Twojej uwagi"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/skills/SkillsManager.tsx
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
@@ -1559,6 +1568,7 @@ msgstr "Wróć do przeglądu"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Back to thread"
 msgstr "Wróć do wątku"
 
@@ -1993,6 +2003,14 @@ msgstr "Nie można utworzyć domyślnej ścieżki drzewa roboczego bez nazwy ga�
 msgid "Cannot switch branches — commit or stash your changes first"
 msgstr "Nie można przełączać gałęzi — najpierw zatwierdź lub ukryj zmiany"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Cell-level provenance"
+msgstr "Pochodzenie na poziomie komórki"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Change"
+msgstr "Zmiana"
+
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 msgid "Change project folder"
 msgstr "Zmień folder projektu"
@@ -2004,6 +2022,14 @@ msgstr "Zmień skrót"
 #: src/renderer/views/MainView/parts/AppOverlays.tsx
 msgid "Change User"
 msgstr "Zmień użytkownika"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "changed"
+msgstr "zmieniono"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Changed"
+msgstr "Zmieniono"
 
 #. Link to the list of release notes
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
@@ -2705,9 +2731,18 @@ msgstr "Kompaktowanie kontekstu"
 msgid "Compare this fingerprint with the one shown by your server."
 msgstr "Porównaj ten odcisk palca z odciskiem wyświetlanym na serwerze."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Compare to published plan"
+msgstr "Porównaj z opublikowanym planem"
+
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #~ msgid "Comparing candidates…"
 #~ msgstr "Porównywanie kandydatów…"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanIntelligencePane.tsx
+msgid "Comparing plan versions…"
+msgstr "Porównywanie wersji planu…"
 
 #: src/renderer/components/consultations/ConsultationPanelCard.tsx
 msgid "complete"
@@ -3051,6 +3086,10 @@ msgstr "Profil MCP Control Centre"
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
 msgstr "Centrum sterowania wymaga autoryzacji. Połącz je ponownie w ustawieniach MCP."
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Control Centre reports the revised plan matches the published plan."
+msgstr "Control Centre zgłasza, że zmieniony plan odpowiada planowi opublikowanemu."
+
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Control plane"
 msgstr "Płaszczyzna sterowania"
@@ -3338,6 +3377,10 @@ msgstr "Utwórz pull request dla kandydata {0} ({label})"
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Create a useful routine with one click, then adjust it anytime."
 msgstr "Utwórz przydatną rutynę jednym kliknięciem i dostosuj ją w dowolnym momencie."
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Create approval proposal"
+msgstr "Utwórz propozycję zatwierdzenia"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Create Campaign Workspace"
@@ -4758,6 +4801,7 @@ msgid "Fetch"
 msgstr "Pobierz"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Field"
 msgstr "Pole"
 
@@ -5936,6 +5980,10 @@ msgstr "Jasny"
 msgid "Lightcode data import is unavailable with a custom data folder."
 msgstr "Import danych Lightcode jest niedostępny przy niestandardowym folderze danych."
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Line item"
+msgstr "Pozycja"
+
 #: src/renderer/components/skills/SkillImportModal.tsx
 msgid "Link to source"
 msgstr "Połącz ze źródłem"
@@ -6155,6 +6203,10 @@ msgstr "Szukanie serwerów deweloperskich…"
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 msgid "Losing worktrees and branches will be removed. Their session history will remain."
 msgstr "Drzewa robocze i gałęzie odrzuconych kandydatów zostaną usunięte. Historia ich sesji zostanie zachowana."
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Low confidence"
+msgstr "Niska pewność"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Low risk"
@@ -6380,6 +6432,10 @@ msgstr "Wywołania narzędzi MCP"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "MCP transport type"
 msgstr "Typ transportu MCP"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Media plan attachments detected in this thread."
+msgstr "Wykryto załączniki planu mediowego w tym wątku."
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Medium risk"
@@ -7048,6 +7104,10 @@ msgstr "Nie znaleziono kamery"
 msgid "No changes"
 msgstr "Żadnych zmian"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "No changes detected"
+msgstr "Nie wykryto zmian"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/GitDiffContent.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/parts/SingleFileDiff.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/ConflictFileCard.tsx
@@ -7344,6 +7404,10 @@ msgstr "Nie znaleziono repozytoriów."
 msgid "No results"
 msgstr "Brak wyników"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "No rows match this filter."
+msgstr "Żaden wiersz nie pasuje do tego filtra."
+
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "No runs yet."
 msgstr "Brak uruchomień."
@@ -7577,6 +7641,10 @@ msgstr "Tylko gdy nieaktywne"
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Only you can approve — nothing executes without it"
 msgstr "Tylko Ty możesz zatwierdzić — bez zatwierdzenia nic się nie wykona"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Only you can approve — nothing executes without it."
+msgstr "Tylko Ty możesz zatwierdzić — bez tego nic się nie wykona."
 
 #: src/renderer/notifications.ts
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
@@ -8086,6 +8154,14 @@ msgstr "Folder nadrzędny na serwerze"
 msgid "Parent folder, e.g. /home/me/projects"
 msgstr "Folder nadrzędny, np. /home/me/projects"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Parsed and compared against the published plan"
+msgstr "Przeanalizowano i porównano z opublikowanym planem"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Parser confidence"
+msgstr "Pewność parsera"
+
 #: src/renderer/utils/prStatus.ts
 msgid "Passed"
 msgstr "Zaliczone"
@@ -8226,6 +8302,14 @@ msgstr "Plan"
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Plan · Fan out · Review"
 msgstr "Plan · Rozdzielenie · Recenzja"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanIntelligencePane.tsx
+msgid "Plan comparison failed"
+msgstr "Porównanie planu nie powiodło się"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Plan diff and provenance"
+msgstr "Różnice planu i pochodzenie"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Plan fact"
@@ -8514,6 +8598,10 @@ msgstr "Prompt"
 msgid "Prompts"
 msgstr "Prompty"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Proposal created — review it in the approval docket."
+msgstr "Utworzono propozycję — sprawdź ją w dossier zatwierdzeń."
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Proposal lifecycle"
 msgstr "Cykl życia propozycji"
@@ -8588,6 +8676,14 @@ msgstr "Publiczny URL"
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Public URL updated."
 msgstr "Zaktualizowano publiczny URL."
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Published"
+msgstr "Opublikowany"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Published value"
+msgstr "Wartość opublikowana"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/useWorktreeActions.ts
 msgid "Pull"
@@ -9072,6 +9168,14 @@ msgstr "Usunąć połączoną umiejętność „{0}”? Jej folder źródłowy n
 msgid "Remove worktree?"
 msgstr "Usunąć drzewo robocze?"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "removed"
+msgstr "usunięto"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Removed"
+msgstr "Usunięto"
+
 #: src/mobile/ThreadTitleRow.tsx
 #: src/mobile/TodoActionsSheet.tsx
 #: src/mobile/views/DesktopsView.tsx
@@ -9402,6 +9506,10 @@ msgstr "Komentarz recenzji"
 msgid "Review decision"
 msgstr "Decyzja recenzji"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Review in approvals"
+msgstr "Przejrzyj w zatwierdzeniach"
+
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Review mode"
 msgstr "Review mode"
@@ -9438,6 +9546,14 @@ msgstr "Do sprawdzenia"
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #~ msgid "Reviewing each candidate's changes to recommend a winner."
 #~ msgstr "Przeglądanie zmian każdego kandydata, aby polecić zwycięzcę."
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Revised"
+msgstr "Zmieniony"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Revised value"
+msgstr "Wartość zmieniona"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Revoke {name}"
@@ -10382,6 +10498,14 @@ msgstr "Posortowane wg ważności · przejdź do wątku kampanii"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Source branch {branch} moved before the worktree was created"
 msgstr "Gałąź źródłowa {branch} została przesunięta przed utworzeniem drzewa roboczego"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Source cell"
+msgstr "Komórka źródłowa"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Source cell unattributed"
+msgstr "Komórka źródłowa nieprzypisana"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Source health"
@@ -11949,6 +12073,10 @@ msgstr "Nie można zaktualizować wątku."
 msgid "Unassigned"
 msgstr "Nieprzypisany"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Unattributed"
+msgstr "Nieprzypisane"
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Unavailable"
 msgstr "Niedostępny"
@@ -11956,6 +12084,10 @@ msgstr "Niedostępny"
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Unavailable project"
 msgstr "Niedostępny projekt"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "unchanged"
+msgstr "bez zmian"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 msgid "Ungroup"

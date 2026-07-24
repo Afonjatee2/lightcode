@@ -951,6 +951,14 @@ msgstr "홈 화면에 추가"
 msgid "Add to-do"
 msgstr "할 일 추가"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "added"
+msgstr "추가됨"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Added"
+msgstr "추가됨"
+
 #: src/renderer/views/MainView/parts/CampaignModeGate.tsx
 msgid "Advanced Mode (Code)"
 msgstr "고급 모드 (코드)"
@@ -1076,6 +1084,7 @@ msgstr "스레드에 응답이 필요할 때 알림"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/skills/SkillsManager.tsx
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
@@ -1559,6 +1568,7 @@ msgstr "개요로 돌아가기"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Back to thread"
 msgstr "스레드로 돌아가기"
 
@@ -1993,6 +2003,14 @@ msgstr "브랜치 이름 없이 기본 작업 트리 경로를 생성할 수 없
 msgid "Cannot switch branches — commit or stash your changes first"
 msgstr "브랜치를 전환할 수 없습니다. 먼저 변경 사항을 커밋하거나 숨기세요."
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Cell-level provenance"
+msgstr "셀 수준 출처"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Change"
+msgstr "변경"
+
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 msgid "Change project folder"
 msgstr "프로젝트 폴더 변경"
@@ -2004,6 +2022,14 @@ msgstr "단축키 변경"
 #: src/renderer/views/MainView/parts/AppOverlays.tsx
 msgid "Change User"
 msgstr "사용자 변경"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "changed"
+msgstr "변경됨"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Changed"
+msgstr "변경됨"
 
 #. Link to the list of release notes
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
@@ -2705,9 +2731,18 @@ msgstr "컨텍스트 압축"
 msgid "Compare this fingerprint with the one shown by your server."
 msgstr "이 지문을 서버에 표시된 지문과 비교하세요."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Compare to published plan"
+msgstr "게시된 플랜과 비교"
+
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #~ msgid "Comparing candidates…"
 #~ msgstr "후보 비교 중…"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanIntelligencePane.tsx
+msgid "Comparing plan versions…"
+msgstr "플랜 버전 비교 중…"
 
 #: src/renderer/components/consultations/ConsultationPanelCard.tsx
 msgid "complete"
@@ -3051,6 +3086,10 @@ msgstr "Control Centre MCP 프로필"
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
 msgstr "제어 센터에 권한이 필요합니다. MCP 설정에서 다시 연결하세요."
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Control Centre reports the revised plan matches the published plan."
+msgstr "Control Centre는 수정된 플랜이 게시된 플랜과 일치한다고 보고합니다."
+
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Control plane"
 msgstr "제어 영역"
@@ -3338,6 +3377,10 @@ msgstr "후보 {0}({label})의 풀 리퀘스트 생성"
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Create a useful routine with one click, then adjust it anytime."
 msgstr "한 번의 클릭으로 유용한 루틴을 만들고 언제든지 조정하세요."
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Create approval proposal"
+msgstr "승인 제안 생성"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Create Campaign Workspace"
@@ -4758,6 +4801,7 @@ msgid "Fetch"
 msgstr "가져오기"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Field"
 msgstr "필드"
 
@@ -5936,6 +5980,10 @@ msgstr "라이트"
 msgid "Lightcode data import is unavailable with a custom data folder."
 msgstr "사용자 지정 데이터 폴더에서는 Lightcode 데이터를 가져올 수 없습니다."
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Line item"
+msgstr "라인 항목"
+
 #: src/renderer/components/skills/SkillImportModal.tsx
 msgid "Link to source"
 msgstr "소스에 연결"
@@ -6155,6 +6203,10 @@ msgstr "개발 서버를 찾는 중…"
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 msgid "Losing worktrees and branches will be removed. Their session history will remain."
 msgstr "선정되지 않은 작업 트리와 브랜치는 제거됩니다. 세션 기록은 유지됩니다."
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Low confidence"
+msgstr "낮은 신뢰도"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Low risk"
@@ -6380,6 +6432,10 @@ msgstr "MCP 도구 호출"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "MCP transport type"
 msgstr "MCP 전송 유형"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Media plan attachments detected in this thread."
+msgstr "이 스레드에서 미디어 플랜 첨부 파일이 감지되었습니다."
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Medium risk"
@@ -7048,6 +7104,10 @@ msgstr "카메라를 찾을 수 없음"
 msgid "No changes"
 msgstr "변경사항 없음"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "No changes detected"
+msgstr "변경 사항이 없습니다"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/GitDiffContent.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/parts/SingleFileDiff.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/ConflictFileCard.tsx
@@ -7344,6 +7404,10 @@ msgstr "저장소를 찾을 수 없습니다."
 msgid "No results"
 msgstr "결과 없음"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "No rows match this filter."
+msgstr "이 필터와 일치하는 행이 없습니다."
+
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "No runs yet."
 msgstr "아직 실행이 없습니다."
@@ -7577,6 +7641,10 @@ msgstr "포커스가 없을 때만"
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Only you can approve — nothing executes without it"
 msgstr "승인은 본인만 가능합니다 — 승인 없이는 실행되지 않습니다"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Only you can approve — nothing executes without it."
+msgstr "승인은 본인만 할 수 있습니다 — 승인 없이는 실행되지 않습니다."
 
 #: src/renderer/notifications.ts
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
@@ -8086,6 +8154,14 @@ msgstr "서버의 상위 폴더"
 msgid "Parent folder, e.g. /home/me/projects"
 msgstr "상위 폴더, 예: /home/me/projects"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Parsed and compared against the published plan"
+msgstr "게시된 플랜과 비교·분석됨"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Parser confidence"
+msgstr "파서 신뢰도"
+
 #: src/renderer/utils/prStatus.ts
 msgid "Passed"
 msgstr "통과"
@@ -8226,6 +8302,14 @@ msgstr "계획"
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Plan · Fan out · Review"
 msgstr "계획 · 분산 · 검토"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanIntelligencePane.tsx
+msgid "Plan comparison failed"
+msgstr "플랜 비교 실패"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Plan diff and provenance"
+msgstr "플랜 차이 및 출처"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Plan fact"
@@ -8514,6 +8598,10 @@ msgstr "프롬프트"
 msgid "Prompts"
 msgstr "프롬프트"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Proposal created — review it in the approval docket."
+msgstr "제안이 생성되었습니다 — 승인 도켓에서 검토하세요."
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Proposal lifecycle"
 msgstr "제안 수명 주기"
@@ -8588,6 +8676,14 @@ msgstr "공개 URL"
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Public URL updated."
 msgstr "공개 URL이 업데이트되었습니다."
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Published"
+msgstr "게시됨"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Published value"
+msgstr "게시된 값"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/useWorktreeActions.ts
 msgid "Pull"
@@ -9072,6 +9168,14 @@ msgstr "연결된 스킬 “{0}”을(를) 제거할까요? 원본 폴더는 삭
 msgid "Remove worktree?"
 msgstr "작업 트리를 삭제하시겠습니까?"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "removed"
+msgstr "제거됨"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Removed"
+msgstr "제거됨"
+
 #: src/mobile/ThreadTitleRow.tsx
 #: src/mobile/TodoActionsSheet.tsx
 #: src/mobile/views/DesktopsView.tsx
@@ -9402,6 +9506,10 @@ msgstr "리뷰 코멘트"
 msgid "Review decision"
 msgstr "결정 검토"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Review in approvals"
+msgstr "승인에서 검토"
+
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Review mode"
 msgstr "Review mode"
@@ -9438,6 +9546,14 @@ msgstr "검토 중"
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #~ msgid "Reviewing each candidate's changes to recommend a winner."
 #~ msgstr "각 후보의 변경 사항을 검토하여 우승자를 추천합니다."
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Revised"
+msgstr "수정됨"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Revised value"
+msgstr "수정된 값"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Revoke {name}"
@@ -10382,6 +10498,14 @@ msgstr "심각도순 · 캠페인 스레드로 이동"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Source branch {branch} moved before the worktree was created"
 msgstr "작업 트리가 생성되기 전에 소스 브랜치 {branch}이(가) 이동했습니다"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Source cell"
+msgstr "소스 셀"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Source cell unattributed"
+msgstr "소스 셀 미지정"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Source health"
@@ -11949,6 +12073,10 @@ msgstr "스레드를 업데이트할 수 없습니다."
 msgid "Unassigned"
 msgstr "미지정"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Unattributed"
+msgstr "미지정"
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Unavailable"
 msgstr "사용할 수 없음"
@@ -11956,6 +12084,10 @@ msgstr "사용할 수 없음"
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Unavailable project"
 msgstr "사용할 수 없는 프로젝트"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "unchanged"
+msgstr "변경 없음"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 msgid "Ungroup"

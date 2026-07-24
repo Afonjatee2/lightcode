@@ -950,6 +950,14 @@ msgstr "ホーム画面に追加"
 msgid "Add to-do"
 msgstr "To-do を追加"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "added"
+msgstr "追加"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Added"
+msgstr "追加"
+
 #: src/renderer/views/MainView/parts/CampaignModeGate.tsx
 msgid "Advanced Mode (Code)"
 msgstr "詳細モード（コード）"
@@ -1075,6 +1083,7 @@ msgstr "スレッドが対応を必要としたら通知"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/skills/SkillsManager.tsx
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
@@ -1558,6 +1567,7 @@ msgstr "概要に戻る"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Back to thread"
 msgstr "スレッドに戻る"
 
@@ -1992,6 +2002,14 @@ msgstr "ブランチ名がないとデフォルトのワークツリー パス�
 msgid "Cannot switch branches — commit or stash your changes first"
 msgstr "ブランチを切り替えることはできません - 最初に変更をコミットまたはスタッシュしてください"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Cell-level provenance"
+msgstr "セル単位の出所"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Change"
+msgstr "変更"
+
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 msgid "Change project folder"
 msgstr "プロジェクトフォルダーを変更"
@@ -2003,6 +2021,14 @@ msgstr "ショートカットを変更"
 #: src/renderer/views/MainView/parts/AppOverlays.tsx
 msgid "Change User"
 msgstr "ユーザーの変更"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "changed"
+msgstr "変更"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Changed"
+msgstr "変更"
 
 #. Link to the list of release notes
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
@@ -2704,9 +2730,18 @@ msgstr "コンテキストの圧縮"
 msgid "Compare this fingerprint with the one shown by your server."
 msgstr "このフィンガープリントをサーバーに表示されているものと比較してください。"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Compare to published plan"
+msgstr "公開済みプランと比較"
+
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #~ msgid "Comparing candidates…"
 #~ msgstr "候補を比較しています…"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanIntelligencePane.tsx
+msgid "Comparing plan versions…"
+msgstr "プラン版を比較中…"
 
 #: src/renderer/components/consultations/ConsultationPanelCard.tsx
 msgid "complete"
@@ -3050,6 +3085,10 @@ msgstr "Control Centre MCPプロファイル"
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
 msgstr "コントロールセンターは認証が必要です。MCP設定で再接続してください。"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Control Centre reports the revised plan matches the published plan."
+msgstr "Control Centre は改訂プランが公開済みプランと一致すると報告しています。"
+
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Control plane"
 msgstr "コントロールプレーン"
@@ -3337,6 +3376,10 @@ msgstr "候補 {0}（{label}）のプルリクエストを作成"
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Create a useful routine with one click, then adjust it anytime."
 msgstr "ワンクリックで便利なルーティンを作成し、いつでも調整できます。"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Create approval proposal"
+msgstr "承認提案を作成"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Create Campaign Workspace"
@@ -4757,6 +4800,7 @@ msgid "Fetch"
 msgstr "フェッチ"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Field"
 msgstr "フィールド"
 
@@ -5935,6 +5979,10 @@ msgstr "ライト"
 msgid "Lightcode data import is unavailable with a custom data folder."
 msgstr "カスタムデータフォルダーでは Lightcode データをインポートできません。"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Line item"
+msgstr "明細"
+
 #: src/renderer/components/skills/SkillImportModal.tsx
 msgid "Link to source"
 msgstr "ソースにリンク"
@@ -6154,6 +6202,10 @@ msgstr "開発サーバーを検索しています…"
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 msgid "Losing worktrees and branches will be removed. Their session history will remain."
 msgstr "敗者のワークツリーとブランチは削除されます。セッション履歴は保持されます。"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Low confidence"
+msgstr "低信頼度"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Low risk"
@@ -6379,6 +6431,10 @@ msgstr "MCP ツール呼び出し"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "MCP transport type"
 msgstr "MCPトランスポートタイプ"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Media plan attachments detected in this thread."
+msgstr "このスレッドでメディアプランの添付を検出しました。"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Medium risk"
@@ -7046,6 +7102,10 @@ msgstr "カメラが見つかりません"
 msgid "No changes"
 msgstr "変更なし"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "No changes detected"
+msgstr "変更は検出されませんでした"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/GitDiffContent.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/parts/SingleFileDiff.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/ConflictFileCard.tsx
@@ -7342,6 +7402,10 @@ msgstr "リポジトリが見つかりません。"
 msgid "No results"
 msgstr "結果なし"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "No rows match this filter."
+msgstr "このフィルターに一致する行はありません。"
+
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "No runs yet."
 msgstr "まだ実行はありません。"
@@ -7575,6 +7639,10 @@ msgstr "焦点が合っていないときのみ"
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Only you can approve — nothing executes without it"
 msgstr "承認できるのはあなただけです — 承認なしでは実行されません"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Only you can approve — nothing executes without it."
+msgstr "承認できるのはあなただけです — 承認なしでは何も実行されません。"
 
 #: src/renderer/notifications.ts
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
@@ -8084,6 +8152,14 @@ msgstr "サーバー上の親フォルダー"
 msgid "Parent folder, e.g. /home/me/projects"
 msgstr "親フォルダー（例: /home/me/projects）"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Parsed and compared against the published plan"
+msgstr "公開済みプランと照合・比較済み"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Parser confidence"
+msgstr "パーサー信頼度"
+
 #: src/renderer/utils/prStatus.ts
 msgid "Passed"
 msgstr "成功"
@@ -8224,6 +8300,14 @@ msgstr "計画"
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Plan · Fan out · Review"
 msgstr "計画 · 分散 · レビュー"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanIntelligencePane.tsx
+msgid "Plan comparison failed"
+msgstr "プラン比較に失敗しました"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Plan diff and provenance"
+msgstr "プラン差分と出所"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Plan fact"
@@ -8512,6 +8596,10 @@ msgstr "プロンプト"
 msgid "Prompts"
 msgstr "プロンプト"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Proposal created — review it in the approval docket."
+msgstr "提案を作成しました — 承認ドケットで確認してください。"
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Proposal lifecycle"
 msgstr "提案ライフサイクル"
@@ -8586,6 +8674,14 @@ msgstr "公開URL"
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Public URL updated."
 msgstr "公開URLを更新しました。"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Published"
+msgstr "公開済み"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Published value"
+msgstr "公開値"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/useWorktreeActions.ts
 msgid "Pull"
@@ -9070,6 +9166,14 @@ msgstr "リンクされたスキル「{0}」を削除しますか？ソースフ
 msgid "Remove worktree?"
 msgstr "ワークツリーを削除しますか?"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "removed"
+msgstr "削除"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Removed"
+msgstr "削除"
+
 #: src/mobile/ThreadTitleRow.tsx
 #: src/mobile/TodoActionsSheet.tsx
 #: src/mobile/views/DesktopsView.tsx
@@ -9400,6 +9504,10 @@ msgstr "レビューコメント"
 msgid "Review decision"
 msgstr "レビューの判定"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Review in approvals"
+msgstr "承認で確認"
+
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Review mode"
 msgstr "Review mode"
@@ -9436,6 +9544,14 @@ msgstr "レビュー中"
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #~ msgid "Reviewing each candidate's changes to recommend a winner."
 #~ msgstr "各候補の変更を確認して勝者を推薦します。"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Revised"
+msgstr "改訂"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Revised value"
+msgstr "改訂値"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Revoke {name}"
@@ -10380,6 +10496,14 @@ msgstr "重要度順 · キャンペーンスレッドを開く"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Source branch {branch} moved before the worktree was created"
 msgstr "ワークツリーの作成前にソースブランチ {branch} が移動しました"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Source cell"
+msgstr "ソースセル"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Source cell unattributed"
+msgstr "ソースセル未特定"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Source health"
@@ -11947,6 +12071,10 @@ msgstr "スレッドを更新できません。"
 msgid "Unassigned"
 msgstr "未割り当て"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Unattributed"
+msgstr "未特定"
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Unavailable"
 msgstr "利用不可"
@@ -11954,6 +12082,10 @@ msgstr "利用不可"
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Unavailable project"
 msgstr "利用できないプロジェクト"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "unchanged"
+msgstr "変更なし"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 msgid "Ungroup"

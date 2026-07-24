@@ -4,6 +4,7 @@ import { CampaignNavPane } from "./parts/CampaignNavPane";
 import { CampaignThreadPane } from "./parts/CampaignThreadPane";
 import { CampaignContextPane } from "./parts/CampaignContextPane";
 import { CampaignApprovalsPane } from "./parts/CampaignApprovalsPane";
+import { PlanIntelligencePane, type PlanIntelligenceSession } from "./parts/PlanIntelligencePane";
 import { useProject } from "@/renderer/state/useThread";
 import { useCampaignContext } from "@/renderer/hooks/useCampaignContext";
 import { useOperationsToday } from "@/renderer/hooks/useOperationsToday";
@@ -58,8 +59,10 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
   const { t } = useLingui();
   const [leftWidth, setLeftWidth] = useState(240);
   const [rightWidth, setRightWidth] = useState(360);
-  const [workspaceView, setWorkspaceView] = useState<"thread" | "approvals">("thread");
+  const [workspaceView, setWorkspaceView] = useState<"thread" | "approvals" | "planDiff">("thread");
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
+  const [planIntelligenceSession, setPlanIntelligenceSession] =
+    useState<PlanIntelligenceSession | null>(null);
   const project = useProject(props.projectId);
   const boundCampaignGroupId = project?.campaignExtension?.campaignGroupId ?? null;
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(boundCampaignGroupId);
@@ -113,7 +116,28 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
       />
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {workspaceView === "approvals" && campaignContext.status === "ready" && activeCampaignId ? (
+        {workspaceView === "planDiff" && planIntelligenceSession && activeCampaignId ? (
+          <PlanIntelligencePane
+            projectId={props.projectId}
+            session={planIntelligenceSession}
+            onBack={() => {
+              setWorkspaceView("thread");
+              setPlanIntelligenceSession(null);
+            }}
+            onOpenApprovals={(proposalId) => {
+              setSelectedProposalId(proposalId);
+              setWorkspaceView("approvals");
+              setPlanIntelligenceSession(null);
+              useAppStore.getState().setPendingCampaignApprovalsFocus({
+                projectId: props.projectId,
+                campaignGroupId: activeCampaignId,
+                proposalId,
+              });
+            }}
+          />
+        ) : workspaceView === "approvals" &&
+          campaignContext.status === "ready" &&
+          activeCampaignId ? (
           <CampaignApprovalsPane
             projectId={props.projectId}
             campaignGroupId={activeCampaignId}
@@ -132,6 +156,17 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
             suggestedQuestions={
               campaignContext.status === "ready" ? campaignContext.data.suggestedQuestions : []
             }
+            onAnalyzeMediaPlan={(input) => {
+              setPlanIntelligenceSession({
+                filePath: input.filePath,
+                filename: input.filename,
+                campaignGroupId: activeCampaignId ?? input.campaignGroupId,
+                ...(campaignContext.status === "ready" && campaignContext.data.identity.jobNumber
+                  ? { jobNumber: campaignContext.data.identity.jobNumber }
+                  : {}),
+              });
+              setWorkspaceView("planDiff");
+            }}
           />
         )}
       </main>
