@@ -195,6 +195,11 @@ msgstr "{0} đã được cập nhật."
 msgid "{0} is comparing the anonymized diffs…"
 msgstr "{0} đang so sánh các diff đã ẩn danh…"
 
+#. placeholder {0}: copy.fileName
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+msgid "{0} is larger than 100 MB. The agent may have trouble reading it."
+msgstr "{0} lớn hơn 100 MB. Tác tử có thể gặp khó khăn khi đọc."
+
 #. placeholder {0}: summary.maxLabel
 #: src/renderer/components/thread/ThreadContextDock.tsx
 msgid "{0} limit"
@@ -1263,6 +1268,11 @@ msgstr "Gắn dock todo vào trình soạn thảo"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
 msgid "Attached browser selection."
 msgstr "Lựa chọn trình duyệt đính kèm."
+
+#. placeholder {0}: relativePaths.join(" ")
+#: src/renderer/views/CampaignWorkspace/parts/campaignComposerAttachments.ts
+msgid "Attached files: {0}"
+msgstr "Tệp đính kèm: {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
@@ -3763,6 +3773,7 @@ msgid "Drives"
 msgstr "Ổ đĩa"
 
 #: src/renderer/components/thread/ThreadComposer.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "Drop here to attach"
 msgstr "Thả vào đây để đính kèm"
 

@@ -10,6 +10,7 @@ import { defineIpcProcedure, defineNoArgProcedure, definePayloadProcedure } from
 import {
   copyImageToClipboardPayloadSchema,
   createProjectDirectoryPayloadSchema,
+  copyCampaignConsultationAttachmentsPayloadSchema,
   ensureCampaignWorkspaceDirPayloadSchema,
   openExternalPayloadSchema,
   pickFilesOptionsSchema,
@@ -18,6 +19,8 @@ import {
   saveImageFilePayloadSchema,
   showNotificationPayloadSchema,
   type CreateProjectDirectoryResult,
+  type CopyCampaignConsultationAttachmentsPayload,
+  type CopyCampaignConsultationAttachmentsResult,
   type EnsureCampaignWorkspaceDirPayload,
   type EnsureCampaignWorkspaceDirResult,
 } from "../schemas";
@@ -149,6 +152,15 @@ export const appProcedures = {
     EnsureCampaignWorkspaceDirResult,
     "main-local"
   >("ensureCampaignWorkspaceDir", "main-local", ensureCampaignWorkspaceDirPayloadSchema),
+  copyCampaignConsultationAttachments: definePayloadProcedure<
+    CopyCampaignConsultationAttachmentsPayload,
+    CopyCampaignConsultationAttachmentsResult,
+    "main-local"
+  >(
+    "copyCampaignConsultationAttachments",
+    "main-local",
+    copyCampaignConsultationAttachmentsPayloadSchema,
+  ),
   listWslDistros: defineNoArgProcedure<string[], "supervisor">("listWslDistros", "supervisor"),
   openExternal: defineIpcProcedure<[string], string, void, "main-local">(
     "openExternal",

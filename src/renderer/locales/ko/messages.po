@@ -195,6 +195,11 @@ msgstr "{0}은(는) 이미 최신 상태입니다."
 msgid "{0} is comparing the anonymized diffs…"
 msgstr "{0}이(가) 익명화된 diff를 비교하고 있습니다…"
 
+#. placeholder {0}: copy.fileName
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+msgid "{0} is larger than 100 MB. The agent may have trouble reading it."
+msgstr "{0}이(가) 100MB보다 큽니다. 에이전트가 읽기 어려울 수 있습니다."
+
 #. placeholder {0}: summary.maxLabel
 #: src/renderer/components/thread/ThreadContextDock.tsx
 msgid "{0} limit"
@@ -1263,6 +1268,11 @@ msgstr "할 일 독을 작성기에 고정"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
 msgid "Attached browser selection."
 msgstr "브라우저 선택 항목을 첨부했습니다."
+
+#. placeholder {0}: relativePaths.join(" ")
+#: src/renderer/views/CampaignWorkspace/parts/campaignComposerAttachments.ts
+msgid "Attached files: {0}"
+msgstr "첨부 파일: {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
@@ -3763,6 +3773,7 @@ msgid "Drives"
 msgstr "드라이브"
 
 #: src/renderer/components/thread/ThreadComposer.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "Drop here to attach"
 msgstr "첨부하려면 여기에 드롭하세요."
 

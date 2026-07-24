@@ -10,9 +10,16 @@ const mocks = vi.hoisted(() => ({
   callMcpTool: vi.fn<(payload: McpToolCallPayload) => Promise<McpToolCallResult>>(),
 }));
 
-vi.mock("@/renderer/bridge", () => ({
-  readBridge: () => ({ callMcpTool: mocks.callMcpTool }),
-}));
+vi.mock("@/renderer/bridge", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/renderer/bridge")>();
+  return {
+    ...actual,
+    isRemoteSession: () => false,
+    readBridge: () => ({
+      callMcpTool: mocks.callMcpTool,
+    }),
+  };
+});
 
 const controlCentreServer = {
   id: "cc-1",
