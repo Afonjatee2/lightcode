@@ -1728,8 +1728,12 @@ msgid "Built-in MCP servers"
 msgstr "Serveurs MCP intégrés"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
-msgid "Built-in servers are managed by Poracode. They can be disabled globally but cannot be edited or removed."
-msgstr "Les serveurs intégrés sont gérés par Poracode. Ils peuvent être désactivés globalement, mais ne peuvent être ni modifiés ni supprimés."
+#~ msgid "Built-in servers are managed by Poracode. They can be disabled globally but cannot be edited or removed."
+#~ msgstr "Les serveurs intégrés sont gérés par Poracode. Ils peuvent être désactivés globalement, mais ne peuvent être ni modifiés ni supprimés."
+
+#: src/renderer/components/mcp/McpServersManager.tsx
+msgid "Built-in servers are managed by Tee's Cockpit. They can be disabled globally but cannot be edited or removed."
+msgstr "Les serveurs intégrés sont gérés par Tee's Cockpit. Ils peuvent être désactivés globalement, mais ne peuvent être ni modifiés ni supprimés."
 
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Built-in shortcut — can't be changed"
@@ -2087,8 +2091,13 @@ msgstr "Choisir le fichier d’identité SSH"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Choose the display language for Poracode's interface."
-msgstr "Choisissez la langue d'affichage de l'interface de Poracode."
+#~ msgid "Choose the display language for Poracode's interface."
+#~ msgstr "Choisissez la langue d'affichage de l'interface de Poracode."
+
+#: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Choose the display language for Tee's Cockpit's interface."
+msgstr "Choisissez la langue d'affichage de l'interface de Tee's Cockpit."
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "Choose thread to attach to"
@@ -2096,8 +2105,13 @@ msgstr "Choisissez le fil auquel attacher"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Choose whether links from Poracode and browser popups stay in Poracode or open externally."
-msgstr "Choisissez si les liens de Poracode et les fenêtres contextuelles du navigateur restent dans Poracode ou s'ouvrent en externe."
+#~ msgid "Choose whether links from Poracode and browser popups stay in Poracode or open externally."
+#~ msgstr "Choisissez si les liens de Poracode et les fenêtres contextuelles du navigateur restent dans Poracode ou s'ouvrent en externe."
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Choose whether links from Tee's Cockpit and browser popups stay in Tee's Cockpit or open externally."
+msgstr "Choisissez si les liens de Tee's Cockpit et les fenêtres contextuelles du navigateur restent dans Tee's Cockpit ou s'ouvrent en externe."
 
 #: src/renderer/views/SettingsOverlay/parts/WorktreeBaseFolderField.tsx
 msgid "Choose worktree base folder"
@@ -2688,8 +2702,12 @@ msgid "Config directory"
 msgstr "Dossier de configuration"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
-msgid "Configure the server Poracode will add when supported agents start."
-msgstr "Configurez le serveur que Poracode ajoutera au démarrage des agents compatibles."
+#~ msgid "Configure the server Poracode will add when supported agents start."
+#~ msgstr "Configurez le serveur que Poracode ajoutera au démarrage des agents compatibles."
+
+#: src/renderer/components/mcp/McpServerEditor.tsx
+msgid "Configure the server Tee's Cockpit will add when supported agents start."
+msgstr "Configurez le serveur que Tee's Cockpit ajoutera au démarrage des agents compatibles."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Configured MCP servers"
@@ -2739,8 +2757,12 @@ msgid "Connect desktop"
 msgstr "Connecter le bureau"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-msgid "Connect directly, through a relay, or over SSH. Every transport uses the same Poracode remote protocol, projects, threads, and agent runtimes."
-msgstr "Connectez-vous directement, via un relais ou par SSH. Chaque transport utilise le même protocole distant Poracode, les mêmes projets, fils et environnements d’exécution d’agents."
+#~ msgid "Connect directly, through a relay, or over SSH. Every transport uses the same Poracode remote protocol, projects, threads, and agent runtimes."
+#~ msgstr "Connectez-vous directement, via un relais ou par SSH. Chaque transport utilise le même protocole distant Poracode, les mêmes projets, fils et environnements d’exécution d’agents."
+
+#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
+msgid "Connect directly, through a relay, or over SSH. Every transport uses the same Tee's Cockpit remote protocol, projects, threads, and agent runtimes."
+msgstr "Connectez-vous directement, via un relais ou par SSH. Chaque transport utilise le même protocole distant Tee's Cockpit, les mêmes projets, fils et environnements d’exécution d’agents."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Connect over SSH"
@@ -2892,8 +2914,12 @@ msgid "Control Centre \"{toolName}\" returned a response that was too large or m
 msgstr "Le Centre de contrôle \"{toolName}\" a renvoyé une réponse trop volumineuse ou malformée. Essayez d'actualiser."
 
 #: src/renderer/hooks/useControlCentreTool.ts
-msgid "Control Centre \"{toolName}\" returned a response this version of Poracode doesn't understand."
-msgstr "Le Centre de contrôle \"{toolName}\" a renvoyé une réponse que cette version de Poracode ne comprend pas."
+#~ msgid "Control Centre \"{toolName}\" returned a response this version of Poracode doesn't understand."
+#~ msgstr "Le Centre de contrôle \"{toolName}\" a renvoyé une réponse que cette version de Poracode ne comprend pas."
+
+#: src/renderer/hooks/useControlCentreTool.ts
+msgid "Control Centre \"{toolName}\" returned a response this version of Tee's Cockpit doesn't understand."
+msgstr "Le Centre de contrôle \"{toolName}\" a renvoyé une réponse que cette version de Tee's Cockpit ne comprend pas."
 
 #: src/renderer/components/consultations/ContextWarnings.tsx
 msgid "Control Centre connection unavailable"
@@ -2960,8 +2986,12 @@ msgid "Copy {0} device code {1}"
 msgstr "Copier {0} le code de l'appareil {1}"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "Copy all Lightcode data into Poracode. Poracode restarts and keeps a complete backup of its current data."
-msgstr "Copiez toutes les données Lightcode dans Poracode. Poracode redémarrera et conservera une sauvegarde complète de ses données actuelles."
+#~ msgid "Copy all Lightcode data into Poracode. Poracode restarts and keeps a complete backup of its current data."
+#~ msgstr "Copiez toutes les données Lightcode dans Poracode. Poracode redémarrera et conservera une sauvegarde complète de ses données actuelles."
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+msgid "Copy all Lightcode data into Tee's Cockpit. Tee's Cockpit restarts and keeps a complete backup of its current data."
+msgstr "Copiez toutes les données Lightcode dans Tee's Cockpit. Tee's Cockpit redémarrera et conservera une sauvegarde complète de ses données actuelles."
 
 #: src/renderer/components/thread/ChatPane/parts/items/ItemMarkdownInner.tsx
 msgid "Copy code"
@@ -3802,8 +3832,12 @@ msgid "Disabled globally"
 msgstr "Désactivé globalement"
 
 #: src/renderer/components/skills/SkillsManager.tsx
-msgid "Disabling a skill moves it out of active skill folders and removes Poracode-managed provider copies. Its files are preserved so you can enable it again."
-msgstr "La désactivation d’une compétence la déplace hors des dossiers de compétences actives et supprime les copies de fournisseurs gérées par Poracode. Ses fichiers sont conservés afin que vous puissiez la réactiver."
+#~ msgid "Disabling a skill moves it out of active skill folders and removes Poracode-managed provider copies. Its files are preserved so you can enable it again."
+#~ msgstr "La désactivation d’une compétence la déplace hors des dossiers de compétences actives et supprime les copies de fournisseurs gérées par Poracode. Ses fichiers sont conservés afin que vous puissiez la réactiver."
+
+#: src/renderer/components/skills/SkillsManager.tsx
+msgid "Disabling a skill moves it out of active skill folders and removes Tee's Cockpit-managed provider copies. Its files are preserved so you can enable it again."
+msgstr "La désactivation d’une compétence la déplace hors des dossiers de compétences actives et supprime les copies de fournisseurs gérées par Tee's Cockpit. Ses fichiers sont conservés afin que vous puissiez la réactiver."
 
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Discard"
@@ -4660,60 +4694,112 @@ msgid "Finished · Waiting for your input"
 msgstr "Terminé · En attente de votre saisie"
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Antigravity CLI integration using Poracode's native runtime."
-msgstr "Intégration CLI Antigravity de première classe utilisant le runtime natif de Poracode."
+#~ msgid "First-class Antigravity CLI integration using Poracode's native runtime."
+#~ msgstr "Intégration CLI Antigravity de première classe utilisant le runtime natif de Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Claude Code integration using Poracode's native SDK runtime."
-msgstr "Intégration Claude Code de première classe à l'aide du runtime SDK natif de Poracode."
+msgid "First-class Antigravity CLI integration using Tee's Cockpit's native runtime."
+msgstr "Intégration CLI Antigravity de première classe utilisant le runtime natif de Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Codex CLI integration using Poracode's native app-server runtime."
-msgstr "Intégration CLI Codex de première classe à l'aide du runtime de serveur d'applications natif de Poracode."
+#~ msgid "First-class Claude Code integration using Poracode's native SDK runtime."
+#~ msgstr "Intégration Claude Code de première classe à l'aide du runtime SDK natif de Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Command Code CLI integration using Poracode's native runtime."
-msgstr "Intégration CLI Command Code de première classe à l’aide du runtime natif de Poracode."
+msgid "First-class Claude Code integration using Tee's Cockpit's native SDK runtime."
+msgstr "Intégration Claude Code de première classe à l'aide du runtime SDK natif de Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Cursor Agent integration using Poracode's native runtime."
-msgstr "Intégration de première classe de Cursor Agent utilisant le runtime natif de Poracode."
+#~ msgid "First-class Codex CLI integration using Poracode's native app-server runtime."
+#~ msgstr "Intégration CLI Codex de première classe à l'aide du runtime de serveur d'applications natif de Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Factory Droid integration using Poracode's ACP runtime."
-msgstr "Intégration native de Factory Droid avec l’environnement d’exécution ACP de Poracode."
+msgid "First-class Codex CLI integration using Tee's Cockpit's native app-server runtime."
+msgstr "Intégration CLI Codex de première classe à l'aide du runtime de serveur d'applications natif de Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Gemini CLI integration using Poracode's native runtime."
-msgstr "Intégration de première classe de Gemini CLI utilisant le runtime natif de Poracode."
+#~ msgid "First-class Command Code CLI integration using Poracode's native runtime."
+#~ msgstr "Intégration CLI Command Code de première classe à l’aide du runtime natif de Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class GitHub Copilot CLI integration using Poracode's native runtime."
-msgstr "Intégration de première classe de GitHub Copilot CLI utilisant le runtime natif de Poracode."
+msgid "First-class Command Code CLI integration using Tee's Cockpit's native runtime."
+msgstr "Intégration CLI Command Code de première classe à l’aide du runtime natif de Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Grok Build CLI integration using Poracode's native runtime."
-msgstr "Intégration CLI Grok Build de première classe à l'aide du runtime natif de Poracode."
+#~ msgid "First-class Cursor Agent integration using Poracode's native runtime."
+#~ msgstr "Intégration de première classe de Cursor Agent utilisant le runtime natif de Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Kimi Code CLI integration using Poracode's native runtime."
-msgstr "Intégration CLI Kimi Code de première classe à l'aide du runtime natif de Poracode."
+msgid "First-class Cursor Agent integration using Tee's Cockpit's native runtime."
+msgstr "Intégration de première classe de Cursor Agent utilisant le runtime natif de Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class OpenCode integration using Poracode's native SDK runtime."
-msgstr "Intégration OpenCode de première classe à l'aide du runtime SDK natif de Poracode."
+#~ msgid "First-class Factory Droid integration using Poracode's ACP runtime."
+#~ msgstr "Intégration native de Factory Droid avec l’environnement d’exécution ACP de Poracode."
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+msgid "First-class Factory Droid integration using Tee's Cockpit's ACP runtime."
+msgstr "Intégration native de Factory Droid avec l’environnement d’exécution ACP de Tee's Cockpit."
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+#~ msgid "First-class Gemini CLI integration using Poracode's native runtime."
+#~ msgstr "Intégration de première classe de Gemini CLI utilisant le runtime natif de Poracode."
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+msgid "First-class Gemini CLI integration using Tee's Cockpit's native runtime."
+msgstr "Intégration de première classe de Gemini CLI utilisant le runtime natif de Tee's Cockpit."
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+#~ msgid "First-class GitHub Copilot CLI integration using Poracode's native runtime."
+#~ msgstr "Intégration de première classe de GitHub Copilot CLI utilisant le runtime natif de Poracode."
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+msgid "First-class GitHub Copilot CLI integration using Tee's Cockpit's native runtime."
+msgstr "Intégration de première classe de GitHub Copilot CLI utilisant le runtime natif de Tee's Cockpit."
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+#~ msgid "First-class Grok Build CLI integration using Poracode's native runtime."
+#~ msgstr "Intégration CLI Grok Build de première classe à l'aide du runtime natif de Poracode."
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+msgid "First-class Grok Build CLI integration using Tee's Cockpit's native runtime."
+msgstr "Intégration CLI Grok Build de première classe à l'aide du runtime natif de Tee's Cockpit."
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+#~ msgid "First-class Kimi Code CLI integration using Poracode's native runtime."
+#~ msgstr "Intégration CLI Kimi Code de première classe à l'aide du runtime natif de Poracode."
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+msgid "First-class Kimi Code CLI integration using Tee's Cockpit's native runtime."
+msgstr "Intégration CLI Kimi Code de première classe à l'aide du runtime natif de Tee's Cockpit."
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+#~ msgid "First-class OpenCode integration using Poracode's native SDK runtime."
+#~ msgstr "Intégration OpenCode de première classe à l'aide du runtime SDK natif de Poracode."
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+msgid "First-class OpenCode integration using Tee's Cockpit's native SDK runtime."
+msgstr "Intégration OpenCode de première classe à l'aide du runtime SDK natif de Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Pi integration using a real terminal and Pi's native SDK runtime."
 msgstr "Intégration Pi de premier plan avec un vrai terminal et le runtime SDK natif de Pi."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Qoder CLI integration using Poracode's native terminal and ACP runtimes."
-msgstr "Intégration Qoder CLI de premier plan avec les runtimes natifs terminal et ACP de Poracode."
+#~ msgid "First-class Qoder CLI integration using Poracode's native terminal and ACP runtimes."
+#~ msgstr "Intégration Qoder CLI de premier plan avec les runtimes natifs terminal et ACP de Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Qwen Code integration using Poracode's native terminal and ACP runtimes."
-msgstr "Intégration de premier ordre de Qwen Code utilisant les environnements d’exécution natifs de terminal et ACP de Poracode."
+msgid "First-class Qoder CLI integration using Tee's Cockpit's native terminal and ACP runtimes."
+msgstr "Intégration Qoder CLI de premier plan avec les runtimes natifs terminal et ACP de Tee's Cockpit."
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+#~ msgid "First-class Qwen Code integration using Poracode's native terminal and ACP runtimes."
+#~ msgstr "Intégration de premier ordre de Qwen Code utilisant les environnements d’exécution natifs de terminal et ACP de Poracode."
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+msgid "First-class Qwen Code integration using Tee's Cockpit's native terminal and ACP runtimes."
+msgstr "Intégration de premier ordre de Qwen Code utilisant les environnements d’exécution natifs de terminal et ACP de Tee's Cockpit."
 
 #: src/renderer/components/pdf/PdfViewer.tsx
 #~ msgid "Fit width"
@@ -5078,8 +5164,12 @@ msgid "Headers"
 msgstr "En-têtes"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
-msgid "Help me create a schedule. Ask for any missing details, then use the Poracode schedule controls to create it for me."
-msgstr "Aide-moi à créer une planification. Demande les détails manquants, puis utilise les contrôles de planification Poracode pour la créer."
+#~ msgid "Help me create a schedule. Ask for any missing details, then use the Poracode schedule controls to create it for me."
+#~ msgstr "Aide-moi à créer une planification. Demande les détails manquants, puis utilise les contrôles de planification Poracode pour la créer."
+
+#: src/renderer/views/SchedulesView/SchedulesView.tsx
+msgid "Help me create a schedule. Ask for any missing details, then use the Tee's Cockpit schedule controls to create it for me."
+msgstr "Aide-moi à créer une planification. Demande les détails manquants, puis utilise les contrôles de planification Tee's Cockpit pour la créer."
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/ThreadSettings.tsx
@@ -5511,8 +5601,13 @@ msgstr "Garde-moi sur la bonne voie"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Keep Poracode in the system tray when it launches at startup."
-msgstr "Garder Poracode dans la zone de notification lors de son lancement au démarrage."
+#~ msgid "Keep Poracode in the system tray when it launches at startup."
+#~ msgstr "Garder Poracode dans la zone de notification lors de son lancement au démarrage."
+
+#: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Keep Tee's Cockpit in the system tray when it launches at startup."
+msgstr "Garder Tee's Cockpit dans la zone de notification lors de son lancement au démarrage."
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -5537,8 +5632,12 @@ msgid "Kimi Code"
 msgstr "Kimi Code"
 
 #: src/renderer/i18n/sharedMessages.ts
-msgid "Kimi Code could not update its credentials because another process is using the credential file. Close other Poracode or Kimi Code processes, then retry."
-msgstr "Kimi Code n’a pas pu mettre à jour ses identifiants, car un autre processus utilise le fichier d’identifiants. Fermez les autres processus Poracode ou Kimi Code, puis réessayez."
+#~ msgid "Kimi Code could not update its credentials because another process is using the credential file. Close other Poracode or Kimi Code processes, then retry."
+#~ msgstr "Kimi Code n’a pas pu mettre à jour ses identifiants, car un autre processus utilise le fichier d’identifiants. Fermez les autres processus Poracode ou Kimi Code, puis réessayez."
+
+#: src/renderer/i18n/sharedMessages.ts
+msgid "Kimi Code could not update its credentials because another process is using the credential file. Close other Tee's Cockpit or Kimi Code processes, then retry."
+msgstr "Kimi Code n’a pas pu mettre à jour ses identifiants, car un autre processus utilise le fichier d’identifiants. Fermez les autres processus Tee's Cockpit ou Kimi Code, puis réessayez."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Kimi Code ended the turn without returning a response. Restart the thread and try again."
@@ -5579,8 +5678,13 @@ msgstr "Lancer au démarrage"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Launch Poracode automatically when you sign in to Windows."
-msgstr "Lancer automatiquement Poracode lors de la connexion à Windows."
+#~ msgid "Launch Poracode automatically when you sign in to Windows."
+#~ msgstr "Lancer automatiquement Poracode lors de la connexion à Windows."
+
+#: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Launch Tee's Cockpit automatically when you sign in to Windows."
+msgstr "Lancer automatiquement Tee's Cockpit lors de la connexion à Windows."
 
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
 msgid "Launch thread"
@@ -5891,8 +5995,13 @@ msgstr "Gérez les compétences partagées dans les portées globales et de proj
 
 #: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Manage the MCP server configurations Poracode adds when starting supported agents. Workspace servers can be configured in each project's settings."
-msgstr "Gérez les configurations de serveurs MCP que Poracode ajoute au démarrage des agents compatibles. Les serveurs de l’espace de travail peuvent être configurés dans les paramètres de chaque projet."
+#~ msgid "Manage the MCP server configurations Poracode adds when starting supported agents. Workspace servers can be configured in each project's settings."
+#~ msgstr "Gérez les configurations de serveurs MCP que Poracode ajoute au démarrage des agents compatibles. Les serveurs de l’espace de travail peuvent être configurés dans les paramètres de chaque projet."
+
+#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Manage the MCP server configurations Tee's Cockpit adds when starting supported agents. Workspace servers can be configured in each project's settings."
+msgstr "Gérez les configurations de serveurs MCP que Tee's Cockpit ajoute au démarrage des agents compatibles. Les serveurs de l’espace de travail peuvent être configurés dans les paramètres de chaque projet."
 
 #: src/renderer/views/SettingsOverlay/parts/SkillsSettings.tsx
 #~ msgid "Manage the skills Poracode makes available to supported agents. Project skills can be managed in each project's settings."
@@ -7648,8 +7757,12 @@ msgid "Pair again"
 msgstr "Associer à nouveau"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-msgid "Pair with Poracode"
-msgstr "Associer à Poracode"
+#~ msgid "Pair with Poracode"
+#~ msgstr "Associer à Poracode"
+
+#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
+msgid "Pair with Tee's Cockpit"
+msgstr "Associer à Tee's Cockpit"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Paired devices"
@@ -7903,12 +8016,17 @@ msgstr "Dirigez ce profil vers un fournisseur non-Anthropic (z.ai, …) avec des
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Popular editor themes adapted to Poracode. Each follows the light or dark mode above."
-msgstr "Thèmes d'éditeur populaires adaptés à Poracode. Chacun suit le mode clair ou sombre ci-dessus."
+#~ msgid "Popular editor themes adapted to Poracode. Each follows the light or dark mode above."
+#~ msgstr "Thèmes d'éditeur populaires adaptés à Poracode. Chacun suit le mode clair ou sombre ci-dessus."
+
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Popular editor themes adapted to Tee's Cockpit. Each follows the light or dark mode above."
+msgstr "Thèmes d'éditeur populaires adaptés à Tee's Cockpit. Chacun suit le mode clair ou sombre ci-dessus."
 
 #: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
-msgid "Poracode and your agents run on the remote machine. SSH is used only to start the remote environment and secure its local tunnel."
-msgstr "Poracode et vos agents s’exécutent sur la machine distante. SSH sert uniquement à démarrer l’environnement distant et à sécuriser son tunnel local."
+#~ msgid "Poracode and your agents run on the remote machine. SSH is used only to start the remote environment and secure its local tunnel."
+#~ msgstr "Poracode et vos agents s’exécutent sur la machine distante. SSH sert uniquement à démarrer l’environnement distant et à sécuriser son tunnel local."
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 #~ msgid "Poracode does not store marketplace credentials in plain settings. Open the catalog to browse its security-scanned skills."
@@ -7917,20 +8035,20 @@ msgstr "Poracode et vos agents s’exécutent sur la machine distante. SSH sert 
 #: src/renderer/components/skills/SkillImportModal.tsx
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
-msgid "Poracode only"
-msgstr "Poracode uniquement"
+#~ msgid "Poracode only"
+#~ msgstr "Poracode uniquement"
 
 #: src/mobile/views/DesktopsView.tsx
 msgid "Poracode will install or reuse its server on the SSH host and keep credentials in this device's secure storage."
 msgstr "Poracode installera ou réutilisera son serveur sur l’hôte SSH et conservera les identifiants dans le stockage sécurisé de cet appareil."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "Poracode will restart, back up its current data, and replace it with a complete copy of your Lightcode data."
-msgstr "Poracode va redémarrer, sauvegarder ses données actuelles et les remplacer par une copie complète de vos données Lightcode."
+#~ msgid "Poracode will restart, back up its current data, and replace it with a complete copy of your Lightcode data."
+#~ msgstr "Poracode va redémarrer, sauvegarder ses données actuelles et les remplacer par une copie complète de vos données Lightcode."
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
-msgid "Poracode's built-in browser tools."
-msgstr "Les outils de navigateur intégrés de Poracode."
+#~ msgid "Poracode's built-in browser tools."
+#~ msgstr "Les outils de navigateur intégrés de Poracode."
 
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/PortsView.tsx
@@ -8156,8 +8274,12 @@ msgid "Provenance"
 msgstr "Provenance"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
-msgid "Provided and managed by Poracode for supported agents."
-msgstr "Fourni et géré par Poracode pour les agents compatibles."
+#~ msgid "Provided and managed by Poracode for supported agents."
+#~ msgstr "Fourni et géré par Poracode pour les agents compatibles."
+
+#: src/renderer/components/mcp/McpServersManager.tsx
+msgid "Provided and managed by Tee's Cockpit for supported agents."
+msgstr "Fourni et géré par Tee's Cockpit pour les agents compatibles."
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/authHelpers.ts
 msgid "provider"
@@ -8220,8 +8342,12 @@ msgid "Pull ↓{behind}"
 msgstr "Tirer ↓{behind}"
 
 #: src/renderer/i18n/sharedMessages.ts
-msgid "Pull did not complete. Your local changes remain in a Poracode stash."
-msgstr "Le pull n'a pas été effectué. Vos modifications locales restent dans un stash Poracode."
+#~ msgid "Pull did not complete. Your local changes remain in a Poracode stash."
+#~ msgstr "Le pull n'a pas été effectué. Vos modifications locales restent dans un stash Poracode."
+
+#: src/renderer/i18n/sharedMessages.ts
+msgid "Pull did not complete. Your local changes remain in a Tee's Cockpit stash."
+msgstr "Le pull n'a pas été effectué. Vos modifications locales restent dans un stash Tee's Cockpit."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Pull failed: {detail}"
@@ -9132,8 +9258,12 @@ msgstr "Exécutez une invite avec plusieurs agents, puis comparez leur travail."
 #~ msgstr "Exécutez des tâches autonomes sur cet appareil sans projet."
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
-msgid "Run standalone tasks on this device. Schedules run while the device is awake and Poracode is open."
-msgstr "Exécutez des tâches autonomes sur cet appareil. Les planifications s'exécutent tant que l'appareil est actif et que Poracode est ouvert."
+#~ msgid "Run standalone tasks on this device. Schedules run while the device is awake and Poracode is open."
+#~ msgstr "Exécutez des tâches autonomes sur cet appareil. Les planifications s'exécutent tant que l'appareil est actif et que Poracode est ouvert."
+
+#: src/renderer/views/SchedulesView/SchedulesView.tsx
+msgid "Run standalone tasks on this device. Schedules run while the device is awake and Tee's Cockpit is open."
+msgstr "Exécutez des tâches autonomes sur cet appareil. Les planifications s'exécutent tant que l'appareil est actif et que Tee's Cockpit est ouvert."
 
 #: src/renderer/commands/registry.ts
 msgid "Run Terminal Command"
@@ -9538,8 +9668,12 @@ msgstr "Sélectionner…"
 #~ msgstr "Projet sélectionné"
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
-msgid "Selects which Control Centre tool subset the \"control-centre\" MCP server exposes for this campaign project. Changes apply when Poracode next starts or reconnects to a newly launched MCP process."
-msgstr "Sélectionne le sous-ensemble d'outils Control Centre que le serveur MCP \"control-centre\" expose pour ce projet de campagne. Les modifications s'appliquent au prochain démarrage de Poracode ou lors de la reconnexion à un processus MCP nouvellement lancé."
+#~ msgid "Selects which Control Centre tool subset the \"control-centre\" MCP server exposes for this campaign project. Changes apply when Poracode next starts or reconnects to a newly launched MCP process."
+#~ msgstr "Sélectionne le sous-ensemble d'outils Control Centre que le serveur MCP \"control-centre\" expose pour ce projet de campagne. Les modifications s'appliquent au prochain démarrage de Poracode ou lors de la reconnexion à un processus MCP nouvellement lancé."
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Selects which Control Centre tool subset the \"control-centre\" MCP server exposes for this campaign project. Changes apply when Tee's Cockpit next starts or reconnects to a newly launched MCP process."
+msgstr "Sélectionne le sous-ensemble d'outils Control Centre que le serveur MCP \"control-centre\" expose pour ce projet de campagne. Les modifications s'appliquent au prochain démarrage de Tee's Cockpit ou lors de la reconnexion à un processus MCP nouvellement lancé."
 
 #: src/renderer/views/RemoteThreadView/RemoteThreadView.tsx
 msgid "Send"
@@ -10514,6 +10648,24 @@ msgstr "Tâche"
 msgid "Task output"
 msgstr "Résultat de la tâche"
 
+#: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
+msgid "Tee's Cockpit and your agents run on the remote machine. SSH is used only to start the remote environment and secure its local tunnel."
+msgstr "Tee's Cockpit et vos agents s’exécutent sur la machine distante. SSH sert uniquement à démarrer l’environnement distant et à sécuriser son tunnel local."
+
+#: src/renderer/components/skills/SkillImportModal.tsx
+#: src/renderer/components/skills/SkillMarketplaceModal.tsx
+#: src/renderer/components/skills/SkillsManager.tsx
+msgid "Tee's Cockpit only"
+msgstr "Tee's Cockpit uniquement"
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+msgid "Tee's Cockpit will restart, back up its current data, and replace it with a complete copy of your Lightcode data."
+msgstr "Tee's Cockpit va redémarrer, sauvegarder ses données actuelles et les remplacer par une copie complète de vos données Lightcode."
+
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "Tee's Cockpit's built-in browser tools."
+msgstr "Les outils de navigateur intégrés de Tee's Cockpit."
+
 #. placeholder {0}: selectedAgent?.label ?? targetProviderFallback
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "Tell {0} what to do next..."
@@ -10889,8 +11041,12 @@ msgid "This removes the worktree on \"{0}\", then deletes the branch."
 msgstr "Cela supprime l'arbre de travail sur \"{0}\", puis supprime la branche."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
-msgid "This server requires authentication before Poracode can check it."
-msgstr "Ce serveur nécessite une authentification avant que Poracode puisse le vérifier."
+#~ msgid "This server requires authentication before Poracode can check it."
+#~ msgstr "Ce serveur nécessite une authentification avant que Poracode puisse le vérifier."
+
+#: src/renderer/components/mcp/McpServersManager.tsx
+msgid "This server requires authentication before Tee's Cockpit can check it."
+msgstr "Ce serveur nécessite une authentification avant que Tee's Cockpit puisse le vérifier."
 
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "This system-wide shortcut is unavailable. Choose another key combination."
@@ -10903,8 +11059,13 @@ msgstr "Ce fil de discussion utilise l'arbre de travail <0>{0}</0>. Supprimer é
 
 #. placeholder {0}: activeDialog.sourceBranch
 #: src/renderer/views/MainView/parts/PullFromSourceDialog.tsx
-msgid "This worktree has local changes. Poracode can temporarily stash them, pull from {0}, then re-apply your changes."
-msgstr "Cet arbre de travail a des modifications locales. Poracode peut les remiser temporairement, récupérer depuis {0}, puis réappliquer vos modifications."
+#~ msgid "This worktree has local changes. Poracode can temporarily stash them, pull from {0}, then re-apply your changes."
+#~ msgstr "Cet arbre de travail a des modifications locales. Poracode peut les remiser temporairement, récupérer depuis {0}, puis réappliquer vos modifications."
+
+#. placeholder {0}: activeDialog.sourceBranch
+#: src/renderer/views/MainView/parts/PullFromSourceDialog.tsx
+msgid "This worktree has local changes. Tee's Cockpit can temporarily stash them, pull from {0}, then re-apply your changes."
+msgstr "Cet arbre de travail a des modifications locales. Tee's Cockpit peut les remiser temporairement, récupérer depuis {0}, puis réappliquer vos modifications."
 
 #: src/renderer/components/thread/ChatPane/parts/items/Reasoning.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ReasoningInline.tsx
@@ -11981,8 +12142,12 @@ msgid "What's New"
 msgstr "Nouveautés"
 
 #: src/renderer/views/SettingsOverlay/parts/ChangelogSettings.tsx
-msgid "What's new in Poracode, newest first."
-msgstr "Nouveautés de Poracode, les plus récentes en premier."
+#~ msgid "What's new in Poracode, newest first."
+#~ msgstr "Nouveautés de Poracode, les plus récentes en premier."
+
+#: src/renderer/views/SettingsOverlay/parts/ChangelogSettings.tsx
+msgid "What's new in Tee's Cockpit, newest first."
+msgstr "Nouveautés de Tee's Cockpit, les plus récentes en premier."
 
 #: src/renderer/views/SettingsOverlay/parts/SearchSettings.tsx
 msgid "When enabled, search respects <0>.gitignore</0> entries."
@@ -11990,8 +12155,13 @@ msgstr "Lorsqu'elle est activée, la recherche respecte les entrées <0>.gitigno
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "When links open in a Poracode browser tab, choose where the browser is revealed."
-msgstr "Lorsque les liens s'ouvrent dans un onglet du navigateur Poracode, choisissez l'endroit où le navigateur est révélé."
+#~ msgid "When links open in a Poracode browser tab, choose where the browser is revealed."
+#~ msgstr "Lorsque les liens s'ouvrent dans un onglet du navigateur Poracode, choisissez l'endroit où le navigateur est révélé."
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "When links open in a Tee's Cockpit browser tab, choose where the browser is revealed."
+msgstr "Lorsque les liens s'ouvrent dans un onglet du navigateur Tee's Cockpit, choisissez l'endroit où le navigateur est révélé."
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "When off, suppress notifications from terminal threads whose status comes from the OSC fallback (no CLI hook plugin)."
@@ -12004,8 +12174,13 @@ msgstr "Quand afficher les toasts dans l’application pour les fils de discussi
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "When you close the window, keep Poracode running in the system tray. Disable to quit on close."
-msgstr "Lorsque vous fermez la fenêtre, laissez Poracode s'exécuter dans la barre d'état système. Désactivez pour quitter à la fermeture."
+#~ msgid "When you close the window, keep Poracode running in the system tray. Disable to quit on close."
+#~ msgstr "Lorsque vous fermez la fenêtre, laissez Poracode s'exécuter dans la barre d'état système. Désactivez pour quitter à la fermeture."
+
+#: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "When you close the window, keep Tee's Cockpit running in the system tray. Disable to quit on close."
+msgstr "Lorsque vous fermez la fenêtre, laissez Tee's Cockpit s'exécuter dans la barre d'état système. Désactivez pour quitter à la fermeture."
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -12017,8 +12192,12 @@ msgid "Where do you want to begin?"
 msgstr "Par où voulez-vous commencer ?"
 
 #: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
-msgid "Where Poracode creates git worktrees for new branches. Changes apply to worktrees created from now on; existing worktrees stay where they are."
-msgstr "Emplacement où Poracode crée les arbres de travail git pour les nouvelles branches. Les changements s'appliquent aux arbres de travail créés à partir de maintenant ; les arbres de travail existants restent à leur place."
+#~ msgid "Where Poracode creates git worktrees for new branches. Changes apply to worktrees created from now on; existing worktrees stay where they are."
+#~ msgstr "Emplacement où Poracode crée les arbres de travail git pour les nouvelles branches. Les changements s'appliquent aux arbres de travail créés à partir de maintenant ; les arbres de travail existants restent à leur place."
+
+#: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
+msgid "Where Tee's Cockpit creates git worktrees for new branches. Changes apply to worktrees created from now on; existing worktrees stay where they are."
+msgstr "Emplacement où Tee's Cockpit crée les arbres de travail git pour les nouvelles branches. Les changements s'appliquent aux arbres de travail créés à partir de maintenant ; les arbres de travail existants restent à leur place."
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Where the run's conversation is created."

@@ -64,7 +64,7 @@ describe("McpSection - Control Centre Profile Wording & State", () => {
 
     // Wording check
     const description = screen.getByText(
-      /exposes for this campaign project. Changes apply when Poracode next starts/,
+      /exposes for this campaign project. Changes apply when Tee's Cockpit next starts/,
     );
     expect(description).toBeInTheDocument();
   });

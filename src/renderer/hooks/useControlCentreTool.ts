@@ -37,8 +37,7 @@ export function resolveControlCentreServer(
   const merged = mergeMcpServers(userMcpServers, project.mcpServers ?? []);
   const server = merged.find(
     (candidate) =>
-      candidate.enabled &&
-      candidate.name.trim().toLowerCase() === CONTROL_CENTRE_MCP_SERVER_NAME,
+      candidate.enabled && candidate.name.trim().toLowerCase() === CONTROL_CENTRE_MCP_SERVER_NAME,
   );
   if (!server) return undefined;
   return applyCampaignMcpProfile([server], getCampaignMcpProfile(project))[0];
@@ -85,7 +84,7 @@ function stateFromResult<T>(
     return {
       status: "error",
       message: i18n._(
-        msg`Control Centre "${toolName}" returned a response this version of Poracode doesn't understand.`,
+        msg`Control Centre "${toolName}" returned a response this version of Tee's Cockpit doesn't understand.`,
       ),
     };
   }

@@ -104,7 +104,7 @@ describe("ComputerUseDesktopOverlay", () => {
       expect(window.showInactive).toHaveBeenCalled();
       const overlayHtml = decodeURIComponent(window.loadURL.mock.calls[0]![0].split(",", 2)[1]!);
       expect(overlayHtml).toContain("inset 0 0 0 3px");
-      expect(overlayHtml).toContain("Poracode using your computer | Esc to Exit");
+      expect(overlayHtml).toContain("Tee's Cockpit using your computer | Esc to Exit");
       expect(overlayHtml).not.toContain("<button");
     }
     expect(electronMock.globalShortcut.register).toHaveBeenCalledWith(

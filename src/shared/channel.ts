@@ -13,7 +13,7 @@ export function resolvePoracodeChannel(): PoracodeChannel {
 }
 
 export function productNameFor(channel: PoracodeChannel): string {
-  return channel === "nightly" ? "Poracode Nightly" : "Poracode";
+  return channel === "nightly" ? "Tee's Cockpit Nightly" : "Tee's Cockpit";
 }
 
 export function appIdFor(channel: PoracodeChannel): string {
@@ -31,5 +31,5 @@ export function updaterChannelFor(channel: PoracodeChannel): string | undefined 
 }
 
 export function artifactPrefixFor(channel: PoracodeChannel): string {
-  return channel === "nightly" ? "Poracode-Nightly" : "Poracode";
+  return channel === "nightly" ? "Tees-Cockpit-Nightly" : "Tees-Cockpit";
 }

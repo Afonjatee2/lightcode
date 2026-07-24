@@ -174,7 +174,7 @@ export function McpServersManager(props: {
       .map((server) => ({ scope, source, server })),
   );
 
-  const builtInDescription = t`Provided and managed by Poracode for supported agents.`;
+  const builtInDescription = t`Provided and managed by Tee's Cockpit for supported agents.`;
   const builtIns: BuiltInRow[] = [
     {
       id: "browser",
@@ -542,8 +542,8 @@ export function McpServersManager(props: {
             <SectionHeading title={t`Built-in MCP servers`} count={visibleBuiltIns.length} />
             <p className="mt-0.5 text-xs text-muted">
               <Trans>
-                Built-in servers are managed by Poracode. They can be disabled globally but cannot
-                be edited or removed.
+                Built-in servers are managed by Tee's Cockpit. They can be disabled globally but
+                cannot be edited or removed.
               </Trans>
             </p>
           </div>
@@ -781,7 +781,7 @@ function McpServerProbeStatus(props: {
         <span className="size-2 shrink-0 rounded-full bg-warning" aria-hidden="true" />
         <Trans>Authentication required</Trans>
         <span aria-hidden="true">·</span>
-        <Trans>This server requires authentication before Poracode can check it.</Trans>
+        <Trans>This server requires authentication before Tee's Cockpit can check it.</Trans>
       </div>
     );
   }

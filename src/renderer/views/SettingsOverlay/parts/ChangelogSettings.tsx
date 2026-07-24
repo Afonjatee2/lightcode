@@ -35,7 +35,7 @@ export function ChangelogSettings() {
   return (
     <SettingsPage
       title={t`Changelog`}
-      description={<Trans>What's new in Poracode, newest first.</Trans>}
+      description={<Trans>What's new in Tee's Cockpit, newest first.</Trans>}
       bodyClassName=""
     >
       {releases.length === 0 ? (

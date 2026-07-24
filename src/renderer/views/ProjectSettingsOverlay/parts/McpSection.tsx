@@ -38,7 +38,7 @@ function CampaignMcpProfileRow(props: { projectId: string }) {
 
   const description = isRemote
     ? t`The active remote Control Centre profile is managed by the remote server administrator. Remote servers do not support client-controlled profile reconfiguration.`
-    : t`Selects which Control Centre tool subset the "control-centre" MCP server exposes for this campaign project. Changes apply when Poracode next starts or reconnects to a newly launched MCP process.`;
+    : t`Selects which Control Centre tool subset the "control-centre" MCP server exposes for this campaign project. Changes apply when Tee's Cockpit next starts or reconnects to a newly launched MCP process.`;
 
   return (
     <SettingRow title={t`Control Centre MCP Profile`} description={description}>

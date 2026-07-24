@@ -253,7 +253,7 @@ describe("GitReviewSidebar", () => {
   it("renders worktree changes from the provided git status", () => {
     const project: Project = {
       id: "project-1",
-      name: "Poracode",
+      name: "Tee's Cockpit",
       createdAt: new Date().toISOString(),
       location: { kind: "windows", path: "C:\\repo-worktree" },
     };
@@ -303,7 +303,7 @@ describe("GitReviewSidebar", () => {
   it("uses Git's merge message as an editable commit template", async () => {
     const project: Project = {
       id: "merge-project",
-      name: "Poracode",
+      name: "Tee's Cockpit",
       createdAt: new Date().toISOString(),
       location: { kind: "windows", path: "C:\\repo-worktree" },
     };
@@ -407,7 +407,7 @@ describe("GitReviewSidebar", () => {
     });
     const project: Project = {
       id: "typed-project",
-      name: "Poracode",
+      name: "Tee's Cockpit",
       createdAt: new Date().toISOString(),
       location: { kind: "windows", path: "C:\\repo" },
     };
@@ -457,7 +457,7 @@ describe("GitReviewSidebar", () => {
   it("reports failed file staging before refreshing the git state", async () => {
     const project: Project = {
       id: "project-1",
-      name: "Poracode",
+      name: "Tee's Cockpit",
       createdAt: new Date().toISOString(),
       location: { kind: "windows", path: "C:\\repo" },
     };
@@ -510,7 +510,7 @@ describe("GitReviewSidebar", () => {
   it("shows an init action when the location is not a git repository", async () => {
     const project: Project = {
       id: "project-1",
-      name: "Poracode",
+      name: "Tee's Cockpit",
       createdAt: new Date().toISOString(),
       location: { kind: "windows", path: "C:\\repo" },
     };
@@ -561,7 +561,7 @@ describe("GitReviewSidebar", () => {
   it("shows the pixel loader while init is pending", async () => {
     const project: Project = {
       id: "project-1",
-      name: "Poracode",
+      name: "Tee's Cockpit",
       createdAt: new Date().toISOString(),
       location: { kind: "windows", path: "C:\\repo" },
     };
@@ -602,7 +602,7 @@ describe("GitReviewSidebar", () => {
   it("shows a clean working tree state after the repo has no changes", () => {
     const project: Project = {
       id: "project-1",
-      name: "Poracode",
+      name: "Tee's Cockpit",
       createdAt: new Date().toISOString(),
       location: { kind: "windows", path: "C:\\repo" },
     };
@@ -643,7 +643,7 @@ describe("GitReviewSidebar", () => {
   it("routes conflict file actions through the touch menu when provided", () => {
     const project: Project = {
       id: "project-1",
-      name: "Poracode",
+      name: "Tee's Cockpit",
       createdAt: new Date().toISOString(),
       location: { kind: "windows", path: "C:\\repo" },
     };
@@ -706,7 +706,7 @@ describe("GitReviewSidebar", () => {
   it("uses the conflict resolver launch override when provided", () => {
     const project: Project = {
       id: "project-1",
-      name: "Poracode",
+      name: "Tee's Cockpit",
       createdAt: new Date().toISOString(),
       location: { kind: "windows", path: "C:\\repo" },
     };
@@ -770,7 +770,7 @@ describe("GitReviewSidebar", () => {
   it("adds a remote from the clean working tree state", async () => {
     const project: Project = {
       id: "project-1",
-      name: "Poracode",
+      name: "Tee's Cockpit",
       createdAt: new Date().toISOString(),
       location: { kind: "windows", path: "C:\\repo" },
     };
@@ -822,7 +822,7 @@ describe("GitReviewSidebar", () => {
   it("moves worktree merge actions into the create PR dropdown", async () => {
     const project: Project = {
       id: "project-1",
-      name: "Poracode",
+      name: "Tee's Cockpit",
       createdAt: new Date().toISOString(),
       location: { kind: "windows", path: "C:\\repo-worktree" },
     };
@@ -884,7 +884,7 @@ describe("GitReviewSidebar", () => {
   it("does not show the removed merge section while worktree source info is still loading", () => {
     const project: Project = {
       id: "project-1",
-      name: "Poracode",
+      name: "Tee's Cockpit",
       createdAt: new Date().toISOString(),
       location: { kind: "windows", path: "C:\\repo-worktree" },
     };
@@ -927,7 +927,7 @@ describe("GitReviewSidebar", () => {
   it("hides pull from source when the worktree is already up to date with its source branch", async () => {
     const project: Project = {
       id: "project-1",
-      name: "Poracode",
+      name: "Tee's Cockpit",
       createdAt: new Date().toISOString(),
       location: { kind: "windows", path: "C:\\repo-worktree" },
     };
@@ -989,7 +989,7 @@ describe("GitReviewSidebar", () => {
   it("shows pull from source when the source branch is ahead", async () => {
     const project: Project = {
       id: "project-1",
-      name: "Poracode",
+      name: "Tee's Cockpit",
       createdAt: new Date().toISOString(),
       location: { kind: "windows", path: "C:\\repo-worktree" },
     };

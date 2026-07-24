@@ -50,7 +50,7 @@ function makeThread(id: string): Thread {
 
 const project: Project = {
   id: "project-1",
-  name: "Poracode",
+  name: "Tee's Cockpit",
   location: { kind: "windows", path: "C:\\repo" },
   createdAt: NOW,
 };

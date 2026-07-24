@@ -31,7 +31,7 @@ const SHARED_MESSAGE_DESCRIPTORS: Record<MessageKey, MessageDescriptor> = {
   }),
   "git.pull.reapplyConflicts": msg({ message: "Re-applying local changes has conflicts" }),
   "git.pull.stashPreserved": msg({
-    message: "Pull did not complete. Your local changes remain in a Poracode stash.",
+    message: "Pull did not complete. Your local changes remain in a Tee's Cockpit stash.",
   }),
   "git.pull.reapplyAfterMerge": msg({
     message: "Your local changes were stashed and will be re-applied once the merge is resolved.",
@@ -173,7 +173,7 @@ const SHARED_MESSAGE_DESCRIPTORS: Record<MessageKey, MessageDescriptor> = {
   "supervisor.notRunning": msg({ message: "Background process is not running" }),
   "kimi.credentialsLocked": msg({
     message:
-      "Kimi Code could not update its credentials because another process is using the credential file. Close other Poracode or Kimi Code processes, then retry.",
+      "Kimi Code could not update its credentials because another process is using the credential file. Close other Tee's Cockpit or Kimi Code processes, then retry.",
   }),
   "kimi.emptyResponse": msg({
     message:
