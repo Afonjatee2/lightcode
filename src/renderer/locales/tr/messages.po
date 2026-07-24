@@ -2339,7 +2339,7 @@ msgstr "Müşteri adı"
 msgid "Client Name"
 msgstr "Müşteri Adı"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Client Update"
 msgstr "Müşteri Güncellemesi"
 
@@ -3275,6 +3275,10 @@ msgstr "Kampanya projesi kaydedilemedi."
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not save the campaign workspace thread."
 msgstr "Kampanya çalışma alanı konusu kaydedilemedi."
+
+#: src/renderer/actions/campaignTopicThreadActions.ts
+msgid "Could not save the topic thread."
+msgstr "Konu iş parçacığı kaydedilemedi."
 
 #: src/renderer/components/mcp/useMcpServerOauth.ts
 msgid "Could not sign in to {serverName}: {message}"
@@ -4461,7 +4465,7 @@ msgstr "Ortam değişkenleri"
 msgid "Environment variables (optional)"
 msgstr "Ortam değişkenleri (isteğe bağlı)"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "EOC Report"
 msgstr "EOC Raporu"
 
@@ -5181,7 +5185,7 @@ msgstr "Gemini"
 
 #: src/mobile/settingsSections.ts
 #: src/renderer/commands/shortcutCatalog.ts
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
@@ -6685,7 +6689,7 @@ msgstr "Modeller"
 msgid "Modes"
 msgstr "Modlar"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Monitoring"
 msgstr "İzleme"
 
@@ -7058,6 +7062,10 @@ msgstr "Ek Claude profili yok."
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/useGitReviewActions.ts
 msgid "No agent available to generate PR summary"
 msgstr "PR özeti oluşturacak temsilci yok"
+
+#: src/renderer/actions/campaignTopicThreadActions.ts
+msgid "No agent is available to create this topic thread."
+msgstr "Bu konu iş parçacığını oluşturmak için kullanılabilir bir aracı yok."
 
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "No agents in this phase."
@@ -8035,7 +8043,7 @@ msgid "Overriding the global setting for this project."
 msgstr "Bu proje için genel ayar geçersiz kılınıyor."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Pacing"
 msgstr "Hız"
 
@@ -8315,7 +8323,7 @@ msgstr "Plan farkı ve kaynak"
 msgid "Plan fact"
 msgstr "Plan gerçeği"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Plan Revision"
 msgstr "Plan Revizyonu"
@@ -12171,6 +12179,10 @@ msgstr "Aşamasız:"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Unpin"
 msgstr "Sabitlemeyi kaldır"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Unread activity"
+msgstr "Okunmamış etkinlik"
 
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/FileRow.tsx

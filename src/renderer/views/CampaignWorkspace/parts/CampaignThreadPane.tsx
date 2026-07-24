@@ -1,26 +1,19 @@
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { msg } from "@lingui/core/macro";
 import type { CampaignContextIdentityViewModel } from "@/renderer/adapters/campaignViewModels";
+import { selectCampaignTopic } from "@/renderer/actions/campaignTopicThreadActions";
 import { openThread } from "@/renderer/actions/threadActions";
 import { ConsultationDock } from "@/renderer/components/consultations";
 import { useConsultationStore } from "@/renderer/components/consultations/consultationStore";
 import { useProjectThreads } from "@/renderer/hooks/uiSelectors";
+import { useAppStore } from "@/renderer/state/appStore";
 import { resolveCampaignAttachmentAbsolutePath } from "@/renderer/services/planIntelligence/resolveCampaignAttachmentPath";
 import { CampaignThreadComposer } from "./CampaignThreadComposer";
-import { resolvePrimaryCampaignThread } from "./campaignThreadComposerRouting";
 import { mediaPlanAttachmentsFromMessage } from "./mediaPlanAttachment";
+import { CAMPAIGN_TOPICS, type CampaignTopicId, campaignWorkspaceKey } from "./campaignTopics";
+import { indexCampaignTopicThreads, isCampaignTopicUnread } from "./campaignTopicThreads";
 import { Button } from "@heroui/react";
 import { FileSpreadsheet } from "lucide-react";
-
-const TOPIC_TABS = [
-  { id: "monitoring", label: msg`Monitoring`, active: true, unread: false },
-  { id: "pacing", label: msg`Pacing`, active: false, unread: false },
-  { id: "plan_revision", label: msg`Plan Revision`, active: false, unread: false },
-  { id: "client_update", label: msg`Client Update`, active: false, unread: false },
-  { id: "eoc_report", label: msg`EOC Report`, active: false, unread: false },
-  { id: "general", label: msg`General`, active: false, unread: false },
-] as const;
 
 export function CampaignThreadPane(props: {
   projectId: string;
@@ -34,15 +27,55 @@ export function CampaignThreadPane(props: {
 }) {
   const { t } = useLingui();
   const projectThreads = useProjectThreads(props.projectId);
-  const primaryThread = resolvePrimaryCampaignThread(projectThreads);
-  const threadId = primaryThread?.id;
+  const consultationRecords = useConsultationStore((state) => state.records);
+  const campaignTopicLastViewedAtByThreadId = useAppStore(
+    (state) => state.campaignTopicLastViewedAtByThreadId,
+  );
+  const campaignGroupId = props.identity?.campaignGroupId ?? null;
+  const activeTopicId = useAppStore((state) => {
+    if (!campaignGroupId) return "monitoring" satisfies CampaignTopicId;
+    const key = campaignWorkspaceKey(props.projectId, campaignGroupId);
+    return state.campaignActiveTopicByKey[key] ?? ("monitoring" satisfies CampaignTopicId);
+  });
+  const [activeThreadId, setActiveThreadId] = useState<string | undefined>();
+  const [isResolvingTopic, setIsResolvingTopic] = useState(false);
+
+  useEffect(() => {
+    if (!props.identity || !campaignGroupId) {
+      setActiveThreadId(undefined);
+      return;
+    }
+
+    let cancelled = false;
+    setIsResolvingTopic(true);
+    void selectCampaignTopic({
+      projectId: props.projectId,
+      campaignGroupId,
+      topicId: activeTopicId,
+    })
+      .then((threadId) => {
+        if (!cancelled) setActiveThreadId(threadId);
+      })
+      .finally(() => {
+        if (!cancelled) setIsResolvingTopic(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [props.projectId, props.identity, campaignGroupId, activeTopicId]);
+
+  const threadId = activeThreadId;
+  const threadsByTopic = indexCampaignTopicThreads(projectThreads);
+  const activeThread = threadId
+    ? projectThreads.find((thread) => thread.id === threadId)
+    : undefined;
   const hasConsultations = useConsultationStore((state) =>
     threadId
       ? [...state.records.values()].some((record) => record.parentThreadId === threadId)
       : false,
   );
-  const consultationRecords = useConsultationStore((state) => state.records);
-  const mediaPlanPrompts = useMemo(() => {
+  const mediaPlanPrompts = (() => {
     if (!threadId) return [];
     const prompts: Array<{ recordId: string; path: string; fileName: string }> = [];
     for (const record of consultationRecords.values()) {
@@ -52,7 +85,7 @@ export function CampaignThreadPane(props: {
       }
     }
     return prompts;
-  }, [consultationRecords, threadId]);
+  })();
 
   if (!props.identity) {
     return (
@@ -66,7 +99,19 @@ export function CampaignThreadPane(props: {
 
   const clientDisplay = props.identity.clientName ?? "—";
   const campaignDisplay = props.identity.campaignName;
-  const defaultProvider = primaryThread?.agentKind ?? "claude";
+  const defaultProvider = activeThread?.agentKind ?? "claude";
+
+  function handleSelectTopic(topicId: CampaignTopicId) {
+    if (!campaignGroupId || topicId === activeTopicId || isResolvingTopic) return;
+    setIsResolvingTopic(true);
+    void selectCampaignTopic({
+      projectId: props.projectId,
+      campaignGroupId,
+      topicId,
+    })
+      .then((nextThreadId) => setActiveThreadId(nextThreadId))
+      .finally(() => setIsResolvingTopic(false));
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -79,21 +124,37 @@ export function CampaignThreadPane(props: {
           role="tablist"
           aria-label={t`Thread topics`}
         >
-          {TOPIC_TABS.map((tab) => (
-            <div
-              key={tab.id}
-              role="tab"
-              aria-selected={tab.active}
-              className={`cockpit-topic-tab ${tab.active ? "cockpit-topic-tab--active" : ""}`}
-            >
-              {t(tab.label)}
-              {tab.unread ? (
-                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--cockpit-accent)] px-1 text-[9.5px] font-extrabold text-[#0e0e14]">
-                  1
-                </span>
-              ) : null}
-            </div>
-          ))}
+          {CAMPAIGN_TOPICS.map((tab) => {
+            const topicThread = threadsByTopic[tab.id];
+            const unread = isCampaignTopicUnread({
+              thread: topicThread,
+              isActive: tab.id === activeTopicId,
+              lastViewedAtMs: topicThread
+                ? campaignTopicLastViewedAtByThreadId[topicThread.id]
+                : undefined,
+              consultationRecords: consultationRecords.values(),
+            });
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={tab.id === activeTopicId}
+                className={`cockpit-topic-tab ${tab.id === activeTopicId ? "cockpit-topic-tab--active" : ""}`}
+                onClick={() => handleSelectTopic(tab.id)}
+              >
+                {t(tab.label)}
+                {unread ? (
+                  <span
+                    className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--cockpit-accent)] px-1 text-[9.5px] font-extrabold text-[#0e0e14]"
+                    aria-label={t`Unread activity`}
+                  >
+                    1
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
       </header>
 

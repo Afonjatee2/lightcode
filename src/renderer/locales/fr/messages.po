@@ -2339,7 +2339,7 @@ msgstr "Nom du client"
 msgid "Client Name"
 msgstr "Nom du client"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Client Update"
 msgstr "Mise à jour client"
 
@@ -3275,6 +3275,10 @@ msgstr "Impossible d'enregistrer le projet de campagne."
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not save the campaign workspace thread."
 msgstr "Impossible d'enregistrer le fil de discussion de l'espace de travail de campagne."
+
+#: src/renderer/actions/campaignTopicThreadActions.ts
+msgid "Could not save the topic thread."
+msgstr "Impossible d'enregistrer le fil de sujet."
 
 #: src/renderer/components/mcp/useMcpServerOauth.ts
 msgid "Could not sign in to {serverName}: {message}"
@@ -4461,7 +4465,7 @@ msgstr "Variables d'environnement"
 msgid "Environment variables (optional)"
 msgstr "Variables d’environnement (facultatives)"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "EOC Report"
 msgstr "Rapport EOC"
 
@@ -5181,7 +5185,7 @@ msgstr "Gemini"
 
 #: src/mobile/settingsSections.ts
 #: src/renderer/commands/shortcutCatalog.ts
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
@@ -6684,7 +6688,7 @@ msgstr "Modèles"
 msgid "Modes"
 msgstr "Modes"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Monitoring"
 msgstr "Surveillance"
 
@@ -7057,6 +7061,10 @@ msgstr "Aucun profil Claude supplémentaire."
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/useGitReviewActions.ts
 msgid "No agent available to generate PR summary"
 msgstr "Aucun agent disponible pour générer un résumé de PR"
+
+#: src/renderer/actions/campaignTopicThreadActions.ts
+msgid "No agent is available to create this topic thread."
+msgstr "Aucun agent disponible pour créer ce fil de sujet."
 
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "No agents in this phase."
@@ -8034,7 +8042,7 @@ msgid "Overriding the global setting for this project."
 msgstr "Remplacement du paramètre global pour ce projet."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Pacing"
 msgstr "Rythme"
 
@@ -8314,7 +8322,7 @@ msgstr "Différences du plan et provenance"
 msgid "Plan fact"
 msgstr "Fait du plan"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Plan Revision"
 msgstr "Révision du plan"
@@ -12170,6 +12178,10 @@ msgstr "Sans phase :"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Unpin"
 msgstr "Désépingler"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Unread activity"
+msgstr "Activité non lue"
 
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/FileRow.tsx

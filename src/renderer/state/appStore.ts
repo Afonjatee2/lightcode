@@ -32,7 +32,7 @@ export const useAppStore = create<AppStoreState>()(
       }),
       {
         name: "poracode-app-v2",
-        version: 4,
+        version: 5,
         storage: createDbStorage(),
         merge: (persistedState, currentState) => {
           const state =
@@ -58,6 +58,8 @@ export const useAppStore = create<AppStoreState>()(
           threads: state.threads,
           view: state.view,
           groupLayouts: state.groupLayouts,
+          campaignActiveTopicByKey: state.campaignActiveTopicByKey,
+          campaignTopicLastViewedAtByThreadId: state.campaignTopicLastViewedAtByThreadId,
         }),
       },
     ),

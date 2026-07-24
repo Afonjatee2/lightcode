@@ -27,6 +27,7 @@ import {
   saveGroupLayout,
 } from "./helpers";
 import type { SavedGroupLayout } from "./types";
+import type { CampaignTopicId } from "@/renderer/views/CampaignWorkspace/parts/campaignTopics";
 import type { SliceCreator } from "./shared";
 
 export interface ViewSlice {
@@ -41,6 +42,10 @@ export interface ViewSlice {
     campaignGroupId: string;
     proposalId?: string;
   } | null;
+  /** Last selected campaign topic tab per project/campaign workspace key. */
+  campaignActiveTopicByKey: Record<string, CampaignTopicId>;
+  /** Persisted view timestamps for campaign topic unread dots (thread id → ms). */
+  campaignTopicLastViewedAtByThreadId: Record<string, number>;
   chatScrollToBottomTokens: Record<string, number>;
   /**
    * Optimistic, urgent active-thread id used only for instant sidebar-row
@@ -57,6 +62,8 @@ export interface ViewSlice {
   setPendingCampaignApprovalsFocus: (
     focus: { projectId: string; campaignGroupId: string; proposalId?: string } | null,
   ) => void;
+  setCampaignActiveTopic: (workspaceKey: string, topicId: CampaignTopicId) => void;
+  markCampaignTopicViewed: (threadId: string) => void;
   requestChatScrollToBottom: (threadId: string) => void;
   setPendingActiveThread: (threadId: string | null) => void;
   openDraft: (projectId: string) => void;
@@ -108,6 +115,8 @@ export const createViewSlice: SliceCreator<ViewSlice> = (set) => ({
   pendingComposerFocusThreadId: null,
   pendingCampaignComposerPrefill: null,
   pendingCampaignApprovalsFocus: null,
+  campaignActiveTopicByKey: {},
+  campaignTopicLastViewedAtByThreadId: {},
   chatScrollToBottomTokens: {},
   pendingActiveThreadId: null,
   groupLayouts: {},
@@ -119,6 +128,28 @@ export const createViewSlice: SliceCreator<ViewSlice> = (set) => ({
     ),
   setPendingCampaignComposerPrefill: (prefill) => set({ pendingCampaignComposerPrefill: prefill }),
   setPendingCampaignApprovalsFocus: (focus) => set({ pendingCampaignApprovalsFocus: focus }),
+  setCampaignActiveTopic: (workspaceKey, topicId) =>
+    set((state) =>
+      state.campaignActiveTopicByKey[workspaceKey] === topicId
+        ? {}
+        : {
+            campaignActiveTopicByKey: {
+              ...state.campaignActiveTopicByKey,
+              [workspaceKey]: topicId,
+            },
+          },
+    ),
+  markCampaignTopicViewed: (threadId) =>
+    set((state) => {
+      const now = Date.now();
+      if (state.campaignTopicLastViewedAtByThreadId[threadId] === now) return {};
+      return {
+        campaignTopicLastViewedAtByThreadId: {
+          ...state.campaignTopicLastViewedAtByThreadId,
+          [threadId]: now,
+        },
+      };
+    }),
   requestChatScrollToBottom: (threadId) =>
     set((state) => ({
       chatScrollToBottomTokens: {

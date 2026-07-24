@@ -2339,7 +2339,7 @@ msgstr "Ім'я клієнта"
 msgid "Client Name"
 msgstr "Ім'я клієнта"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Client Update"
 msgstr "Оновлення клієнта"
 
@@ -3275,6 +3275,10 @@ msgstr "Не вдалося зберегти проєкт кампанії."
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not save the campaign workspace thread."
 msgstr "Не вдалося зберегти тред робочої області кампанії."
+
+#: src/renderer/actions/campaignTopicThreadActions.ts
+msgid "Could not save the topic thread."
+msgstr "Не вдалося зберегти тематичну гілку."
 
 #: src/renderer/components/mcp/useMcpServerOauth.ts
 msgid "Could not sign in to {serverName}: {message}"
@@ -4461,7 +4465,7 @@ msgstr "Змінні середовища"
 msgid "Environment variables (optional)"
 msgstr "Змінні середовища (необов’язково)"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "EOC Report"
 msgstr "Звіт EOC"
 
@@ -5181,7 +5185,7 @@ msgstr "Gemini"
 
 #: src/mobile/settingsSections.ts
 #: src/renderer/commands/shortcutCatalog.ts
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
@@ -6685,7 +6689,7 @@ msgstr "Моделі"
 msgid "Modes"
 msgstr "Режими"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Monitoring"
 msgstr "Моніторинг"
 
@@ -7058,6 +7062,10 @@ msgstr "Додаткових профілів Claude немає."
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/useGitReviewActions.ts
 msgid "No agent available to generate PR summary"
 msgstr "Немає доступного агента для генерації підсумку PR"
+
+#: src/renderer/actions/campaignTopicThreadActions.ts
+msgid "No agent is available to create this topic thread."
+msgstr "Немає доступного агента для створення цієї тематичної гілки."
 
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "No agents in this phase."
@@ -8035,7 +8043,7 @@ msgid "Overriding the global setting for this project."
 msgstr "Перевизначення глобального налаштування для цього проєкту."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Pacing"
 msgstr "Темп"
 
@@ -8315,7 +8323,7 @@ msgstr "Відмінності плану та походження"
 msgid "Plan fact"
 msgstr "Факт плану"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Plan Revision"
 msgstr "Ревізія плану"
@@ -12171,6 +12179,10 @@ msgstr "Без фази:"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Unpin"
 msgstr "Відкріпити"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Unread activity"
+msgstr "Непрочитана активність"
 
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/FileRow.tsx

@@ -2339,7 +2339,7 @@ msgstr "클라이언트 이름"
 msgid "Client Name"
 msgstr "클라이언트 이름"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Client Update"
 msgstr "클라이언트 업데이트"
 
@@ -3275,6 +3275,10 @@ msgstr "캠페인 프로젝트를 저장할 수 없습니다."
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not save the campaign workspace thread."
 msgstr "캠페인 작업 영역 스레드를 저장할 수 없습니다."
+
+#: src/renderer/actions/campaignTopicThreadActions.ts
+msgid "Could not save the topic thread."
+msgstr "주제 스레드를 저장할 수 없습니다."
 
 #: src/renderer/components/mcp/useMcpServerOauth.ts
 msgid "Could not sign in to {serverName}: {message}"
@@ -4461,7 +4465,7 @@ msgstr "환경 변수"
 msgid "Environment variables (optional)"
 msgstr "환경 변수(선택 사항)"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "EOC Report"
 msgstr "EOC 보고서"
 
@@ -5181,7 +5185,7 @@ msgstr "Gemini"
 
 #: src/mobile/settingsSections.ts
 #: src/renderer/commands/shortcutCatalog.ts
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
@@ -6685,7 +6689,7 @@ msgstr "모델"
 msgid "Modes"
 msgstr "모드"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Monitoring"
 msgstr "모니터링"
 
@@ -7058,6 +7062,10 @@ msgstr "추가 Claude 프로필이 없습니다."
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/useGitReviewActions.ts
 msgid "No agent available to generate PR summary"
 msgstr "PR 요약을 생성할 수 있는 에이전트가 없습니다."
+
+#: src/renderer/actions/campaignTopicThreadActions.ts
+msgid "No agent is available to create this topic thread."
+msgstr "이 주제 스레드를 만들 수 있는 에이전트가 없습니다."
 
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "No agents in this phase."
@@ -8035,7 +8043,7 @@ msgid "Overriding the global setting for this project."
 msgstr "이 프로젝트의 전역 설정을 재정의합니다."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Pacing"
 msgstr "진행 속도"
 
@@ -8315,7 +8323,7 @@ msgstr "플랜 차이 및 출처"
 msgid "Plan fact"
 msgstr "계획 사실"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Plan Revision"
 msgstr "계획 개정"
@@ -12171,6 +12179,10 @@ msgstr "단계 미지정:"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Unpin"
 msgstr "고정 해제"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Unread activity"
+msgstr "읽지 않은 활동"
 
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/FileRow.tsx
