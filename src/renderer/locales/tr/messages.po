@@ -2045,6 +2045,10 @@ msgstr "CLI kancaları"
 msgid "Click a shortcut to record a new key, or ＋ to add another."
 msgstr "Yeni bir tuş kaydetmek için bir kısayola tıklayın veya başka bir tane eklemek için ＋ simgesine tıklayın."
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Client Comms"
+msgstr "Müşteri İletişimi"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Client name"
 msgstr "Müşteri adı"
@@ -2740,6 +2744,10 @@ msgstr "Kontrol Merkezi bağlantısı yok"
 msgid "Control Centre is not available. You can still create a campaign workspace manually, but live campaign context will not load until the MCP connection works."
 msgstr "Kontrol Merkezi kullanılamıyor. Yine de manuel olarak bir kampanya çalışma alanı oluşturabilirsiniz, ancak MCP bağlantısı çalışana kadar canlı kampanya bağlamı yüklenmeyecektir."
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Control Centre MCP Profile"
+msgstr "Control Centre MCP Profili"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
@@ -3429,6 +3437,10 @@ msgstr "Reddet"
 msgid "Deny and tell the agent what to do differently…"
 msgstr "Reddet ve aracıya neyi farklı yapması gerektiğini söyle…"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Deployment"
+msgstr "Dağıtım"
+
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
 #~ msgstr "Birden fazla ajanın çalıştıracağı görevi açıklayın…"
@@ -3506,6 +3518,10 @@ msgstr "Geliştirici"
 #: src/mobile/views/PortsView.tsx
 msgid "Dev servers listening on your desktop's localhost."
 msgstr "Masaüstünüzün localhost'unda dinleyen geliştirme sunucuları."
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Development"
+msgstr "Geliştirme"
 
 #: src/renderer/views/SettingsOverlay/parts/DevSettings.tsx
 msgid "Development-only overrides. Only visible in the PORACODE DEV build."
@@ -6003,6 +6019,10 @@ msgstr "Modlar"
 msgid "Monitoring"
 msgstr "İzleme"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Monitoring (read-only)"
+msgstr "İzleme (salt okunur)"
+
 #: src/mobile/NarrowShell.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "More"
@@ -7490,6 +7510,7 @@ msgid "Plan"
 msgstr "Plan"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Plan Revision"
 msgstr "Plan Revizyonu"
 
@@ -9082,6 +9103,10 @@ msgstr "Seç…"
 #~ msgid "Selected project"
 #~ msgstr "Seçili proje"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Selects which Control Centre tool subset the \"control-centre\" MCP server exposes for this campaign project. Changes apply when Poracode next starts or reconnects to a newly launched MCP process."
+msgstr "\"control-centre\" MCP sunucusunun bu kampanya projesi için sunacağı Control Centre araç alt kümesini seçer. Değişiklikler, Poracode bir sonraki başlatılışında veya yeni başlatılan bir MCP sürecine yeniden bağlandığında uygulanır."
+
 #: src/renderer/views/RemoteThreadView/RemoteThreadView.tsx
 msgid "Send"
 msgstr "Gönder"
@@ -10127,6 +10152,10 @@ msgstr "Bu uzak oturum zaten yoktu."
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "the {0} WSL user"
 #~ msgstr "{0} WSL kullanıcısı"
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "The active remote Control Centre profile is managed by the remote server administrator. Remote servers do not support client-controlled profile reconfiguration."
+msgstr "Etkin uzak Control Centre profili, uzak sunucu yöneticisi tarafından yönetilir. Uzak sunucular, istemci denetimli profil yeniden yapılandırmasını desteklemez."
 
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 msgid "the agent"

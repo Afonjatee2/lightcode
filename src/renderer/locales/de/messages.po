@@ -2045,6 +2045,10 @@ msgstr "CLI-Hooks"
 msgid "Click a shortcut to record a new key, or ＋ to add another."
 msgstr "Klicke auf ein Tastenkürzel, um eine neue Taste aufzuzeichnen, oder auf ＋, um ein weiteres hinzuzufügen."
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Client Comms"
+msgstr "Kundenkommunikation"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Client name"
 msgstr "Kundenname"
@@ -2740,6 +2744,10 @@ msgstr "Control Center nicht verfügbar"
 msgid "Control Centre is not available. You can still create a campaign workspace manually, but live campaign context will not load until the MCP connection works."
 msgstr "Control Center ist nicht verfügbar. Sie können weiterhin manuell einen Kampagnen-Arbeitsbereich erstellen, aber der Live-Kampagnenkontext wird erst geladen, wenn die MCP-Verbindung funktioniert."
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Control Centre MCP Profile"
+msgstr "Control Centre MCP-Profil"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
@@ -3429,6 +3437,10 @@ msgstr "Ablehnen"
 msgid "Deny and tell the agent what to do differently…"
 msgstr "Lehnen Sie ab und sagen Sie dem Agenten, was er anders machen soll ..."
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Deployment"
+msgstr "Bereitstellung"
+
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
 #~ msgstr "Beschreiben Sie die Aufgabe, die mit mehreren Agenten ausgeführt werden soll…"
@@ -3506,6 +3518,10 @@ msgstr "Entwickler"
 #: src/mobile/views/PortsView.tsx
 msgid "Dev servers listening on your desktop's localhost."
 msgstr "Dev-Server, die auf dem localhost Ihres Desktops lauschen."
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Development"
+msgstr "Entwicklung"
 
 #: src/renderer/views/SettingsOverlay/parts/DevSettings.tsx
 msgid "Development-only overrides. Only visible in the PORACODE DEV build."
@@ -6003,6 +6019,10 @@ msgstr "Modi"
 msgid "Monitoring"
 msgstr "Überwachung"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Monitoring (read-only)"
+msgstr "Überwachung (schreibgeschützt)"
+
 #: src/mobile/NarrowShell.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "More"
@@ -7490,6 +7510,7 @@ msgid "Plan"
 msgstr "Plan"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Plan Revision"
 msgstr "Plan-Revision"
 
@@ -9082,6 +9103,10 @@ msgstr "Auswählen…"
 #~ msgid "Selected project"
 #~ msgstr "Ausgewähltes Projekt"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Selects which Control Centre tool subset the \"control-centre\" MCP server exposes for this campaign project. Changes apply when Poracode next starts or reconnects to a newly launched MCP process."
+msgstr "Wählt aus, welche Control-Centre-Tool-Untergruppe der \"control-centre\"-MCP-Server für dieses Kampagnenprojekt bereitstellt. Änderungen werden wirksam, wenn Poracode das nächste Mal gestartet wird oder die Verbindung zu einem neu gestarteten MCP-Prozess wiederhergestellt wird."
+
 #: src/renderer/views/RemoteThreadView/RemoteThreadView.tsx
 msgid "Send"
 msgstr "Senden"
@@ -10127,6 +10152,10 @@ msgstr "Diese Remote-Sitzung war bereits nicht mehr vorhanden."
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "the {0} WSL user"
 #~ msgstr "den WSL-Benutzer {0}"
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "The active remote Control Centre profile is managed by the remote server administrator. Remote servers do not support client-controlled profile reconfiguration."
+msgstr "Das aktive Remote-Control-Centre-Profil wird vom Remote-Server-Administrator verwaltet. Remote-Server unterstützen keine clientgesteuerte Profilrekonfiguration."
 
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 msgid "the agent"

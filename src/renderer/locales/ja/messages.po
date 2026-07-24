@@ -2044,6 +2044,10 @@ msgstr "CLIフック"
 msgid "Click a shortcut to record a new key, or ＋ to add another."
 msgstr "ショートカットをクリックして新しいキーを記録するか、＋で別のキーを追加します。"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Client Comms"
+msgstr "クライアント連絡"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Client name"
 msgstr "クライアント名"
@@ -2739,6 +2743,10 @@ msgstr "コントロールセンターに接続できません"
 msgid "Control Centre is not available. You can still create a campaign workspace manually, but live campaign context will not load until the MCP connection works."
 msgstr "コントロールセンターは利用できません。手動でキャンペーンワークスペースを作成することはできますが、MCP接続が機能するまでライブキャンペーンコンテキストは読み込まれません。"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Control Centre MCP Profile"
+msgstr "Control Centre MCPプロファイル"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
@@ -3428,6 +3436,10 @@ msgstr "拒否する"
 msgid "Deny and tell the agent what to do differently…"
 msgstr "拒否し、エージェントに別の対処法を伝えます..."
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Deployment"
+msgstr "デプロイ"
+
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
 #~ msgstr "複数のエージェントで実行するタスクを入力…"
@@ -3505,6 +3517,10 @@ msgstr "開発"
 #: src/mobile/views/PortsView.tsx
 msgid "Dev servers listening on your desktop's localhost."
 msgstr "デスクトップの localhost で待ち受けている開発サーバー。"
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Development"
+msgstr "開発"
 
 #: src/renderer/views/SettingsOverlay/parts/DevSettings.tsx
 msgid "Development-only overrides. Only visible in the PORACODE DEV build."
@@ -6001,6 +6017,10 @@ msgstr "モード"
 msgid "Monitoring"
 msgstr "モニタリング"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Monitoring (read-only)"
+msgstr "モニタリング（読み取り専用）"
+
 #: src/mobile/NarrowShell.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "More"
@@ -7488,6 +7508,7 @@ msgid "Plan"
 msgstr "計画"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Plan Revision"
 msgstr "計画リビジョン"
 
@@ -9080,6 +9101,10 @@ msgstr "選択…"
 #~ msgid "Selected project"
 #~ msgstr "選択したプロジェクト"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Selects which Control Centre tool subset the \"control-centre\" MCP server exposes for this campaign project. Changes apply when Poracode next starts or reconnects to a newly launched MCP process."
+msgstr "このキャンペーンプロジェクトに対して\"control-centre\" MCPサーバーが公開するControl Centreツールサブセットを選択します。変更は、次回Poracodeが起動するか、新しく起動されたMCPプロセスに再接続したときに適用されます。"
+
 #: src/renderer/views/RemoteThreadView/RemoteThreadView.tsx
 msgid "Send"
 msgstr "送信"
@@ -10125,6 +10150,10 @@ msgstr "そのリモートセッションはすでに存在しません。"
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "the {0} WSL user"
 #~ msgstr "{0} WSL ユーザー"
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "The active remote Control Centre profile is managed by the remote server administrator. Remote servers do not support client-controlled profile reconfiguration."
+msgstr "アクティブなリモートControl Centreプロファイルは、リモートサーバー管理者によって管理されます。リモートサーバーはクライアント制御によるプロファイルの再構成をサポートしていません。"
 
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 msgid "the agent"

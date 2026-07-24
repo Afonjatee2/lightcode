@@ -2045,6 +2045,10 @@ msgstr "CLI 후크"
 msgid "Click a shortcut to record a new key, or ＋ to add another."
 msgstr "단축키를 클릭하여 새 키를 기록하거나 ＋를 눌러 추가하세요."
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Client Comms"
+msgstr "클라이언트 커뮤니케이션"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Client name"
 msgstr "클라이언트 이름"
@@ -2740,6 +2744,10 @@ msgstr "제어 센터 연결 불가"
 msgid "Control Centre is not available. You can still create a campaign workspace manually, but live campaign context will not load until the MCP connection works."
 msgstr "제어 센터를 사용할 수 없습니다. 수동으로 캠페인 작업 영역을 만들 수 있지만 MCP 연결이 작동할 때까지 라이브 캠페인 컨텍스트가 로드되지 않습니다."
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Control Centre MCP Profile"
+msgstr "Control Centre MCP 프로필"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
@@ -3429,6 +3437,10 @@ msgstr "거부"
 msgid "Deny and tell the agent what to do differently…"
 msgstr "거부하고 에이전트에게 다르게 해야 할 일을 알려주세요…"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Deployment"
+msgstr "배포"
+
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
 #~ msgstr "여러 에이전트로 실행할 작업을 설명하세요…"
@@ -3506,6 +3518,10 @@ msgstr "데브"
 #: src/mobile/views/PortsView.tsx
 msgid "Dev servers listening on your desktop's localhost."
 msgstr "데스크톱의 localhost에서 대기 중인 개발 서버입니다."
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Development"
+msgstr "개발"
 
 #: src/renderer/views/SettingsOverlay/parts/DevSettings.tsx
 msgid "Development-only overrides. Only visible in the PORACODE DEV build."
@@ -6003,6 +6019,10 @@ msgstr "모드"
 msgid "Monitoring"
 msgstr "모니터링"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Monitoring (read-only)"
+msgstr "모니터링 (읽기 전용)"
+
 #: src/mobile/NarrowShell.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "More"
@@ -7490,6 +7510,7 @@ msgid "Plan"
 msgstr "계획"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Plan Revision"
 msgstr "계획 개정"
 
@@ -9082,6 +9103,10 @@ msgstr "선택…"
 #~ msgid "Selected project"
 #~ msgstr "선택한 프로젝트"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Selects which Control Centre tool subset the \"control-centre\" MCP server exposes for this campaign project. Changes apply when Poracode next starts or reconnects to a newly launched MCP process."
+msgstr "이 캠페인 프로젝트에 대해 \"control-centre\" MCP 서버가 노출할 Control Centre 도구 하위 집합을 선택합니다. 변경 사항은 Poracode가 다음에 시작되거나 새로 시작된 MCP 프로세스에 다시 연결될 때 적용됩니다。"
+
 #: src/renderer/views/RemoteThreadView/RemoteThreadView.tsx
 msgid "Send"
 msgstr "보내기"
@@ -10127,6 +10152,10 @@ msgstr "해당 원격 세션은 이미 없어졌습니다."
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "the {0} WSL user"
 #~ msgstr "{0} WSL 사용자"
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "The active remote Control Centre profile is managed by the remote server administrator. Remote servers do not support client-controlled profile reconfiguration."
+msgstr "활성 원격 Control Centre 프로필은 원격 서버 관리자가 관리합니다. 원격 서버는 클라이언트 제어 프로필 재구성을 지원하지 않습니다。"
 
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 msgid "the agent"

@@ -2045,6 +2045,10 @@ msgstr "Haki CLI"
 msgid "Click a shortcut to record a new key, or ＋ to add another."
 msgstr "Kliknij skrót, aby zarejestrować nowy klawisz, lub ＋, aby dodać kolejny."
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Client Comms"
+msgstr "Komunikacja z klientem"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Client name"
 msgstr "Nazwa klienta"
@@ -2740,6 +2744,10 @@ msgstr "Centrum sterowania niedostępne"
 msgid "Control Centre is not available. You can still create a campaign workspace manually, but live campaign context will not load until the MCP connection works."
 msgstr "Centrum sterowania jest niedostępne. Nadal możesz ręcznie utworzyć przestrzeń roboczą kampanii, ale kontekst kampanii na żywo nie załaduje się, dopóki połączenie MCP nie będzie działać."
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Control Centre MCP Profile"
+msgstr "Profil MCP Control Centre"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
@@ -3429,6 +3437,10 @@ msgstr "Odmów"
 msgid "Deny and tell the agent what to do differently…"
 msgstr "Odmów i powiedz agentowi, co ma zrobić inaczej…"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Deployment"
+msgstr "Wdrożenie"
+
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
 #~ msgstr "Opisz zadanie, które ma wykonać wielu agentów…"
@@ -3506,6 +3518,10 @@ msgstr "Dev"
 #: src/mobile/views/PortsView.tsx
 msgid "Dev servers listening on your desktop's localhost."
 msgstr "Serwery deweloperskie nasłuchujące na localhost Twojego komputera."
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Development"
+msgstr "Programowanie"
 
 #: src/renderer/views/SettingsOverlay/parts/DevSettings.tsx
 msgid "Development-only overrides. Only visible in the PORACODE DEV build."
@@ -6003,6 +6019,10 @@ msgstr "Tryby"
 msgid "Monitoring"
 msgstr "Monitorowanie"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Monitoring (read-only)"
+msgstr "Monitorowanie (tylko do odczytu)"
+
 #: src/mobile/NarrowShell.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "More"
@@ -7490,6 +7510,7 @@ msgid "Plan"
 msgstr "Plan"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Plan Revision"
 msgstr "Rewizja planu"
 
@@ -9082,6 +9103,10 @@ msgstr "Wybierz…"
 #~ msgid "Selected project"
 #~ msgstr "Wybrany projekt"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Selects which Control Centre tool subset the \"control-centre\" MCP server exposes for this campaign project. Changes apply when Poracode next starts or reconnects to a newly launched MCP process."
+msgstr "Wybiera podzbiór narzędzi Control Centre, które serwer MCP \"control-centre\" udostępnia dla tego projektu kampanii. Zmiany zostaną zastosowane przy następnym uruchomieniu Poracode lub ponownym połączeniu z nowo uruchomionym procesem MCP."
+
 #: src/renderer/views/RemoteThreadView/RemoteThreadView.tsx
 msgid "Send"
 msgstr "Wyślij"
@@ -10127,6 +10152,10 @@ msgstr "Ta sesja zdalna już nie istnieje."
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "the {0} WSL user"
 #~ msgstr "użytkownika WSL {0}"
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "The active remote Control Centre profile is managed by the remote server administrator. Remote servers do not support client-controlled profile reconfiguration."
+msgstr "Aktywny zdalny profil Control Centre jest zarządzany przez administratora serwera zdalnego. Serwery zdalne nie obsługują rekonfiguracji profilu kontrolowanej przez klienta."
 
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 msgid "the agent"

@@ -2045,6 +2045,10 @@ msgstr "Hook CLI"
 msgid "Click a shortcut to record a new key, or ＋ to add another."
 msgstr "Nhấp vào một phím tắt để ghi lại phím mới, hoặc ＋ để thêm phím khác."
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Client Comms"
+msgstr "Liên lạc với khách hàng"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Client name"
 msgstr "Tên khách hàng"
@@ -2740,6 +2744,10 @@ msgstr "Trung tâm điều khiển không khả dụng"
 msgid "Control Centre is not available. You can still create a campaign workspace manually, but live campaign context will not load until the MCP connection works."
 msgstr "Trung tâm điều khiển không khả dụng. Bạn vẫn có thể tạo không gian làm việc chiến dịch theo cách thủ công, nhưng ngữ cảnh chiến dịch trực tiếp sẽ không tải cho đến khi kết nối MCP hoạt động."
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Control Centre MCP Profile"
+msgstr "Hồ sơ MCP Control Centre"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
@@ -3429,6 +3437,10 @@ msgstr "Từ chối"
 msgid "Deny and tell the agent what to do differently…"
 msgstr "Từ chối và cho tác nhân biết cần làm gì khác đi…"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Deployment"
+msgstr "Triển khai"
+
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
 #~ msgstr "Mô tả tác vụ cần chạy với nhiều tác nhân…"
@@ -3506,6 +3518,10 @@ msgstr "Dev"
 #: src/mobile/views/PortsView.tsx
 msgid "Dev servers listening on your desktop's localhost."
 msgstr "Máy chủ phát triển đang lắng nghe trên localhost của máy tính bạn."
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Development"
+msgstr "Phát triển"
 
 #: src/renderer/views/SettingsOverlay/parts/DevSettings.tsx
 msgid "Development-only overrides. Only visible in the PORACODE DEV build."
@@ -6003,6 +6019,10 @@ msgstr "Chế độ"
 msgid "Monitoring"
 msgstr "Giám sát"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Monitoring (read-only)"
+msgstr "Giám sát (chỉ đọc)"
+
 #: src/mobile/NarrowShell.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "More"
@@ -7490,6 +7510,7 @@ msgid "Plan"
 msgstr "kế hoạch"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Plan Revision"
 msgstr "Điều chỉnh kế hoạch"
 
@@ -9082,6 +9103,10 @@ msgstr "Chọn…"
 #~ msgid "Selected project"
 #~ msgstr "Dự án đã chọn"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Selects which Control Centre tool subset the \"control-centre\" MCP server exposes for this campaign project. Changes apply when Poracode next starts or reconnects to a newly launched MCP process."
+msgstr "Chọn tập hợp con công cụ Control Centre mà máy chủ MCP \"control-centre\" hiển thị cho dự án chiến dịch này. Các thay đổi sẽ được áp dụng khi Poracode khởi động lại lần tiếp theo hoặc kết nối lại với tiến trình MCP mới được khởi chạy."
+
 #: src/renderer/views/RemoteThreadView/RemoteThreadView.tsx
 msgid "Send"
 msgstr "Gửi"
@@ -10127,6 +10152,10 @@ msgstr "Phiên từ xa đó đã không còn."
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "the {0} WSL user"
 #~ msgstr "người dùng WSL {0}"
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "The active remote Control Centre profile is managed by the remote server administrator. Remote servers do not support client-controlled profile reconfiguration."
+msgstr "Hồ sơ Control Centre từ xa đang hoạt động được quản lý bởi quản trị viên máy chủ từ xa. Máy chủ từ xa không hỗ trợ cấu hình lại hồ sơ do máy khách kiểm soát."
 
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 msgid "the agent"

@@ -1,5 +1,10 @@
 import type { ProjectLocation, PromptSegment, TerminalSize, Thread } from "@/shared/contracts";
-import { resolveMcpLaunchSnapshot } from "@/shared/contracts";
+import {
+  applyCampaignMcpProfile,
+  getCampaignMcpProfile,
+  getProjectPurpose,
+  resolveMcpLaunchSnapshot,
+} from "@/shared/contracts";
 import { isHomeProjectId } from "@/shared/homeScope";
 import { buildPromptContentBlocks } from "@/shared/promptContent";
 import { captureThreadStarted } from "@/renderer/analytics/posthog";
@@ -55,9 +60,11 @@ export async function performInitialThreadLaunch(input: {
   }
 
   const sharedSettings = useSharedSettings.getState();
+  const project = useAppStore.getState().projects.find((item) => item.id === thread.projectId);
   const projectMcpServers =
-    useAppStore.getState().projects.find((project) => project.id === thread.projectId)
-      ?.mcpServers ?? [];
+    project && getProjectPurpose(project) === "campaign"
+      ? applyCampaignMcpProfile(project.mcpServers ?? [], getCampaignMcpProfile(project))
+      : (project?.mcpServers ?? []);
   const mcpLaunchSnapshot = resolveMcpLaunchSnapshot(sharedSettings, projectMcpServers);
   // Record which custom servers this session launches with so the active
   // composer's MCP menu can show the run's actual bindings (settings may
