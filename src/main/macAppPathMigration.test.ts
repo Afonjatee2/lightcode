@@ -23,7 +23,7 @@ describe("repairLegacyMacAppPath", () => {
   }
 
   it("restores the legacy Nightly path as a relative symlink", () => {
-    const executablePath = packagedExecutable("Poracode Nightly.app");
+    const executablePath = packagedExecutable("Tee's Cockpit Nightly.app");
 
     expect(
       repairLegacyMacAppPath("nightly", {
@@ -33,13 +33,15 @@ describe("repairLegacyMacAppPath", () => {
       }),
     ).toBe("created");
 
-    const legacyPath = join(root, "Lightcode Nightly.app");
-    expect(lstatSync(legacyPath).isSymbolicLink()).toBe(true);
-    expect(readlinkSync(legacyPath)).toBe("Poracode Nightly.app");
+    for (const legacyName of ["Poracode Nightly.app", "Lightcode Nightly.app"]) {
+      const legacyPath = join(root, legacyName);
+      expect(lstatSync(legacyPath).isSymbolicLink()).toBe(true);
+      expect(readlinkSync(legacyPath)).toBe("Tee's Cockpit Nightly.app");
+    }
   });
 
   it("restores the legacy Stable path", () => {
-    const executablePath = packagedExecutable("Poracode.app");
+    const executablePath = packagedExecutable("Tee's Cockpit.app");
 
     expect(
       repairLegacyMacAppPath("stable", {
@@ -48,11 +50,12 @@ describe("repairLegacyMacAppPath", () => {
         executablePath,
       }),
     ).toBe("created");
-    expect(readlinkSync(join(root, "Lightcode.app"))).toBe("Poracode.app");
+    expect(readlinkSync(join(root, "Poracode.app"))).toBe("Tee's Cockpit.app");
+    expect(readlinkSync(join(root, "Lightcode.app"))).toBe("Tee's Cockpit.app");
   });
 
   it("never replaces an existing legacy app", () => {
-    const executablePath = packagedExecutable("Poracode Nightly.app");
+    const executablePath = packagedExecutable("Tee's Cockpit Nightly.app");
     const legacyPath = join(root, "Lightcode Nightly.app");
     mkdirSync(legacyPath);
 
@@ -62,12 +65,13 @@ describe("repairLegacyMacAppPath", () => {
         isPackaged: true,
         executablePath,
       }),
-    ).toBe("skipped");
+    ).toBe("created");
     expect(lstatSync(legacyPath).isDirectory()).toBe(true);
+    expect(readlinkSync(join(root, "Poracode Nightly.app"))).toBe("Tee's Cockpit Nightly.app");
   });
 
   it("skips unpackaged, non-macOS, and unexpectedly named bundles", () => {
-    const executablePath = packagedExecutable("Poracode Nightly.app");
+    const executablePath = packagedExecutable("Tee's Cockpit Nightly.app");
     const otherExecutablePath = packagedExecutable("Renamed.app");
 
     expect(

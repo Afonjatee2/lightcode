@@ -119,7 +119,7 @@ function makeAgentStatus(overrides: Partial<AgentStatus> = {}): AgentStatus {
 
 const draftProject: Project = {
   id: "project-1",
-  name: "Poracode",
+  name: "Tee's Cockpit",
   location: { kind: "posix", path: "/tmp/poracode" },
   createdAt: new Date().toISOString(),
 };
@@ -320,7 +320,7 @@ describe("ThreadSlashCommands", () => {
     expect(screen.getByText("/help")).toBeInTheDocument();
   });
 
-  it("shows Poracode Codex server commands instead of CLI commands in GUI chat composer", async () => {
+  it("shows Tee's Cockpit Codex server commands instead of CLI commands in GUI chat composer", async () => {
     const baseCapabilities = makeAgentStatus().capabilities;
     await renderThread(
       makeThread({
@@ -357,7 +357,7 @@ describe("ThreadSlashCommands", () => {
     expect(screen.queryByText("/status")).not.toBeInTheDocument();
   });
 
-  it("shows Poracode Codex server commands instead of CLI commands in GUI draft composer", async () => {
+  it("shows Tee's Cockpit Codex server commands instead of CLI commands in GUI draft composer", async () => {
     const baseCapabilities = makeAgentStatus().capabilities;
     await renderDraftComposer(
       makeAgentStatus({
@@ -500,7 +500,7 @@ describe("ThreadSlashCommands", () => {
             skillName: "skill-creator",
             skillPath: "/bundled/skill-creator/SKILL.md",
             skillInvocation: "Use the skill-creator skill.",
-            skillProvider: "Poracode built-ins",
+            skillProvider: "Tee's Cockpit built-ins",
             skillScope: "global",
           },
         ],
@@ -511,7 +511,7 @@ describe("ThreadSlashCommands", () => {
         name: "skill-creator",
         path: "/bundled/skill-creator/SKILL.md",
         invocation: "Use the skill-creator skill.",
-        provider: "Poracode built-ins",
+        provider: "Tee's Cockpit built-ins",
         scope: "global",
       },
       { kind: "text", content: " Create a new managed skill." },
@@ -542,7 +542,7 @@ describe("ThreadSlashCommands", () => {
           skillName: "skill-creator",
           skillPath: "/bundled/skill-creator/SKILL.md",
           skillInvocation: "/skill-creator",
-          skillProvider: "Poracode built-ins",
+          skillProvider: "Tee's Cockpit built-ins",
           skillScope: "global",
         },
       ]),

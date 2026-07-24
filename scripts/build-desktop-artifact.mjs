@@ -520,8 +520,8 @@ function buildElectronBuilderConfig(macArtifactKind = "branded") {
   ).join("\n");
 
   return `appId: ${appId}
-productName: ${productName}
-copyright: Copyright (C) 2026 Poracode
+productName: ${JSON.stringify(productName)}
+copyright: Copyright (C) 2026 Tee's Cockpit
 
 directories:
   output: release
@@ -603,7 +603,7 @@ linux:
   artifactName: ${prefix}-\${version}-\${arch}.\${ext}
 
 mac:
-  executableName: ${macExecutableName}
+  executableName: ${JSON.stringify(macExecutableName)}
   target:
     - target: dmg
       arch:
@@ -619,7 +619,7 @@ mac:
   hardenedRuntime: true
   gatekeeperAssess: false
   extendInfo:
-    NSMicrophoneUsageDescription: Poracode uses the microphone for local voice input in the composer.
+    NSMicrophoneUsageDescription: Tee's Cockpit uses the microphone for local voice input in the composer.
   entitlements: ${macEntitlements}
   entitlementsInherit: ${macEntitlementsInherit}
   notarize: true

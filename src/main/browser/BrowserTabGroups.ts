@@ -2,7 +2,7 @@ import { threadGroupColor } from "@/shared/browserMcpThread";
 import { browserTabGroupSchema, type BrowserTabGroupInfo } from "@/shared/ipc";
 
 const AGENT_GROUP_ID = "group-agent";
-const AGENT_GROUP_TITLE = "Poracode";
+const AGENT_GROUP_TITLE = "Tee's Cockpit";
 const AGENT_GROUP_COLOR = "purple" as const;
 
 interface GroupableTab {

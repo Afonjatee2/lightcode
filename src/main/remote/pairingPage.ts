@@ -22,7 +22,7 @@ function buildDarkPageShell(input: {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#070709" />
-  <title>Poracode</title>${input.headExtra ?? ""}
+  <title>Tee's Cockpit</title>${input.headExtra ?? ""}
   <style>
 ${input.css}
   </style>
@@ -107,8 +107,8 @@ export function buildLocalPairingPageHtml(input: { readonly httpBaseUrl: string 
     }`,
     body: `  <div class="app">
     <main>
-      <h1>Poracode</h1>
-      <p>The mobile web app bundle is not available from this desktop build. Rebuild Poracode so <span class="inline-code">mobile.html</span> is included in the renderer output, then open the pairing link again.</p>
+      <h1>Tee's Cockpit</h1>
+      <p>The mobile web app bundle is not available from this desktop build. Rebuild Tee's Cockpit so <span class="inline-code">mobile.html</span> is included in the renderer output, then open the pairing link again.</p>
       <p>Desktop endpoint</p>
       <code class="endpoint" id="endpoint"></code>
     </main>
@@ -167,8 +167,8 @@ export function buildForwardEnterErrorPageHtml(): string {
 
 const LOCAL_PAIRING_MANIFEST_JSON = JSON.stringify({
   id: "/app",
-  name: "Poracode",
-  short_name: "Poracode",
+  name: "Tee's Cockpit",
+  short_name: "Cockpit",
   start_url: "/app",
   scope: "/",
   display: "standalone",
@@ -348,12 +348,10 @@ export function buildLocalPairingServiceWorkerJs(appVersion: string): string {
 }
 
 // Kept in sync with public/app-icon.svg (the static/standalone icon).
-const LOCAL_PAIRING_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Poracode">
+const LOCAL_PAIRING_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Tee's Cockpit">
   <rect width="1024" height="1024" rx="232" fill="#0E0E14"/>
-  <path fill-rule="evenodd" fill="#EAF0FB"
-    d="M352,300 H556 A152,152 0 0 1 556,604 H472 V730 H352 Z
-       M472,392 H548 A60,60 0 0 1 548,512 H472 Z"/>
-  <circle cx="636" cy="694" r="46" fill="#8B7BFF"/>
+  <path fill="#EAF0FB" d="M286,300 H738 V414 H570 V730 H454 V414 H286 Z"/>
+  <circle cx="670" cy="684" r="46" fill="#8B7BFF"/>
 </svg>
 `;
 

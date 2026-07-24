@@ -199,8 +199,8 @@ export function AboutSettings() {
               title={t`Import Lightcode data`}
               description={
                 <Trans>
-                  Copy all Lightcode data into Poracode. Poracode restarts and keeps a complete
-                  backup of its current data.
+                  Copy all Lightcode data into Tee's Cockpit. Tee's Cockpit restarts and keeps a
+                  complete backup of its current data.
                 </Trans>
               }
             >
@@ -247,8 +247,8 @@ export function AboutSettings() {
         title={t`Import Lightcode data again?`}
         body={
           <Trans>
-            Poracode will restart, back up its current data, and replace it with a complete copy of
-            your Lightcode data.
+            Tee's Cockpit will restart, back up its current data, and replace it with a complete
+            copy of your Lightcode data.
           </Trans>
         }
         confirmLabel={t`Import and restart`}

@@ -263,7 +263,7 @@ describe("McpServersManager", () => {
     await waitFor(() => {
       expect(screen.getByRole("status")).toHaveTextContent("Authentication required");
       expect(screen.getByRole("status")).toHaveTextContent(
-        "This server requires authentication before Poracode can check it.",
+        "This server requires authentication before Tee's Cockpit can check it.",
       );
     });
     expect(screen.queryByText("0 tools")).not.toBeInTheDocument();
