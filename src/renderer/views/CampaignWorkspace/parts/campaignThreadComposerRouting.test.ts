@@ -69,6 +69,11 @@ describe("routeCampaignComposerMessage", () => {
     expect(routeCampaignComposerMessage("   ", "codex")).toEqual({ kind: "empty" });
   });
 
+  it("rejects an unknown @mention instead of wrapping it", () => {
+    const result = routeCampaignComposerMessage("@nosuchagent hello", "codex");
+    expect(result.kind).toBe("parse_error");
+  });
+
   it("returns a parse error when the mention is malformed", () => {
     const result = routeCampaignComposerMessage("@codex", "codex");
     expect(result).toMatchObject({

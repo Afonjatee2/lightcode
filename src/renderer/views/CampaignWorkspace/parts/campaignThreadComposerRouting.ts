@@ -34,6 +34,12 @@ export function routeCampaignComposerMessage(
     return { kind: "consultation", message: trimmed };
   }
   if (parsed.code === "unknown_mention") {
+    // Plain prose falls back to the thread's default provider, but text that
+    // *starts* with an @word is a mistyped mention — surface it instead of
+    // launching a consultation doomed to fail on a nonexistent agent.
+    if (trimmed.startsWith("@")) {
+      return { kind: "parse_error", message: parsed.message };
+    }
     return { kind: "consultation", message: `@${defaultProvider} ${trimmed}` };
   }
   return { kind: "parse_error", message: parsed.message };
