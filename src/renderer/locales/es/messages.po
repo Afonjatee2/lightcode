@@ -17,6 +17,10 @@ msgstr ""
 msgid "-y @modelcontextprotocol/server-memory"
 msgstr "-y @modelcontextprotocol/server-memory"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "(coming in Phase 4)"
+msgstr "(próximamente en la Fase 4)"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "(Draft)"
 msgstr "(Borrador)"
@@ -129,6 +133,11 @@ msgstr "{0} ({envName}) actualizado a v{newVersion}."
 msgid "{0} ({envName}) updated."
 msgstr "{0} ({envName}) actualizado."
 
+#. placeholder {0}: context.activeDecisions.length
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "{0} active decisions"
+msgstr "{0} decisiones activas"
+
 #. placeholder {0}: days.map((day) => weekdayNames[day]).join(", ")
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "{0} at {time}"
@@ -211,6 +220,11 @@ msgstr "{0} necesita una entrada."
 msgid "{0} of {matchCount}"
 msgstr "{0} de {matchCount}"
 
+#. placeholder {0}: context.pendingProposals.length
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "{0} pending proposals"
+msgstr "{0} propuestas pendientes"
+
 #. placeholder {0}: cell.count
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "{0} prompt - {when}"
@@ -221,6 +235,11 @@ msgstr "{0} prompt - {when}"
 msgid "{0} prompts - {when}"
 msgstr "{0} prompts - {when}"
 
+#. placeholder {0}: formatMoney(budget.remaining, budget.currency)
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "{0} remaining"
+msgstr "{0} restantes"
+
 #. placeholder {0}: item.runCount.toLocaleString()
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
 msgid "{0} run"
@@ -230,6 +249,11 @@ msgstr "{0} ejecución"
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
 msgid "{0} runs"
 msgstr "{0} ejecuciones"
+
+#. placeholder {0}: evidenceFreshness.staleSourceCount
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "{0} stale data source(s)"
+msgstr "{0} fuente(s) de datos obsoleta(s)"
 
 #. placeholder {0}: threads.length
 #: src/mobile/views/ThreadsView.tsx
@@ -282,6 +306,12 @@ msgstr "{0} usados"
 #: src/renderer/components/skills/SkillImportModal.tsx
 msgid "{0}: {stateLabel}"
 msgstr "{0}: {stateLabel}"
+
+#. placeholder {0}: context.pacing.variancePct > 0 ? "+" : ""
+#. placeholder {1}: context.pacing.variancePct
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "{0}{1}% vs expected"
+msgstr "{0}{1}% vs esperado"
 
 #. placeholder {0}: selectedRows.length
 #. placeholder {0}: selectedSkills.length
@@ -340,6 +370,10 @@ msgstr "hace {days}d"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
 msgid "{envOrAgentLabel} needs authentication."
 msgstr "{envOrAgentLabel} necesita autenticación."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "{failedCount} data sources have failed to sync"
+msgstr "{failedCount} fuentes de datos no se han podido sincronizar"
 
 #: src/mobile/views/pr/PrOverviewPage.tsx
 msgid "{filesCount, plural, one {# file changed} other {# files changed}}"
@@ -484,6 +518,10 @@ msgstr "hace {seconds}s"
 msgid "{serverName} from {providerLabel}: {disabledLabel}"
 msgstr "{serverName} de {providerLabel}: {disabledLabel}"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "{staleCount} data sources have stale data"
+msgstr "{staleCount} fuentes de datos tienen datos obsoletos"
+
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "{used} tokens"
 msgstr "{used} tokens"
@@ -504,6 +542,14 @@ msgstr "{usedLabel} tokens"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/ModelVisibilityDropdown.tsx
 msgid "{visibleCount} of {totalCount} visible"
 msgstr "{visibleCount} de {totalCount} visibles"
+
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "@codex check the budget pacing"
+msgstr "@codex verificar el ritmo del presupuesto"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "@media-plans"
+msgstr "@media-plans"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "/absolute/path/to/project"
@@ -552,6 +598,11 @@ msgstr "30d"
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
 msgid "7d"
 msgstr "7d"
+
+#. placeholder {0}: existingProject.name
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "A campaign workspace for \"{0}\" already exists with this campaign group ID. Opening it will switch to the existing workspace."
+msgstr "Ya existe un espacio de trabajo de campaña para \"{0}\" con este ID de grupo de campaña. Al abrirlo se cambiará al espacio de trabajo existente."
 
 #: src/renderer/actions/experimentDecisionActions.ts
 #: src/renderer/actions/experimentWorktreeActions.ts
@@ -603,6 +654,10 @@ msgstr "Opciones de cuenta"
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
 msgid "Accounts"
 msgstr "Cuentas"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Acme Corp"
+msgstr "Acme S.A."
 
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
@@ -721,6 +776,10 @@ msgstr "Agregar una tarea…"
 msgid "Add action"
 msgstr "Agregar acción"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Add Alias"
+msgstr "Añadir alias"
+
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Add an existing folder"
 msgstr "Añadir una carpeta existente"
@@ -814,6 +873,10 @@ msgstr "Agregar a favoritos"
 msgid "Add to Home Screen"
 msgstr "Agregar a la pantalla de inicio"
 
+#: src/renderer/views/MainView/parts/CampaignModeGate.tsx
+msgid "Advanced Mode (Code)"
+msgstr "Modo avanzado (Código)"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Advertise a custom base URL, e.g. a reverse proxy or tunnel. Leave empty for automatic."
 msgstr "Anuncia una URL base personalizada, por ejemplo un proxy inverso o un túnel. Déjalo vacío para que sea automático."
@@ -888,6 +951,10 @@ msgstr "Agentes"
 msgid "Agents · General"
 msgstr "Agentes · General"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Aggregated findings:"
+msgstr "Hallazgos agregados:"
+
 #. Settings section: AI / assistant configuration
 #. Settings section: AI / assistant configuration
 #: src/mobile/settingsSections.ts
@@ -950,6 +1017,10 @@ msgstr "Todos los dispositivos"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "All efforts"
 msgstr "Todos los niveles de esfuerzo"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "All failed"
+msgstr "Todos fallaron"
 
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 #: src/renderer/views/PrReviewOverlay/PrReviewOverlay.tsx
@@ -1293,6 +1364,10 @@ msgstr "Color del avatar {color}"
 msgid "Back"
 msgstr "Atrás"
 
+#: src/renderer/views/MainView/parts/CampaignModeGate.tsx
+msgid "Back to Campaign"
+msgstr "Volver a la campaña"
+
 #: src/mobile/views/GitView.tsx
 msgid "Back to changes"
 msgstr "Volver a cambios"
@@ -1512,6 +1587,10 @@ msgstr "Inicio de sesión en el navegador"
 msgid "Browser tabs"
 msgstr "Pestañas del navegador"
 
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Budget data not available"
+msgstr "Datos de presupuesto no disponibles"
+
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Budget limit reached"
 msgstr "Límite de presupuesto alcanzado"
@@ -1572,6 +1651,39 @@ msgstr "Solo en caché"
 msgid "Camera access blocked"
 msgstr "Acceso a la cámara bloqueado"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Campaign Context"
+msgstr "Contexto de campaña"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Campaign group ID"
+msgstr "ID del grupo de campaña"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Campaign Group ID"
+msgstr "ID del grupo de campaña"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Campaign name"
+msgstr "Nombre de la campaña"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Campaign Name"
+msgstr "Nombre de la campaña"
+
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Campaign plan not available"
+msgstr "Plan de campaña no disponible"
+
+#. placeholder {0}: input.name.trim()
+#: src/renderer/actions/campaignProjectActions.ts
+msgid "Campaign workspace \"{0}\" created."
+msgstr "Espacio de trabajo de campaña \"{0}\" creado."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
+msgid "Campaigns"
+msgstr "Campañas"
+
 #: src/mobile/views/PortsView.tsx
 msgid "Can't load ports"
 msgstr "No se pudieron cargar los puertos"
@@ -1581,6 +1693,7 @@ msgstr "No se pudieron cargar los puertos"
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/components/common/ConfirmDialog.tsx
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
@@ -1596,6 +1709,7 @@ msgstr "No se pudieron cargar los puertos"
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppOverlays.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectModal.tsx
 #: src/renderer/views/MainView/parts/PullFromSourceDialog.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/DeleteWorktreeDialog.tsx
@@ -1612,6 +1726,10 @@ msgstr "Cancelar"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Cancel new Claude profile"
 msgstr "Cancelar nuevo perfil de Claude"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Cancel panel"
+msgstr "Cancelar panel"
 
 #: src/renderer/components/thread/ThreadPendingSteerStrip.tsx
 msgid "Cancel pending steer"
@@ -1698,6 +1816,10 @@ msgstr "Cambios no disponibles"
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Channel"
 msgstr "Canal"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Channels"
+msgstr "Canales"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
@@ -1922,6 +2044,22 @@ msgstr "Hooks de CLI"
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Click a shortcut to record a new key, or ＋ to add another."
 msgstr "Haz clic en un atajo para registrar una nueva tecla, o en ＋ para añadir otro."
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Client Comms"
+msgstr "Comunicaciones con el cliente"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Client name"
+msgstr "Nombre del cliente"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Client Name"
+msgstr "Nombre del cliente"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Client Update"
+msgstr "Actualización del cliente"
 
 #: src/mobile/views/ManageProjectsView.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
@@ -2308,6 +2446,11 @@ msgstr "Compara esta huella digital con la que aparece en tu servidor."
 #~ msgid "Comparing candidates…"
 #~ msgstr "Comparando candidatos…"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "complete"
+msgstr "completado"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Complete"
 msgstr "Completado"
@@ -2348,6 +2491,11 @@ msgstr "completado"
 #: src/renderer/utils/prStatus.ts
 msgid "Completed"
 msgstr "Completado"
+
+#. placeholder {0}: completedAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Completed {0}"
+msgstr "Completado {0}"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
@@ -2499,6 +2647,26 @@ msgstr "Conexiones"
 msgid "Console"
 msgstr "Consola"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Consult"
+msgstr "Consultar"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation complete"
+msgstr "Consulta completada"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation failed"
+msgstr "La consulta falló"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation was cancelled"
+msgstr "La consulta fue cancelada"
+
+#: src/renderer/components/consultations/ConsultationDock.tsx
+msgid "Consultations"
+msgstr "Consultas"
+
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Contains sensitive values; add manually"
 msgstr "Contiene valores confidenciales; añádelo manualmente"
@@ -2559,6 +2727,31 @@ msgstr "Continuar en..."
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control an external Chrome browser."
 msgstr "Controla un navegador Chrome externo."
+
+#: src/renderer/hooks/useControlCentreTool.ts
+msgid "Control Centre \"{toolName}\" returned a response that was too large or malformed. Try refreshing."
+msgstr "Centro de control \"{toolName}\" devolvió una respuesta demasiado grande o mal formada. Intente actualizar."
+
+#: src/renderer/hooks/useControlCentreTool.ts
+msgid "Control Centre \"{toolName}\" returned a response this version of Poracode doesn't understand."
+msgstr "Centro de control \"{toolName}\" devolvió una respuesta que esta versión de Poracode no entiende."
+
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Control Centre connection unavailable"
+msgstr "Centro de Control no disponible"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Control Centre is not available. You can still create a campaign workspace manually, but live campaign context will not load until the MCP connection works."
+msgstr "El Centro de control no está disponible. Aún puede crear un espacio de trabajo de campaña manualmente, pero el contexto de campaña en vivo no se cargará hasta que la conexión MCP funcione."
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Control Centre MCP Profile"
+msgstr "Perfil MCP de Control Centre"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
+msgid "Control Centre needs authorization. Reconnect it in MCP settings."
+msgstr "El Centro de control necesita autorización. Vuelva a conectarlo en la configuración de MCP."
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control the desktop."
@@ -2688,6 +2881,18 @@ msgstr "No se pudo abortar la fusión: {detail}"
 msgid "Could not complete the merge"
 msgstr "No se pudo completar la fusión"
 
+#: src/renderer/actions/campaignProjectActions.ts
+msgid "Could not create a thread for the existing campaign workspace."
+msgstr "No se pudo crear un hilo para el espacio de trabajo de campaña existente."
+
+#: src/renderer/actions/campaignProjectActions.ts
+msgid "Could not create the campaign workspace directory."
+msgstr "No se pudo crear el directorio del espacio de trabajo de campaña."
+
+#: src/renderer/actions/campaignProjectActions.ts
+msgid "Could not create the campaign workspace thread."
+msgstr "No se pudo crear el hilo del espacio de trabajo de campaña."
+
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Could not extract context."
@@ -2706,9 +2911,21 @@ msgstr "No se pudieron cargar las pull requests de {0}."
 #~ msgid "Could not open this PDF."
 #~ msgstr "No se pudo abrir este PDF."
 
+#: src/renderer/hooks/useControlCentreTool.ts
+msgid "Could not reach the MCP runtime."
+msgstr "No se pudo contactar con el entorno de ejecución MCP."
+
 #: src/renderer/components/thread/ChatPane/parts/items/useReadAbsoluteFile.tsx
 msgid "Could not read file."
 msgstr "No se pudo leer el archivo."
+
+#: src/renderer/actions/campaignProjectActions.ts
+msgid "Could not save the campaign project."
+msgstr "No se pudo guardar el proyecto de campaña."
+
+#: src/renderer/actions/campaignProjectActions.ts
+msgid "Could not save the campaign workspace thread."
+msgstr "No se pudo guardar el hilo del espacio de trabajo de campaña."
 
 #: src/renderer/components/mcp/useMcpServerOauth.ts
 msgid "Could not sign in to {serverName}: {message}"
@@ -2808,6 +3025,10 @@ msgstr "Crear una pull request para el candidato {0} ({label})"
 msgid "Create a useful routine with one click, then adjust it anytime."
 msgstr "Crea una rutina útil con un clic y ajústala cuando quieras."
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Create Campaign Workspace"
+msgstr "Crear espacio de trabajo de campaña"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CreatePrModal.tsx
 msgid "Create Draft PR"
 msgstr "Crear PR en borrador"
@@ -2875,9 +3096,18 @@ msgstr "Crear con un agente"
 #~ msgid "Create:"
 #~ msgstr "Crear:"
 
+#. placeholder {0}: createdAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Created {0}"
+msgstr "Creado {0}"
+
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
 msgid "Created a worktree on \"{newBranch}\", but the changes conflicted and remain in a git stash — resolve them in the worktree."
 msgstr "Se creó un worktree en \"{newBranch}\", pero los cambios entraron en conflicto y permanecen en un stash de git: resuélvelos en el worktree."
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Creating…"
+msgstr "Creando…"
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "Credentials are configured."
@@ -3014,9 +3244,17 @@ msgstr "Resumen diario"
 msgid "Dark"
 msgstr "Oscuro"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Dates"
+msgstr "Fechas"
+
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #~ msgid "Days"
 #~ msgstr "Días"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Decisions & Proposals"
+msgstr "Decisiones y propuestas"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 msgid "Decline"
@@ -3030,6 +3268,14 @@ msgstr "DeepSeek"
 msgid "Default"
 msgstr "Predeterminado"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Default agent"
+msgstr "Agente predeterminado"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Default Agent"
+msgstr "Agente predeterminado"
+
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
 msgid "Default auto-refresh (minutes)"
@@ -3039,6 +3285,14 @@ msgstr "Actualización automática predeterminada (minutos)"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Default Create PR action"
 msgstr "Acción de crear PR predeterminada"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Default model"
+msgstr "Modelo predeterminado"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Default Model"
+msgstr "Modelo predeterminado"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -3183,6 +3437,10 @@ msgstr "Denegar"
 msgid "Deny and tell the agent what to do differently…"
 msgstr "Denegar y decirle al agente qué hacer de otra manera…"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Deployment"
+msgstr "Despliegue"
+
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
 #~ msgstr "Describe la tarea que se ejecutará con varios agentes…"
@@ -3260,6 +3518,10 @@ msgstr "Desarrollo"
 #: src/mobile/views/PortsView.tsx
 msgid "Dev servers listening on your desktop's localhost."
 msgstr "Servidores de desarrollo escuchando en el localhost de tu escritorio."
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Development"
+msgstr "Desarrollo"
 
 #: src/renderer/views/SettingsOverlay/parts/DevSettings.tsx
 msgid "Development-only overrides. Only visible in the PORACODE DEV build."
@@ -3435,6 +3697,7 @@ msgstr "No volver a preguntar"
 msgid "Don't show hook install proposal"
 msgstr "No mostrar la propuesta de instalación de hooks"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "done"
@@ -3503,6 +3766,18 @@ msgstr "Descarta los envoltorios de hook entrantes en el supervisor para que los
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Duplicate server name in scan"
 msgstr "Nombre de servidor duplicado en el análisis"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "e.g. cg-abc-123"
+msgstr "p. ej. cg-abc-123"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "e.g. claude-sonnet-4"
+msgstr "p. ej. claude-sonnet-4"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "e.g. claude, codex, gemini"
+msgstr "p. ej. claude, codex, gemini"
 
 #: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
 msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk refactors, Claude Opus for anything subtle."
@@ -3729,6 +4004,10 @@ msgstr "Variables de entorno"
 msgid "Environment variables (optional)"
 msgstr "Variables de entorno (opcionales)"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "EOC Report"
+msgstr "Informe EOC"
+
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ToolCall.tsx
@@ -3774,6 +4053,20 @@ msgstr "Cada hora"
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Every hour at {0} minutes past"
 msgstr "Cada hora, a los {0} minutos"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Evidence freshness"
+msgstr "Actualidad de la evidencia"
+
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Evidence freshness unknown"
+msgstr "Actualidad de la evidencia desconocida"
+
+#. placeholder {0}: oldest.toLocaleDateString()
+#. placeholder {1}: newest.toLocaleDateString()
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Evidence from {0} to {1}"
+msgstr "Evidencia del {0} al {1}"
 
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -3941,6 +4234,7 @@ msgstr "Extrayendo contexto de {0}..."
 msgid "Factory Droid"
 msgstr "Factory Droid"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 #: src/renderer/views/LoginTerminalOverlay/LoginTerminalOverlay.tsx
 msgid "failed"
@@ -4089,6 +4383,10 @@ msgstr "Filtrar skills por estado"
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Filters"
 msgstr "Filtros"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Finalise"
+msgstr "Finalizar"
 
 #: src/renderer/commands/registry.ts
 #: src/renderer/components/find/FindBar.tsx
@@ -4328,6 +4626,7 @@ msgstr "Gemini"
 
 #: src/mobile/settingsSections.ts
 #: src/renderer/commands/shortcutCatalog.ts
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
@@ -4745,6 +5044,11 @@ msgstr "Se importó 1 skill."
 msgid "Improved"
 msgstr "Mejorado"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "In progress"
+msgstr "En progreso"
+
 #: src/mobile/QrScanner.tsx
 msgid "In-app camera scanning only works over HTTPS. Use your phone's camera app to scan the desktop QR code, or enter the endpoint and token below."
 msgstr "El escaneo con cámara dentro de la app solo funciona con HTTPS. Usa la app de cámara del teléfono para escanear el código QR del escritorio, o introduce el endpoint y el token abajo."
@@ -4906,6 +5210,14 @@ msgstr "Interrumpido: la sesión del agente terminó antes de completarse."
 msgid "Italic"
 msgstr "Cursiva"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Job number"
+msgstr "Número de trabajo"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Job Number"
+msgstr "Número de trabajo"
+
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "JSON"
 msgstr "JSON"
@@ -4940,6 +5252,10 @@ msgstr "Mantener Poracode en la bandeja del sistema cuando se inicie automática
 msgid "Keep the system awake while any thread is actively working."
 msgstr "Mantener el sistema activo mientras cualquier hilo esté trabajando."
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Key findings:"
+msgstr "Hallazgos clave:"
+
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Kill bash"
 msgstr "Detener bash"
@@ -4959,6 +5275,10 @@ msgstr "Kimi Code no pudo actualizar sus credenciales porque otro proceso está 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Kimi Code ended the turn without returning a response. Restart the thread and try again."
 msgstr "Kimi Code finalizó el turno sin devolver una respuesta. Reinicia el hilo y vuelve a intentarlo."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "KPI Health"
+msgstr "Estado de KPI"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -5081,6 +5401,14 @@ msgstr "Cargando"
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "Loading accounts…"
 msgstr "Cargando cuentas…"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Loading campaign context…"
+msgstr "Cargando contexto de campaña…"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
+msgid "Loading campaigns…"
+msgstr "Cargando campañas…"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/parts/SingleFileDiff.tsx
 msgid "Loading diff..."
@@ -5372,6 +5700,10 @@ msgstr "Maximizar navegador"
 #~ msgid "MCP Market"
 #~ msgstr "MCP Market"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "MCP Profile"
+msgstr "Perfil MCP"
+
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
 msgid "MCP server"
@@ -5555,6 +5887,10 @@ msgstr "La fusión está bloqueada"
 msgid "Message actions"
 msgstr "Acciones del mensaje"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Message composer"
+msgstr "Compositor de mensajes"
+
 #: src/renderer/views/RemoteThreadView/RemoteThreadView.tsx
 msgid "Message the remote agent…"
 msgstr "Escribe al agente remoto…"
@@ -5618,6 +5954,10 @@ msgstr "Pestaña del navegador del escritorio duplicada"
 msgid "Mirroring is unavailable."
 msgstr "La duplicación no está disponible."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Missing Data"
+msgstr "Datos faltantes"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Mobile push notifications"
 msgstr "Notificaciones push móviles"
@@ -5626,6 +5966,10 @@ msgstr "Notificaciones push móviles"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Mode"
 msgstr "Modo"
+
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Mode:"
+msgstr "Modo:"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Model"
@@ -5670,6 +6014,14 @@ msgstr "Modelos"
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
 msgid "Modes"
 msgstr "Modos"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Monitoring"
+msgstr "Monitorización"
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Monitoring (read-only)"
+msgstr "Monitorización (solo lectura)"
 
 #: src/mobile/NarrowShell.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
@@ -5839,6 +6191,10 @@ msgstr "Nuevo nombre de acción"
 #: src/renderer/components/common/BranchSelector/parts/BranchFooterActions.tsx
 msgid "New branch name..."
 msgstr "Nombre de la nueva rama..."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
+msgid "New Campaign Project"
+msgstr "Nuevo proyecto de campaña"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "New Claude profile config directory"
@@ -6047,6 +6403,10 @@ msgstr "No se encontraron ramas"
 msgid "No browser tab open"
 msgstr "No hay pestañas de navegador abiertas"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "No budget configured"
+msgstr "Sin presupuesto configurado"
+
 #: src/mobile/QrScanner.tsx
 msgid "No camera found"
 msgstr "No se encontró cámara"
@@ -6067,6 +6427,10 @@ msgstr "No hay cambios para mostrar"
 msgid "No changes yet"
 msgstr "Aún no hay cambios"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "No channel executions."
+msgstr "Sin ejecuciones de canal."
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrChecksTab.tsx
 msgid "No checks reported for this PR."
@@ -6084,6 +6448,10 @@ msgstr "No se encontraron commits."
 msgid "No configured MCP servers yet"
 msgstr "Aún no hay servidores MCP configurados"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "No connected sources reported."
+msgstr "No se informaron fuentes conectadas."
+
 #: src/mobile/WideShell.tsx
 msgid "No connection paired"
 msgstr "Ninguna conexión emparejada"
@@ -6096,9 +6464,17 @@ msgstr "Aún no hay conexiones"
 msgid "No content streams."
 msgstr "No hay flujos de contenido."
 
+#: src/renderer/hooks/useControlCentreTool.ts
+msgid "No Control Centre MCP server is configured for this project."
+msgstr "No hay un servidor MCP de Centro de control configurado para este proyecto."
+
 #: src/renderer/views/PrReviewOverlay/parts/PrConversationTab.tsx
 msgid "No conversation yet. Be the first to comment."
 msgstr "Aún no hay conversación. Sé el primero en comentar."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "No data sources connected"
+msgstr "Sin fuentes de datos conectadas"
 
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/providers/usageFormat.ts
@@ -6162,9 +6538,21 @@ msgstr "Aún no hay historial"
 #~ msgid "No installed agents with selectable models are available for this project."
 #~ msgstr "No hay agentes instalados con modelos seleccionables disponibles para este proyecto."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "No KPI targets set"
+msgstr "Sin objetivos de KPI establecidos"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "No KPI targets set."
+msgstr "Sin objetivos de KPI establecidos."
+
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "No Lightcode data was found."
 msgstr "No se encontraron datos de Lightcode."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
+msgid "No live campaigns in Control Centre."
+msgstr "No hay campañas activas en el Centro de control."
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "No marketplace skills match these filters."
@@ -6229,6 +6617,10 @@ msgstr "No se encontró micrófono."
 msgid "No models found"
 msgstr "No se encontraron modelos"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "No open alerts."
+msgstr "Sin alertas abiertas."
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No other agents installed"
 msgstr "No hay otros agentes instalados"
@@ -6277,6 +6669,10 @@ msgstr "Aún no hay proveedores listos"
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "No pull requests found."
 msgstr "No se encontraron pull requests."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "No recent events."
+msgstr "Sin eventos recientes."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
 msgid "No remote configured. Add a remote to enable push and pull."
@@ -6544,6 +6940,10 @@ msgstr "Abrir un terminal"
 msgid "Open a thread first to attach to it."
 msgstr "Abre primero un hilo para adjuntarlo."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Open Alerts"
+msgstr "Alertas abiertas"
+
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ExperimentGroupHeader.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
@@ -6785,6 +7185,11 @@ msgstr "OpenCode"
 msgid "Opened {0} (#{1})"
 msgstr "Abierto {0} (n.º {1})"
 
+#. placeholder {0}: existing.name
+#: src/renderer/actions/campaignProjectActions.ts
+msgid "Opened existing campaign workspace \"{0}\"."
+msgstr "Se abrió el espacio de trabajo de campaña existente \"{0}\"."
+
 #. placeholder {0}: pr.number
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "Opened pull request #{0} for the candidate."
@@ -6797,6 +7202,10 @@ msgstr "Clave privada OpenSSH"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Optional"
 msgstr "Opcional"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Optional reference number"
+msgstr "Número de referencia opcional"
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Optional status hooks. Installed hooks update automatically; missing hooks are never installed automatically."
@@ -6812,6 +7221,10 @@ msgstr "Opcional. Al activarlo, se ejecuta tailscale serve para el puerto de acc
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionRows.tsx
 msgid "Options"
 msgstr "Opciones"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Or pick from Control Centre"
+msgstr "O seleccionar del Centro de control"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/userInputForm.tsx
 msgid "Or write a custom answer"
@@ -6852,6 +7265,10 @@ msgstr "Reemplaza {conflict}"
 #: src/renderer/views/ProjectSettingsOverlay/parts/SearchSection.tsx
 msgid "Overriding the global setting for this project."
 msgstr "Anulando el ajuste global para este proyecto."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Pacing"
+msgstr "Ritmo"
 
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 msgid "Package config"
@@ -6923,9 +7340,26 @@ msgid "Pairing…"
 msgstr "Emparejando…"
 
 #: src/renderer/commands/shortcutCatalog.ts
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Panel"
 msgstr "Panel"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel Consultation"
+msgstr "Panel de Consulta"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel consultation was cancelled"
+msgstr "La consulta del panel fue cancelada"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel failed"
+msgstr "El panel falló"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel synthesis complete"
+msgstr "Síntesis del panel completada"
 
 #: src/renderer/commands/shortcutCatalog.ts
 msgid "Panels and overlays"
@@ -6983,6 +7417,10 @@ msgstr "Pegar en la entrada"
 msgid "Paste the SSH private key."
 msgstr "Pega la clave privada SSH."
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Path or URL"
+msgstr "Ruta o URL"
+
 #: src/renderer/views/SchedulesView/parts/ScheduleRow.tsx
 msgid "Pause"
 msgstr "Pausar"
@@ -7029,6 +7467,10 @@ msgstr "Dirección pendiente"
 msgid "permission"
 msgstr "permiso"
 
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Permission-restricted content hidden"
+msgstr "Contenido restringido oculto"
+
 #: src/mobile/routeComponents.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "Pick a thread from the list to follow the agent from here."
@@ -7066,6 +7508,11 @@ msgstr "Fijado"
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Plan"
 msgstr "Plan"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Plan Revision"
+msgstr "Revisión del plan"
 
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
 msgid "Plan, ask, build…"
@@ -7350,6 +7797,10 @@ msgstr "El proveedor no ha informado del uso de tokens."
 msgid "Provider presets"
 msgstr "Preajustes de proveedor"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Provider:"
+msgstr "Proveedor:"
+
 #. plural
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/authHelpers.ts
 msgid "providers"
@@ -7468,6 +7919,10 @@ msgstr "Error en el push: {detail}"
 msgid "Push updates to paired mobile devices when threads finish or need you, even when the app is closed."
 msgstr "Envía novedades a los dispositivos móviles emparejados cuando los hilos terminan o necesitan tu atención, incluso con la app cerrada."
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Q4 Brand Launch"
+msgstr "Lanzamiento de marca Q4"
+
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionSwitcher.tsx
 msgid "Questions"
 msgstr "Preguntas"
@@ -7546,6 +8001,10 @@ msgstr "Razonamiento"
 msgid "Recent"
 msgstr "Recientes"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Recent Events"
+msgstr "Eventos recientes"
+
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Recent installs"
 msgstr "Instalaciones recientes"
@@ -7553,6 +8012,10 @@ msgstr "Instalaciones recientes"
 #: src/renderer/views/HomeView.tsx
 msgid "Recent threads"
 msgstr "Hilos recientes"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Recommendations:"
+msgstr "Recomendaciones:"
 
 #: src/mobile/components.tsx
 msgid "Reconnect"
@@ -7602,6 +8065,10 @@ msgstr "Actualizar autenticación de {0}"
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsageProviderCard.tsx
 msgid "Refresh {label}"
 msgstr "Actualizar {label}"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Refresh context"
+msgstr "Actualizar contexto"
 
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Refresh detected agents"
@@ -7736,6 +8203,10 @@ msgstr "¿Quitar <0>{0}</0> y eliminar permanentemente todos sus hilos? Esta acc
 #: src/renderer/views/ProjectSettingsOverlay/parts/ActionsSection.tsx
 msgid "Remove action"
 msgstr "Eliminar acción"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Remove alias"
+msgstr "Eliminar alias"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserBookmarkBar.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
@@ -7929,9 +8400,17 @@ msgstr "Restablecer valores predeterminados"
 msgid "Resize browser drawer"
 msgstr "Redimensionar cajón del navegador"
 
+#: src/renderer/views/CampaignWorkspace/CampaignWorkspaceShell.tsx
+msgid "Resize campaign list"
+msgstr "Redimensionar lista de campañas"
+
 #: src/renderer/components/layout/SplitPaneContainer.tsx
 msgid "Resize column"
 msgstr "Redimensionar columna"
+
+#: src/renderer/views/CampaignWorkspace/CampaignWorkspaceShell.tsx
+msgid "Resize context panel"
+msgstr "Redimensionar panel de contexto"
 
 #: src/renderer/views/MainView/parts/AppShell/AppShell.tsx
 msgid "Resize git panel"
@@ -7962,6 +8441,10 @@ msgstr "Redimensionar panel de terminal"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Resolves merge conflicts during rebase or merge."
 msgstr "Resuelve conflictos de fusión durante el rebase o la fusión."
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Resource Aliases"
+msgstr "Alias de recursos"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Restore"
@@ -7995,6 +8478,7 @@ msgstr "Reanudar"
 #: src/mobile/views/BrowserView.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/mobile/views/TerminalView.tsx
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -8016,6 +8500,14 @@ msgstr "Reintentar la limpieza"
 #: src/mobile/components.tsx
 msgid "Retry now"
 msgstr "Reintentar ahora"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Retry of panel"
+msgstr "Reintento del panel"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Retry panel"
+msgstr "Reintentar panel"
 
 #: src/renderer/hooks/usePrWriteActions.ts
 msgid "Retry with admin"
@@ -8133,6 +8625,10 @@ msgstr "Panel derecho"
 msgid "Right-click to switch ring"
 msgstr "Haz clic derecho para cambiar de anillo"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Role:"
+msgstr "Rol:"
+
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
@@ -8217,6 +8713,7 @@ msgstr "Ejecutar comando de terminal"
 msgid "Run this schedule automatically on the schedule below."
 msgstr "Ejecutar esta programación automáticamente según la programación de abajo."
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "running"
@@ -8520,6 +9017,10 @@ msgstr "Seleccionar {0} de {1}"
 msgid "Select {serverName} from {providerLabel}"
 msgstr "Seleccionar {serverName} de {providerLabel}"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Select a campaign to view its thread"
+msgstr "Seleccione una campaña para ver su hilo"
+
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorModal.tsx
 msgid "Select a file from the tree"
 msgstr "Selecciona un archivo del árbol"
@@ -8602,6 +9103,10 @@ msgstr "Seleccionar…"
 #~ msgid "Selected project"
 #~ msgstr "Proyecto seleccionado"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Selects which Control Centre tool subset the \"control-centre\" MCP server exposes for this campaign project. Changes apply when Poracode next starts or reconnects to a newly launched MCP process."
+msgstr "Selecciona qué subconjunto de herramientas de Control Centre expone el servidor MCP \"control-centre\" para este proyecto de campaña. Los cambios se aplican la próxima vez que Poracode se inicie o se reconecte a un proceso MCP recién lanzado."
+
 #: src/renderer/views/RemoteThreadView/RemoteThreadView.tsx
 msgid "Send"
 msgstr "Enviar"
@@ -8617,6 +9122,7 @@ msgstr "Envía texto genérico en lugar de los títulos de conversación a trav�
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/thread/ThreadComposerSection.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
 msgid "Send message"
 msgstr "Enviar mensaje"
 
@@ -9024,6 +9530,10 @@ msgstr "Ordenar hilos"
 msgid "Source branch {branch} moved before the worktree was created"
 msgstr "La rama de origen {branch} se movió antes de que se creara el worktree"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Source Health"
+msgstr "Estado de fuentes"
+
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Sources"
 msgstr "Fuentes"
@@ -9031,6 +9541,10 @@ msgstr "Fuentes"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Space separated; use quotes around spaces"
 msgstr "Separados por espacios; usa comillas si contienen espacios"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Spend vs Budget"
+msgstr "Gasto vs presupuesto"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/DevTerminalPanel/DevTerminalPanel.tsx
 msgid "Split Terminal"
@@ -9108,6 +9622,10 @@ msgstr "Preparado"
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 msgid "Staged ({0})"
 msgstr "Preparado ({0})"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Standard"
+msgstr "Estándar"
 
 #: src/renderer/commands/registry.ts
 msgid "Star or unstar the current chat or model"
@@ -9193,6 +9711,11 @@ msgstr "Empieza con una programación"
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Start Without Context"
 msgstr "Iniciar sin contexto"
+
+#. placeholder {0}: startedAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Started {0}"
+msgstr "Iniciado {0}"
 
 #: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
 msgid "Started {targetLabel} thread"
@@ -9364,6 +9887,10 @@ msgstr "Enviar revisión"
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "Succeeded"
 msgstr "Exitosa"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Suggested Questions"
+msgstr "Preguntas sugeridas"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Suggestions"
@@ -9626,6 +10153,10 @@ msgstr "Esa sesión remota ya no existía."
 #~ msgid "the {0} WSL user"
 #~ msgstr "el usuario de WSL {0}"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "The active remote Control Centre profile is managed by the remote server administrator. Remote servers do not support client-controlled profile reconfiguration."
+msgstr "El perfil activo de Control Centre remoto es administrado por el administrador del servidor remoto. Los servidores remotos no admiten la reconfiguración de perfiles controlada por el cliente."
+
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 msgid "the agent"
 msgstr "el agente"
@@ -9653,6 +10184,10 @@ msgstr "Los candidatos aún no han realizado ningún cambio."
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "the chosen folder"
 msgstr "la carpeta elegida"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "The Control Centre campaign group this workspace binds to."
+msgstr "El grupo de campaña del Centro de control al que se vincula este espacio de trabajo."
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
@@ -9859,6 +10394,10 @@ msgstr "Esto elimina permanentemente la rama \"{0}\"."
 msgid "this project"
 msgstr "este proyecto"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "This project isn't linked to a Control Centre campaign yet."
+msgstr "Este proyecto aún no está vinculado a una campaña del Centro de control."
+
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "This remote project is unavailable. Reconnect the environment and try again."
 msgstr "Este proyecto remoto no está disponible. Vuelve a conectar el entorno e inténtalo de nuevo."
@@ -9950,6 +10489,10 @@ msgstr "Panel del objetivo del hilo"
 msgid "Thread is already unloaded."
 msgstr "El hilo ya está descargado."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Thread messages will appear here"
+msgstr "Los mensajes del hilo aparecerán aquí"
+
 #: src/renderer/components/thread/PresentationModeTabs.tsx
 msgid "Thread mode"
 msgstr "Modo del hilo"
@@ -9966,6 +10509,14 @@ msgstr "Orden de los hilos"
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Thread todo dock"
 msgstr "Panel de tareas del hilo"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Thread topics"
+msgstr "Temas del hilo"
+
+#: src/renderer/actions/campaignProjectActions.ts
+msgid "Thread was not found after creation — the workspace could not be saved."
+msgstr "No se encontró el hilo después de la creación — no se pudo guardar el espacio de trabajo."
 
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/ThreadSettings.tsx
@@ -10134,6 +10685,10 @@ msgstr "Tipo"
 #: src/renderer/commands/CommandPalette.tsx
 msgid "Type a command"
 msgstr "Escribe un comando"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Type a message…"
+msgstr "Escriba un mensaje…"
 
 #: src/mobile/views/BrowserView.tsx
 msgid "Type into the page"
@@ -10424,6 +10979,10 @@ msgstr "Desinstalar"
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Unknown"
 msgstr "Desconocido"
+
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Unknown mention. Try @codex, @claude, @daily-operator, @verify, etc."
+msgstr "Mención desconocida. Prueba @codex, @claude, @daily-operator, @verify, etc."
 
 #: src/renderer/notifications.ts
 msgid "Unknown project"
@@ -10727,6 +11286,10 @@ msgstr "Ver {0}"
 #: src/renderer/views/SettingsOverlay/parts/ChangelogSettings.tsx
 msgid "View all releases on GitHub"
 msgstr "Ver todas las versiones en GitHub"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "View child thread"
+msgstr "Ver hilo secundario"
 
 #: src/mobile/views/GitActionSheet.tsx
 msgid "View diff"

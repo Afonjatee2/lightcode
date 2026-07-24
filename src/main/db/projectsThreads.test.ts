@@ -139,6 +139,32 @@ describe("projectsThreads (real sqlite round-trip)", () => {
     });
   });
 
+  it("round-trips the complete Phase 3 campaign project across a database restart", () => {
+    const campaignProject = {
+      id: "campaign-project-roundtrip",
+      name: "AIB Campaign",
+      purpose: "campaign" as const,
+      campaignExtension: {
+        campaignGroupId: "cg-aib-2026",
+        clientName: "AIB NI",
+        campaignName: "Community Fund 2026",
+        jobNumber: "JOB-2026-041",
+        defaultAgentKind: "codex",
+        defaultModel: "gpt-5.6",
+        mcpProfile: "monitoring" as const,
+        resourceAliases: { "@media-plans": "drive://media-plans/aib" },
+      },
+      location: { kind: "posix" as const, path: "/tmp/aib-campaign" },
+      mcpServers: [],
+      createdAt: "2026-07-23T00:00:00.000Z",
+    };
+    dbUpsertProject(campaignProject, 0);
+    expect(dbGetProject(campaignProject.id)).toEqual(campaignProject);
+    closeDatabase();
+    initDatabase(join(dir, "state.sqlite"));
+    expect(dbGetProject(campaignProject.id)).toEqual(campaignProject);
+  });
+
   it("persists candidate threads and the experiment record atomically", () => {
     const existing = testThread({ id: "candidate-existing" });
     dbPersistExperimentState({

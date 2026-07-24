@@ -17,6 +17,10 @@ msgstr ""
 msgid "-y @modelcontextprotocol/server-memory"
 msgstr "-y @modelcontextprotocol/server-memory"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "(coming in Phase 4)"
+msgstr "(очікується у Фазі 4)"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "(Draft)"
 msgstr "(Чернетка)"
@@ -129,6 +133,11 @@ msgstr "{0} ({envName}) оновлено до v{newVersion}."
 msgid "{0} ({envName}) updated."
 msgstr "{0} ({envName}) оновлено."
 
+#. placeholder {0}: context.activeDecisions.length
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "{0} active decisions"
+msgstr "{0} активних рішень"
+
 #. placeholder {0}: days.map((day) => weekdayNames[day]).join(", ")
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "{0} at {time}"
@@ -211,6 +220,11 @@ msgstr "{0} потребує введення."
 msgid "{0} of {matchCount}"
 msgstr "{0} з {matchCount}"
 
+#. placeholder {0}: context.pendingProposals.length
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "{0} pending proposals"
+msgstr "{0} очікуваних пропозицій"
+
 #. placeholder {0}: cell.count
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "{0} prompt - {when}"
@@ -221,6 +235,11 @@ msgstr "{0} запит - {when}"
 msgid "{0} prompts - {when}"
 msgstr "{0} запитів - {when}"
 
+#. placeholder {0}: formatMoney(budget.remaining, budget.currency)
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "{0} remaining"
+msgstr "Залишилось: {0}"
+
 #. placeholder {0}: item.runCount.toLocaleString()
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
 msgid "{0} run"
@@ -230,6 +249,11 @@ msgstr "{0} запуск"
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
 msgid "{0} runs"
 msgstr "{0} запусків"
+
+#. placeholder {0}: evidenceFreshness.staleSourceCount
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "{0} stale data source(s)"
+msgstr "{0} застарілих джерел даних"
 
 #. placeholder {0}: threads.length
 #: src/mobile/views/ThreadsView.tsx
@@ -282,6 +306,12 @@ msgstr "{0} використано"
 #: src/renderer/components/skills/SkillImportModal.tsx
 msgid "{0}: {stateLabel}"
 msgstr "{0}: {stateLabel}"
+
+#. placeholder {0}: context.pacing.variancePct > 0 ? "+" : ""
+#. placeholder {1}: context.pacing.variancePct
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "{0}{1}% vs expected"
+msgstr "{0}{1}% від очікуваного"
 
 #. placeholder {0}: selectedRows.length
 #. placeholder {0}: selectedSkills.length
@@ -340,6 +370,10 @@ msgstr "{days}д тому"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
 msgid "{envOrAgentLabel} needs authentication."
 msgstr "{envOrAgentLabel} потребує автентифікації."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "{failedCount} data sources have failed to sync"
+msgstr "Не вдалося синхронізувати джерел даних: {failedCount}"
 
 #: src/mobile/views/pr/PrOverviewPage.tsx
 msgid "{filesCount, plural, one {# file changed} other {# files changed}}"
@@ -484,6 +518,10 @@ msgstr "{seconds}с тому"
 msgid "{serverName} from {providerLabel}: {disabledLabel}"
 msgstr "{serverName} з {providerLabel}: {disabledLabel}"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "{staleCount} data sources have stale data"
+msgstr "У {staleCount} джерел даних застарілі дані"
+
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "{used} tokens"
 msgstr "{used} токенів"
@@ -504,6 +542,14 @@ msgstr "{usedLabel} токенів"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/ModelVisibilityDropdown.tsx
 msgid "{visibleCount} of {totalCount} visible"
 msgstr "{visibleCount} із {totalCount} видимих"
+
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "@codex check the budget pacing"
+msgstr "@codex перевірити темп бюджету"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "@media-plans"
+msgstr "@media-plans"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "/absolute/path/to/project"
@@ -552,6 +598,11 @@ msgstr "30 дн"
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
 msgid "7d"
 msgstr "7 дн"
+
+#. placeholder {0}: existingProject.name
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "A campaign workspace for \"{0}\" already exists with this campaign group ID. Opening it will switch to the existing workspace."
+msgstr "Робоча область кампанії для \"{0}\" вже існує з цим ідентифікатором групи кампаній. При відкритті відбудеться перемикання на наявну робочу область."
 
 #: src/renderer/actions/experimentDecisionActions.ts
 #: src/renderer/actions/experimentWorktreeActions.ts
@@ -603,6 +654,10 @@ msgstr "Параметри облікового запису"
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
 msgid "Accounts"
 msgstr "Облікові записи"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Acme Corp"
+msgstr "ТОВ «Акме»"
 
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
@@ -721,6 +776,10 @@ msgstr "Додати завдання…"
 msgid "Add action"
 msgstr "Додати дію"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Add Alias"
+msgstr "Додати псевдонім"
+
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Add an existing folder"
 msgstr "Додати наявну папку"
@@ -814,6 +873,10 @@ msgstr "Додати до обраного"
 msgid "Add to Home Screen"
 msgstr "Додати на головний екран"
 
+#: src/renderer/views/MainView/parts/CampaignModeGate.tsx
+msgid "Advanced Mode (Code)"
+msgstr "Розширений режим (Код)"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Advertise a custom base URL, e.g. a reverse proxy or tunnel. Leave empty for automatic."
 msgstr "Оголосіть власний базовий URL, наприклад зворотний проксі або тунель. Залиште порожнім для автоматичного режиму."
@@ -888,6 +951,10 @@ msgstr "Агенти"
 msgid "Agents · General"
 msgstr "Агенти · Загальні"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Aggregated findings:"
+msgstr "Узагальнені висновки:"
+
 #. Settings section: AI / assistant configuration
 #. Settings section: AI / assistant configuration
 #: src/mobile/settingsSections.ts
@@ -950,6 +1017,10 @@ msgstr "Усі пристрої"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "All efforts"
 msgstr "Усі рівні зусиль"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "All failed"
+msgstr "Усі невдалі"
 
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 #: src/renderer/views/PrReviewOverlay/PrReviewOverlay.tsx
@@ -1293,6 +1364,10 @@ msgstr "Колір аватара {color}"
 msgid "Back"
 msgstr "Назад"
 
+#: src/renderer/views/MainView/parts/CampaignModeGate.tsx
+msgid "Back to Campaign"
+msgstr "Повернутися до кампанії"
+
 #: src/mobile/views/GitView.tsx
 msgid "Back to changes"
 msgstr "Назад до змін"
@@ -1512,6 +1587,10 @@ msgstr "Вхід через браузер"
 msgid "Browser tabs"
 msgstr "Вкладки браузера"
 
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Budget data not available"
+msgstr "Дані бюджету недоступні"
+
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Budget limit reached"
 msgstr "Досягнуто ліміту бюджету"
@@ -1572,6 +1651,39 @@ msgstr "Лише кеш"
 msgid "Camera access blocked"
 msgstr "Доступ до камери заблоковано"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Campaign Context"
+msgstr "Контекст кампанії"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Campaign group ID"
+msgstr "ID групи кампаній"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Campaign Group ID"
+msgstr "ID групи кампаній"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Campaign name"
+msgstr "Назва кампанії"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Campaign Name"
+msgstr "Назва кампанії"
+
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Campaign plan not available"
+msgstr "План кампанії недоступний"
+
+#. placeholder {0}: input.name.trim()
+#: src/renderer/actions/campaignProjectActions.ts
+msgid "Campaign workspace \"{0}\" created."
+msgstr "Робочу область кампанії «{0}» створено."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
+msgid "Campaigns"
+msgstr "Кампанії"
+
 #: src/mobile/views/PortsView.tsx
 msgid "Can't load ports"
 msgstr "Не вдалося завантажити порти"
@@ -1581,6 +1693,7 @@ msgstr "Не вдалося завантажити порти"
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/components/common/ConfirmDialog.tsx
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
@@ -1596,6 +1709,7 @@ msgstr "Не вдалося завантажити порти"
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppOverlays.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectModal.tsx
 #: src/renderer/views/MainView/parts/PullFromSourceDialog.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/DeleteWorktreeDialog.tsx
@@ -1612,6 +1726,10 @@ msgstr "Скасувати"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Cancel new Claude profile"
 msgstr "Скасувати новий профіль Claude"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Cancel panel"
+msgstr "Скасувати панель"
 
 #: src/renderer/components/thread/ThreadPendingSteerStrip.tsx
 msgid "Cancel pending steer"
@@ -1698,6 +1816,10 @@ msgstr "Зміни недоступні"
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Channel"
 msgstr "Канал"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Channels"
+msgstr "Канали"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
@@ -1922,6 +2044,22 @@ msgstr "Хуки CLI"
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Click a shortcut to record a new key, or ＋ to add another."
 msgstr "Натисніть комбінацію клавіш, щоб записати нову клавішу, або ＋, щоб додати ще одну."
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Client Comms"
+msgstr "Комунікації з клієнтом"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Client name"
+msgstr "Ім'я клієнта"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Client Name"
+msgstr "Ім'я клієнта"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Client Update"
+msgstr "Оновлення клієнта"
 
 #: src/mobile/views/ManageProjectsView.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
@@ -2308,6 +2446,11 @@ msgstr "Порівняйте цей відбиток із відбитком, п
 #~ msgid "Comparing candidates…"
 #~ msgstr "Порівняння кандидатів…"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "complete"
+msgstr "завершено"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Complete"
 msgstr "Завершено"
@@ -2348,6 +2491,11 @@ msgstr "завершено"
 #: src/renderer/utils/prStatus.ts
 msgid "Completed"
 msgstr "Завершено"
+
+#. placeholder {0}: completedAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Completed {0}"
+msgstr "Завершено {0}"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
@@ -2499,6 +2647,26 @@ msgstr "Підключення"
 msgid "Console"
 msgstr "Консоль"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Consult"
+msgstr "Консультація"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation complete"
+msgstr "Консультацію завершено"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation failed"
+msgstr "Консультація не вдалася"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation was cancelled"
+msgstr "Консультацію скасовано"
+
+#: src/renderer/components/consultations/ConsultationDock.tsx
+msgid "Consultations"
+msgstr "Консультації"
+
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Contains sensitive values; add manually"
 msgstr "Містить конфіденційні значення; додайте вручну"
@@ -2559,6 +2727,31 @@ msgstr "Продовжити в..."
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control an external Chrome browser."
 msgstr "Керує зовнішнім браузером Chrome."
+
+#: src/renderer/hooks/useControlCentreTool.ts
+msgid "Control Centre \"{toolName}\" returned a response that was too large or malformed. Try refreshing."
+msgstr "Центр керування «{toolName}» повернув відповідь, яка занадто велика або пошкоджена. Спробуйте оновити."
+
+#: src/renderer/hooks/useControlCentreTool.ts
+msgid "Control Centre \"{toolName}\" returned a response this version of Poracode doesn't understand."
+msgstr "Центр керування «{toolName}» повернув відповідь, яку ця версія Poracode не розуміє."
+
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Control Centre connection unavailable"
+msgstr "Центр керування недоступний"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Control Centre is not available. You can still create a campaign workspace manually, but live campaign context will not load until the MCP connection works."
+msgstr "Центр керування недоступний. Ви все ще можете створити робочу область кампанії вручну, але контекст кампанії в реальному часі не завантажиться, поки не запрацює з'єднання MCP."
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Control Centre MCP Profile"
+msgstr "Профіль MCP Control Centre"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
+msgid "Control Centre needs authorization. Reconnect it in MCP settings."
+msgstr "Центру керування потрібна авторизація. Перепідключіть його в налаштуваннях MCP."
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control the desktop."
@@ -2688,6 +2881,18 @@ msgstr "Не вдалося перервати злиття: {detail}"
 msgid "Could not complete the merge"
 msgstr "Не вдалося завершити злиття"
 
+#: src/renderer/actions/campaignProjectActions.ts
+msgid "Could not create a thread for the existing campaign workspace."
+msgstr "Не вдалося створити тред для наявної робочої області кампанії."
+
+#: src/renderer/actions/campaignProjectActions.ts
+msgid "Could not create the campaign workspace directory."
+msgstr "Не вдалося створити директорію робочої області кампанії."
+
+#: src/renderer/actions/campaignProjectActions.ts
+msgid "Could not create the campaign workspace thread."
+msgstr "Не вдалося створити тред робочої області кампанії."
+
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Could not extract context."
@@ -2706,9 +2911,21 @@ msgstr "Не вдалося завантажити pull request для {0}."
 #~ msgid "Could not open this PDF."
 #~ msgstr "Не вдалося відкрити цей PDF-файл."
 
+#: src/renderer/hooks/useControlCentreTool.ts
+msgid "Could not reach the MCP runtime."
+msgstr "Не вдалося підключитися до середовища виконання MCP."
+
 #: src/renderer/components/thread/ChatPane/parts/items/useReadAbsoluteFile.tsx
 msgid "Could not read file."
 msgstr "Не вдалося прочитати файл."
+
+#: src/renderer/actions/campaignProjectActions.ts
+msgid "Could not save the campaign project."
+msgstr "Не вдалося зберегти проєкт кампанії."
+
+#: src/renderer/actions/campaignProjectActions.ts
+msgid "Could not save the campaign workspace thread."
+msgstr "Не вдалося зберегти тред робочої області кампанії."
 
 #: src/renderer/components/mcp/useMcpServerOauth.ts
 msgid "Could not sign in to {serverName}: {message}"
@@ -2808,6 +3025,10 @@ msgstr "Створити pull request для кандидата {0} ({label})"
 msgid "Create a useful routine with one click, then adjust it anytime."
 msgstr "Створіть корисний розпорядок одним клацанням і змінюйте його будь-коли."
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Create Campaign Workspace"
+msgstr "Створити робочу область кампанії"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CreatePrModal.tsx
 msgid "Create Draft PR"
 msgstr "Створити чернетку PR"
@@ -2875,9 +3096,18 @@ msgstr "Створити з агентом"
 #~ msgid "Create:"
 #~ msgstr "Створити:"
 
+#. placeholder {0}: createdAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Created {0}"
+msgstr "Створено {0}"
+
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
 msgid "Created a worktree on \"{newBranch}\", but the changes conflicted and remain in a git stash — resolve them in the worktree."
 msgstr "Worktree створено на \"{newBranch}\", але зміни спричинили конфлікт і залишаються в git stash — вирішіть їх у worktree."
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Creating…"
+msgstr "Створення…"
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "Credentials are configured."
@@ -3014,9 +3244,17 @@ msgstr "Щоденний огляд"
 msgid "Dark"
 msgstr "Темна"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Dates"
+msgstr "Дати"
+
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #~ msgid "Days"
 #~ msgstr "Дні"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Decisions & Proposals"
+msgstr "Рішення та пропозиції"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 msgid "Decline"
@@ -3030,6 +3268,14 @@ msgstr "DeepSeek"
 msgid "Default"
 msgstr "За замовчуванням"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Default agent"
+msgstr "Агент за замовчуванням"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Default Agent"
+msgstr "Агент за замовчуванням"
+
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
 msgid "Default auto-refresh (minutes)"
@@ -3039,6 +3285,14 @@ msgstr "Автооновлення за замовчуванням (хвилин
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Default Create PR action"
 msgstr "Типова дія створення PR"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Default model"
+msgstr "Модель за замовчуванням"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Default Model"
+msgstr "Модель за замовчуванням"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -3183,6 +3437,10 @@ msgstr "Заборонити"
 msgid "Deny and tell the agent what to do differently…"
 msgstr "Заборонити й сказати агенту, що зробити інакше…"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Deployment"
+msgstr "Розгортання"
+
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
 #~ msgstr "Опишіть завдання, яке мають виконати кілька агентів…"
@@ -3260,6 +3518,10 @@ msgstr "Розробка"
 #: src/mobile/views/PortsView.tsx
 msgid "Dev servers listening on your desktop's localhost."
 msgstr "Сервери розробки, що слухають localhost вашого комп'ютера."
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Development"
+msgstr "Розробка"
 
 #: src/renderer/views/SettingsOverlay/parts/DevSettings.tsx
 msgid "Development-only overrides. Only visible in the PORACODE DEV build."
@@ -3435,6 +3697,7 @@ msgstr "Не питати знову"
 msgid "Don't show hook install proposal"
 msgstr "Не показувати пропозицію встановлення хука"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "done"
@@ -3503,6 +3766,18 @@ msgstr "Відкидає вхідні конверти хуків на супе�
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Duplicate server name in scan"
 msgstr "Повторювана назва сервера в результатах сканування"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "e.g. cg-abc-123"
+msgstr "напр. cg-abc-123"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "e.g. claude-sonnet-4"
+msgstr "напр. claude-sonnet-4"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "e.g. claude, codex, gemini"
+msgstr "напр. claude, codex, gemini"
 
 #: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
 msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk refactors, Claude Opus for anything subtle."
@@ -3729,6 +4004,10 @@ msgstr "Змінні середовища"
 msgid "Environment variables (optional)"
 msgstr "Змінні середовища (необов’язково)"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "EOC Report"
+msgstr "Звіт EOC"
+
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ToolCall.tsx
@@ -3774,6 +4053,20 @@ msgstr "Щогодини"
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Every hour at {0} minutes past"
 msgstr "Щогодини о {0} хв."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Evidence freshness"
+msgstr "Актуальність даних"
+
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Evidence freshness unknown"
+msgstr "Актуальність даних невідома"
+
+#. placeholder {0}: oldest.toLocaleDateString()
+#. placeholder {1}: newest.toLocaleDateString()
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Evidence from {0} to {1}"
+msgstr "Дані з {0} по {1}"
 
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -3941,6 +4234,7 @@ msgstr "Видобування контексту з {0}..."
 msgid "Factory Droid"
 msgstr "Factory Droid"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 #: src/renderer/views/LoginTerminalOverlay/LoginTerminalOverlay.tsx
 msgid "failed"
@@ -4089,6 +4383,10 @@ msgstr "Фільтрувати навички за станом"
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Filters"
 msgstr "Фільтри"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Finalise"
+msgstr "Завершити"
 
 #: src/renderer/commands/registry.ts
 #: src/renderer/components/find/FindBar.tsx
@@ -4328,6 +4626,7 @@ msgstr "Gemini"
 
 #: src/mobile/settingsSections.ts
 #: src/renderer/commands/shortcutCatalog.ts
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
@@ -4745,6 +5044,11 @@ msgstr "Імпортовано 1 навичку."
 msgid "Improved"
 msgstr "Покращено"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "In progress"
+msgstr "Виконується"
+
 #: src/mobile/QrScanner.tsx
 msgid "In-app camera scanning only works over HTTPS. Use your phone's camera app to scan the desktop QR code, or enter the endpoint and token below."
 msgstr "Сканування камерою в застосунку працює лише через HTTPS. Скористайтеся камерою телефона, щоб відсканувати QR-код десктопа, або введіть endpoint і токен нижче."
@@ -4906,6 +5210,14 @@ msgstr "Перервано: сесія агента завершилася до 
 msgid "Italic"
 msgstr "Курсив"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Job number"
+msgstr "Номер завдання"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Job Number"
+msgstr "Номер завдання"
+
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "JSON"
 msgstr "JSON"
@@ -4940,6 +5252,10 @@ msgstr "Під час запуску разом із системою залиш
 msgid "Keep the system awake while any thread is actively working."
 msgstr "Не давати системі засинати, поки будь-який тред активно працює."
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Key findings:"
+msgstr "Ключові висновки:"
+
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Kill bash"
 msgstr "Завершити bash"
@@ -4959,6 +5275,10 @@ msgstr "Kimi Code не вдалося оновити облікові дані, 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Kimi Code ended the turn without returning a response. Restart the thread and try again."
 msgstr "Kimi Code завершив хід, не повернувши відповіді. Перезапустіть гілку та повторіть спробу."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "KPI Health"
+msgstr "Стан KPI"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -5081,6 +5401,14 @@ msgstr "Завантаження"
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "Loading accounts…"
 msgstr "Завантаження облікових записів…"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Loading campaign context…"
+msgstr "Завантаження контексту кампанії…"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
+msgid "Loading campaigns…"
+msgstr "Завантаження кампаній…"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/parts/SingleFileDiff.tsx
 msgid "Loading diff..."
@@ -5372,6 +5700,10 @@ msgstr "Розгорнути браузер"
 #~ msgid "MCP Market"
 #~ msgstr "MCP Market"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "MCP Profile"
+msgstr "Профіль MCP"
+
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
 msgid "MCP server"
@@ -5555,6 +5887,10 @@ msgstr "Злиття заблоковано"
 msgid "Message actions"
 msgstr "Дії з повідомленням"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Message composer"
+msgstr "Редактор повідомлень"
+
 #: src/renderer/views/RemoteThreadView/RemoteThreadView.tsx
 msgid "Message the remote agent…"
 msgstr "Повідомлення віддаленому агенту…"
@@ -5618,6 +5954,10 @@ msgstr "Дзеркальна вкладка браузера десктопа"
 msgid "Mirroring is unavailable."
 msgstr "Дзеркалювання недоступне."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Missing Data"
+msgstr "Відсутні дані"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Mobile push notifications"
 msgstr "Мобільні push-сповіщення"
@@ -5626,6 +5966,10 @@ msgstr "Мобільні push-сповіщення"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Mode"
 msgstr "Режим"
+
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Mode:"
+msgstr "Режим:"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Model"
@@ -5670,6 +6014,14 @@ msgstr "Моделі"
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
 msgid "Modes"
 msgstr "Режими"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Monitoring"
+msgstr "Моніторинг"
+
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Monitoring (read-only)"
+msgstr "Моніторинг (лише читання)"
 
 #: src/mobile/NarrowShell.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
@@ -5839,6 +6191,10 @@ msgstr "Нова назва дії"
 #: src/renderer/components/common/BranchSelector/parts/BranchFooterActions.tsx
 msgid "New branch name..."
 msgstr "Назва нової гілки..."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
+msgid "New Campaign Project"
+msgstr "Новий проєкт кампанії"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "New Claude profile config directory"
@@ -6047,6 +6403,10 @@ msgstr "Гілки не знайдено"
 msgid "No browser tab open"
 msgstr "Немає відкритих вкладок браузера"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "No budget configured"
+msgstr "Бюджет не налаштовано"
+
 #: src/mobile/QrScanner.tsx
 msgid "No camera found"
 msgstr "Камеру не знайдено"
@@ -6067,6 +6427,10 @@ msgstr "Немає змін для відображення"
 msgid "No changes yet"
 msgstr "Змін поки немає"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "No channel executions."
+msgstr "Немає виконань каналів."
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrChecksTab.tsx
 msgid "No checks reported for this PR."
@@ -6084,6 +6448,10 @@ msgstr "Коміти не знайдено."
 msgid "No configured MCP servers yet"
 msgstr "Сервери MCP ще не налаштовано"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "No connected sources reported."
+msgstr "Підключені джерела не вказані."
+
 #: src/mobile/WideShell.tsx
 msgid "No connection paired"
 msgstr "Немає спарених підключень"
@@ -6096,9 +6464,17 @@ msgstr "Ще немає підключень"
 msgid "No content streams."
 msgstr "Немає потоків вмісту."
 
+#: src/renderer/hooks/useControlCentreTool.ts
+msgid "No Control Centre MCP server is configured for this project."
+msgstr "Для цього проєкту не налаштовано MCP-сервер Центру керування."
+
 #: src/renderer/views/PrReviewOverlay/parts/PrConversationTab.tsx
 msgid "No conversation yet. Be the first to comment."
 msgstr "Розмови ще немає. Прокоментуйте першим."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "No data sources connected"
+msgstr "Немає підключених джерел даних"
 
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/providers/usageFormat.ts
@@ -6162,9 +6538,21 @@ msgstr "Історії ще немає"
 #~ msgid "No installed agents with selectable models are available for this project."
 #~ msgstr "Для цього проєкту немає встановлених агентів із моделями, які можна вибрати."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "No KPI targets set"
+msgstr "Цілі KPI не задано"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "No KPI targets set."
+msgstr "Цілі KPI не задано."
+
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "No Lightcode data was found."
 msgstr "Дані Lightcode не знайдено."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
+msgid "No live campaigns in Control Centre."
+msgstr "Немає активних кампаній у Центрі керування."
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "No marketplace skills match these filters."
@@ -6229,6 +6617,10 @@ msgstr "Мікрофон не знайдено."
 msgid "No models found"
 msgstr "Моделі не знайдено"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "No open alerts."
+msgstr "Немає відкритих сповіщень."
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No other agents installed"
 msgstr "Інших встановлених агентів немає"
@@ -6277,6 +6669,10 @@ msgstr "Готових провайдерів поки немає"
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "No pull requests found."
 msgstr "Pull request не знайдено."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "No recent events."
+msgstr "Немає нещодавніх подій."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
 msgid "No remote configured. Add a remote to enable push and pull."
@@ -6544,6 +6940,10 @@ msgstr "Відкрити термінал"
 msgid "Open a thread first to attach to it."
 msgstr "Спершу відкрийте тред, щоб прикріпити до нього."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Open Alerts"
+msgstr "Відкриті сповіщення"
+
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ExperimentGroupHeader.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
@@ -6785,6 +7185,11 @@ msgstr "OpenCode"
 msgid "Opened {0} (#{1})"
 msgstr "Відкрито {0} (№{1})"
 
+#. placeholder {0}: existing.name
+#: src/renderer/actions/campaignProjectActions.ts
+msgid "Opened existing campaign workspace \"{0}\"."
+msgstr "Відкрито наявну робочу область кампанії «{0}»."
+
 #. placeholder {0}: pr.number
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "Opened pull request #{0} for the candidate."
@@ -6797,6 +7202,10 @@ msgstr "Закритий ключ OpenSSH"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Optional"
 msgstr "Необов’язково"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Optional reference number"
+msgstr "Необов'язковий номер посилання"
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Optional status hooks. Installed hooks update automatically; missing hooks are never installed automatically."
@@ -6812,6 +7221,10 @@ msgstr "Необов’язково. Після ввімкнення запус�
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionRows.tsx
 msgid "Options"
 msgstr "Параметри"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Or pick from Control Centre"
+msgstr "Або виберіть із Центру керування"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/userInputForm.tsx
 msgid "Or write a custom answer"
@@ -6852,6 +7265,10 @@ msgstr "Перевизначає {conflict}"
 #: src/renderer/views/ProjectSettingsOverlay/parts/SearchSection.tsx
 msgid "Overriding the global setting for this project."
 msgstr "Перевизначення глобального налаштування для цього проєкту."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Pacing"
+msgstr "Темп"
 
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 msgid "Package config"
@@ -6923,9 +7340,26 @@ msgid "Pairing…"
 msgstr "Підключення…"
 
 #: src/renderer/commands/shortcutCatalog.ts
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Panel"
 msgstr "Панель"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel Consultation"
+msgstr "Панельна консультація"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel consultation was cancelled"
+msgstr "Панельну консультацію скасовано"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel failed"
+msgstr "Помилка панелі"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel synthesis complete"
+msgstr "Синтез панелі завершено"
 
 #: src/renderer/commands/shortcutCatalog.ts
 msgid "Panels and overlays"
@@ -6983,6 +7417,10 @@ msgstr "Вставити в поле введення"
 msgid "Paste the SSH private key."
 msgstr "Вставте закритий ключ SSH."
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Path or URL"
+msgstr "Шлях або URL"
+
 #: src/renderer/views/SchedulesView/parts/ScheduleRow.tsx
 msgid "Pause"
 msgstr "Призупинити"
@@ -7029,6 +7467,10 @@ msgstr "Очікуване скерування"
 msgid "permission"
 msgstr "дозвіл"
 
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Permission-restricted content hidden"
+msgstr "Контент з обмеженим доступом приховано"
+
 #: src/mobile/routeComponents.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "Pick a thread from the list to follow the agent from here."
@@ -7066,6 +7508,11 @@ msgstr "Закріплено"
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Plan"
 msgstr "План"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Plan Revision"
+msgstr "Ревізія плану"
 
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
 msgid "Plan, ask, build…"
@@ -7350,6 +7797,10 @@ msgstr "Провайдер не повідомив про використанн
 msgid "Provider presets"
 msgstr "Пресети провайдерів"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Provider:"
+msgstr "Провайдер:"
+
 #. plural
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/authHelpers.ts
 msgid "providers"
@@ -7468,6 +7919,10 @@ msgstr "Збій push: {detail}"
 msgid "Push updates to paired mobile devices when threads finish or need you, even when the app is closed."
 msgstr "Надсилайте оновлення на спарені мобільні пристрої, коли треди завершуються або потребують вашої уваги, навіть коли застосунок закрито."
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Q4 Brand Launch"
+msgstr "Запуск бренду в Q4"
+
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionSwitcher.tsx
 msgid "Questions"
 msgstr "Питання"
@@ -7546,6 +8001,10 @@ msgstr "Міркування"
 msgid "Recent"
 msgstr "Нещодавні"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Recent Events"
+msgstr "Нещодавні події"
+
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Recent installs"
 msgstr "Недавні встановлення"
@@ -7553,6 +8012,10 @@ msgstr "Недавні встановлення"
 #: src/renderer/views/HomeView.tsx
 msgid "Recent threads"
 msgstr "Нещодавні треди"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Recommendations:"
+msgstr "Рекомендації:"
 
 #: src/mobile/components.tsx
 msgid "Reconnect"
@@ -7602,6 +8065,10 @@ msgstr "Оновити автентифікацію {0}"
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsageProviderCard.tsx
 msgid "Refresh {label}"
 msgstr "Оновити {label}"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Refresh context"
+msgstr "Оновити контекст"
 
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Refresh detected agents"
@@ -7736,6 +8203,10 @@ msgstr "Видалити <0>{0}</0> і назавжди видалити всі 
 #: src/renderer/views/ProjectSettingsOverlay/parts/ActionsSection.tsx
 msgid "Remove action"
 msgstr "Видалити дію"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Remove alias"
+msgstr "Видалити псевдонім"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserBookmarkBar.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
@@ -7929,9 +8400,17 @@ msgstr "Скинути до типового"
 msgid "Resize browser drawer"
 msgstr "Змінити розмір панелі браузера"
 
+#: src/renderer/views/CampaignWorkspace/CampaignWorkspaceShell.tsx
+msgid "Resize campaign list"
+msgstr "Змінити розмір списку кампаній"
+
 #: src/renderer/components/layout/SplitPaneContainer.tsx
 msgid "Resize column"
 msgstr "Змінити розмір стовпця"
+
+#: src/renderer/views/CampaignWorkspace/CampaignWorkspaceShell.tsx
+msgid "Resize context panel"
+msgstr "Змінити розмір панелі контексту"
 
 #: src/renderer/views/MainView/parts/AppShell/AppShell.tsx
 msgid "Resize git panel"
@@ -7962,6 +8441,10 @@ msgstr "Змінити розмір панелі термінала"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Resolves merge conflicts during rebase or merge."
 msgstr "Розв'язує конфлікти злиття під час rebase або злиття."
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Resource Aliases"
+msgstr "Псевдоніми ресурсів"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Restore"
@@ -7995,6 +8478,7 @@ msgstr "Продовжити"
 #: src/mobile/views/BrowserView.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/mobile/views/TerminalView.tsx
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -8016,6 +8500,14 @@ msgstr "Повторити очищення"
 #: src/mobile/components.tsx
 msgid "Retry now"
 msgstr "Повторить сейчас"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Retry of panel"
+msgstr "Повтор панелі"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Retry panel"
+msgstr "Повторити панель"
 
 #: src/renderer/hooks/usePrWriteActions.ts
 msgid "Retry with admin"
@@ -8133,6 +8625,10 @@ msgstr "Права панель"
 msgid "Right-click to switch ring"
 msgstr "Клацніть правою кнопкою, щоб перемкнути кільце"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Role:"
+msgstr "Роль:"
+
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
@@ -8217,6 +8713,7 @@ msgstr "Виконати команду терміналу"
 msgid "Run this schedule automatically on the schedule below."
 msgstr "Автоматично запускати цей розклад за розкладом нижче."
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "running"
@@ -8520,6 +9017,10 @@ msgstr "Вибрати {0} з {1}"
 msgid "Select {serverName} from {providerLabel}"
 msgstr "Вибрати {serverName} з {providerLabel}"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Select a campaign to view its thread"
+msgstr "Виберіть кампанію, щоб переглянути її тред"
+
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorModal.tsx
 msgid "Select a file from the tree"
 msgstr "Виберіть файл із дерева"
@@ -8602,6 +9103,10 @@ msgstr "Вибрати…"
 #~ msgid "Selected project"
 #~ msgstr "Вибраний проєкт"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "Selects which Control Centre tool subset the \"control-centre\" MCP server exposes for this campaign project. Changes apply when Poracode next starts or reconnects to a newly launched MCP process."
+msgstr "Вибирає піднабір інструментів Control Centre, який сервер MCP \"control-centre\" надає для цього проекту кампанії. Зміни застосовуються під час наступного запуску Poracode або повторного підключення до щойно запущеного процесу MCP."
+
 #: src/renderer/views/RemoteThreadView/RemoteThreadView.tsx
 msgid "Send"
 msgstr "Надіслати"
@@ -8617,6 +9122,7 @@ msgstr "Надсилати загальний текст замість назв
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/thread/ThreadComposerSection.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
 msgid "Send message"
 msgstr "Надіслати повідомлення"
 
@@ -9024,6 +9530,10 @@ msgstr "Сортувати треди"
 msgid "Source branch {branch} moved before the worktree was created"
 msgstr "Вихідна гілка {branch} перемістилася до створення worktree"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Source Health"
+msgstr "Стан джерел"
+
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Sources"
 msgstr "Джерела"
@@ -9031,6 +9541,10 @@ msgstr "Джерела"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Space separated; use quotes around spaces"
 msgstr "Розділяйте пробілами; значення з пробілами беріть у лапки"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Spend vs Budget"
+msgstr "Витрати проти бюджету"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/DevTerminalPanel/DevTerminalPanel.tsx
 msgid "Split Terminal"
@@ -9108,6 +9622,10 @@ msgstr "Підготовлено"
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 msgid "Staged ({0})"
 msgstr "Підготовлено ({0})"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Standard"
+msgstr "Стандартний"
 
 #: src/renderer/commands/registry.ts
 msgid "Star or unstar the current chat or model"
@@ -9193,6 +9711,11 @@ msgstr "Почати з розкладу"
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Start Without Context"
 msgstr "Запустити без контексту"
+
+#. placeholder {0}: startedAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Started {0}"
+msgstr "Розпочато {0}"
 
 #: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
 msgid "Started {targetLabel} thread"
@@ -9364,6 +9887,10 @@ msgstr "Надіслати рецензію"
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "Succeeded"
 msgstr "Успішно"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Suggested Questions"
+msgstr "Запропоновані запитання"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Suggestions"
@@ -9626,6 +10153,10 @@ msgstr "Цієї віддаленої сесії вже не було."
 #~ msgid "the {0} WSL user"
 #~ msgstr "користувача WSL {0}"
 
+#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
+msgid "The active remote Control Centre profile is managed by the remote server administrator. Remote servers do not support client-controlled profile reconfiguration."
+msgstr "Активний віддалений профіль Control Centre керується адміністратором віддаленого сервера. Віддалені сервери не підтримують реконфігурацію профілю на стороні клієнта."
+
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 msgid "the agent"
 msgstr "агент"
@@ -9653,6 +10184,10 @@ msgstr "Кандидати ще не внесли жодних змін."
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "the chosen folder"
 msgstr "обрана папка"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "The Control Centre campaign group this workspace binds to."
+msgstr "Група кампаній Центру керування, до якої прив'язана ця робоча область."
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
@@ -9859,6 +10394,10 @@ msgstr "Це назавжди видалить гілку \"{0}\"."
 msgid "this project"
 msgstr "цей проєкт"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "This project isn't linked to a Control Centre campaign yet."
+msgstr "Цей проєкт ще не пов'язаний із кампанією Центру керування."
+
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "This remote project is unavailable. Reconnect the environment and try again."
 msgstr "Цей віддалений проєкт недоступний. Перепідключіть середовище та спробуйте ще раз."
@@ -9950,6 +10489,10 @@ msgstr "Панель мети треда"
 msgid "Thread is already unloaded."
 msgstr "Тред уже вивантажено."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Thread messages will appear here"
+msgstr "Повідомлення треду з'являться тут"
+
 #: src/renderer/components/thread/PresentationModeTabs.tsx
 msgid "Thread mode"
 msgstr "Режим треда"
@@ -9966,6 +10509,14 @@ msgstr "Порядок сортування тредів"
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Thread todo dock"
 msgstr "Панель завдань треда"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Thread topics"
+msgstr "Теми треду"
+
+#: src/renderer/actions/campaignProjectActions.ts
+msgid "Thread was not found after creation — the workspace could not be saved."
+msgstr "Тред не знайдено після створення — не вдалося зберегти робочу область."
 
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/ThreadSettings.tsx
@@ -10134,6 +10685,10 @@ msgstr "Тип"
 #: src/renderer/commands/CommandPalette.tsx
 msgid "Type a command"
 msgstr "Введіть команду"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Type a message…"
+msgstr "Введіть повідомлення…"
 
 #: src/mobile/views/BrowserView.tsx
 msgid "Type into the page"
@@ -10424,6 +10979,10 @@ msgstr "Видалити"
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Unknown"
 msgstr "Невідомо"
+
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Unknown mention. Try @codex, @claude, @daily-operator, @verify, etc."
+msgstr "Невідома згадка. Спробуйте @codex, @claude, @daily-operator, @verify тощо."
 
 #: src/renderer/notifications.ts
 msgid "Unknown project"
@@ -10727,6 +11286,10 @@ msgstr "Переглянути {0}"
 #: src/renderer/views/SettingsOverlay/parts/ChangelogSettings.tsx
 msgid "View all releases on GitHub"
 msgstr "Усі випуски на GitHub"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "View child thread"
+msgstr "Переглянути дочірній тред"
 
 #: src/mobile/views/GitActionSheet.tsx
 msgid "View diff"

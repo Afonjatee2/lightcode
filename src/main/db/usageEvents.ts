@@ -1,4 +1,9 @@
-import { bumpProfileDataGeneration, getProfileDataGeneration, getSqlite } from "./connection";
+import {
+  bumpProfileDataGeneration,
+  getProfileDataGeneration,
+  getSqlite,
+  runWriteTransaction,
+} from "./connection";
 
 // ── Durable usage-events log (decoupled from thread lifecycle) ──────
 //
@@ -37,8 +42,8 @@ export function dbAppendUsageEvents(events: readonly UsageEventInput[]): void {
   const stmt = sqlite.prepare(
     "INSERT INTO usage_events (ts, kind, provider, model, mode, fast, effort, name, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
   );
-  sqlite.transaction((rows: readonly UsageEventInput[]) => {
-    for (const e of rows) {
+  runWriteTransaction(sqlite, () => {
+    for (const e of events) {
       stmt.run(
         e.ts,
         e.kind,
@@ -51,7 +56,7 @@ export function dbAppendUsageEvents(events: readonly UsageEventInput[]): void {
         e.value ?? 1,
       );
     }
-  })(events);
+  });
   bumpProfileDataGeneration();
 }
 

@@ -25,6 +25,8 @@ import {
   dbSyncAll,
   dbUpsertProject,
   dbUpsertThread,
+  markProjectIdsKnown,
+  markThreadIdsKnown,
 } from "../db";
 import {
   deleteThreadAttachments,
@@ -35,6 +37,7 @@ import {
   writeImageFile,
 } from "../attachments/localFiles";
 import { createProjectDirectory } from "../projectDirectory";
+import { ensureCampaignWorkspaceDir } from "../campaignWorkspaceDir";
 import { diffSyncedThreadIds } from "./threadSyncBroadcast";
 import { showOsNotification } from "../osNotifications";
 import { showAndFocusWindow } from "../window/showAndFocusWindow";
@@ -208,6 +211,10 @@ export function createLocalIpcHandlers(
       return true;
     },
     createProjectDirectory: (payload) => createProjectDirectory(payload),
+    ensureCampaignWorkspaceDir: (payload) => {
+      const baseDir = options.requirePoracodePaths().baseDir;
+      return ensureCampaignWorkspaceDir(baseDir, payload);
+    },
     // Desktop-as-client: proxy a remote Poracode server request through the
     // main process (no browser CORS). Restricted to http(s) and a bounded
     // response so a hostile/buggy peer can't exfiltrate via odd schemes or
@@ -409,8 +416,19 @@ export function createLocalIpcHandlers(
       }
       return { nativeCapable };
     },
-    dbGetProjects: () => dbGetProjects(),
-    dbGetThreads: () => dbGetThreads(),
+    // Marks ids "known" to the renderer's store — see the doc comment on
+    // `dbSyncAll` for why this hydration read is the gate that lets its
+    // full-snapshot reconciliation safely delete rows again.
+    dbGetProjects: () => {
+      const projects = dbGetProjects();
+      markProjectIdsKnown(projects.map((project) => project.id));
+      return projects;
+    },
+    dbGetThreads: () => {
+      const threads = dbGetThreads();
+      markThreadIdsKnown(threads.map((thread) => thread.id));
+      return threads;
+    },
     dbGetState: (key) => dbGetState(key),
     dbSetState: ({ key, value }) => dbSetState(key, value),
     dbUpsertProject: (project) => dbUpsertProject(project, 0),

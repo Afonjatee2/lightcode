@@ -64,6 +64,10 @@ export function dbUpsertProject(project: Project, sortOrder: number): void {
       scripts: project.scripts ? JSON.stringify(project.scripts) : null,
       searchSettings: project.searchSettings ? JSON.stringify(project.searchSettings) : null,
       mcpServers: project.mcpServers ? JSON.stringify(project.mcpServers) : null,
+      purpose: project.purpose ?? null,
+      campaignExtension: project.campaignExtension ? JSON.stringify(project.campaignExtension) : null,
+      // Legacy compatibility only; campaignExtension is canonical.
+      campaignGroupId: project.campaignExtension?.campaignGroupId ?? null,
       disabled: !!project.disabled,
       sortOrder,
       createdAt: project.createdAt,
@@ -77,6 +81,10 @@ export function dbUpsertProject(project: Project, sortOrder: number): void {
         scripts: project.scripts ? JSON.stringify(project.scripts) : null,
         searchSettings: project.searchSettings ? JSON.stringify(project.searchSettings) : null,
         mcpServers: project.mcpServers ? JSON.stringify(project.mcpServers) : null,
+        purpose: project.purpose ?? null,
+        campaignExtension: project.campaignExtension ? JSON.stringify(project.campaignExtension) : null,
+        // Legacy compatibility only; campaignExtension is canonical.
+        campaignGroupId: project.campaignExtension?.campaignGroupId ?? null,
         disabled: !!project.disabled,
         sortOrder,
       },

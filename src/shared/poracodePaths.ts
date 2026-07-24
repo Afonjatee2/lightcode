@@ -21,6 +21,11 @@ export interface PoracodePaths {
    * of fetching the CDN URL on every mount.
    */
   acpIconsDir: string;
+  /**
+   * Managed workspace directories for campaign projects. Each campaign project
+   * gets its own subdirectory named by project ID under this root.
+   */
+  campaignWorkspacesDir: string;
 }
 
 export function resolvePoracodeBaseDir(
@@ -46,5 +51,6 @@ export function resolvePoracodePaths(baseDir: string = resolvePoracodeBaseDir())
     statusCachePath: join(cacheDir, "agent-status-cache.json"),
     agentPluginsDir: join(baseDir, "agent-plugins"),
     acpIconsDir: join(cacheDir, "acp-icons"),
+    campaignWorkspacesDir: join(baseDir, "campaign-workspaces"),
   };
 }

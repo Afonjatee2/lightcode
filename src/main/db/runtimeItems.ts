@@ -3,7 +3,7 @@ import type { RuntimeEvent, ThreadContextUsage, ToolCallPayload } from "@/shared
 import { inlineImagePayloadRenders } from "@/shared/inlineImagePayload";
 import type { PersistedRuntimePage } from "@/shared/ipc/schemas";
 import { isSubAgentTool } from "@/shared/toolCallClassification";
-import { getSqlite } from "./connection";
+import { getSqlite, runWriteTransaction } from "./connection";
 import { safeParse } from "./rowMappers";
 
 /**
@@ -373,7 +373,7 @@ export function dbApplyThreadRuntimeEvents(
 ): void {
   if (events.length === 0) return;
   const sqlite = getSqlite();
-  sqlite.transaction(() => {
+  runWriteTransaction(sqlite, () => {
     if (!threadExistsInSqlite(sqlite, threadId)) return;
 
     const getItem = sqlite.prepare(
@@ -502,15 +502,15 @@ export function dbApplyThreadRuntimeEvents(
           break;
       }
     }
-  })();
+  });
 }
 
 export function dbReplaceThreadRuntimeItems(threadId: string, items: PersistedRuntimeItem[]): void {
   const sqlite = getSqlite();
-  sqlite.transaction(() => {
+  runWriteTransaction(sqlite, () => {
     if (!threadExistsInSqlite(sqlite, threadId)) return;
     replaceThreadRuntimeItemsInSqlite(sqlite, threadId, items);
-  })();
+  });
 }
 
 function threadExistsInSqlite(sqlite: InstanceType<typeof Database>, threadId: string): boolean {
@@ -570,7 +570,7 @@ export function dbClearThreadRuntimeItems(threadId: string): void {
 
 export function dbTruncateThreadRuntimeAfter(threadId: string, itemId: string): void {
   const sqlite = getSqlite();
-  sqlite.transaction(() => {
+  runWriteTransaction(sqlite, () => {
     const checkpoint = sqlite
       .prepare("SELECT position FROM thread_runtime_items WHERE thread_id = ? AND item_id = ?")
       .get(threadId, itemId) as { position: number } | undefined;
@@ -590,7 +590,7 @@ export function dbTruncateThreadRuntimeAfter(threadId: string, itemId: string): 
            )`,
       )
       .run(threadId);
-  })();
+  });
 }
 
 /**
@@ -624,7 +624,7 @@ export function dbGetThreadCompletedTurns(threadId: string): PersistedCompletedT
 
 export function dbAppendThreadCompletedTurn(threadId: string, turn: PersistedCompletedTurn): void {
   const sqlite = getSqlite();
-  sqlite.transaction(() => {
+  runWriteTransaction(sqlite, () => {
     if (!threadExistsInSqlite(sqlite, threadId)) return;
     const row = sqlite
       .prepare(
@@ -638,7 +638,7 @@ export function dbAppendThreadCompletedTurn(threadId: string, turn: PersistedCom
          VALUES (?, ?, ?, ?, ?)`,
       )
       .run(threadId, row.idx, turn.startedAt, turn.endedAt, turn.anchorItemId);
-  })();
+  });
 }
 
 export function dbGetLatestThreadRuntimeAnchorItemId(threadId: string): string | null {
@@ -659,10 +659,10 @@ export function dbReplaceThreadCompletedTurns(
   turns: PersistedCompletedTurn[],
 ): void {
   const sqlite = getSqlite();
-  sqlite.transaction(() => {
+  runWriteTransaction(sqlite, () => {
     if (!threadExistsInSqlite(sqlite, threadId)) return;
     replaceThreadCompletedTurnsInSqlite(sqlite, threadId, turns);
-  })();
+  });
 }
 
 export function dbReplaceThreadRuntimeSnapshot(
@@ -672,14 +672,14 @@ export function dbReplaceThreadRuntimeSnapshot(
   contextUsage: ThreadContextUsage | null | undefined,
 ): void {
   const sqlite = getSqlite();
-  sqlite.transaction(() => {
+  runWriteTransaction(sqlite, () => {
     if (!threadExistsInSqlite(sqlite, threadId)) return;
     replaceThreadRuntimeItemsInSqlite(sqlite, threadId, items);
     replaceThreadCompletedTurnsInSqlite(sqlite, threadId, turns);
     if (contextUsage !== undefined) {
       replaceThreadContextUsageInSqlite(sqlite, threadId, contextUsage);
     }
-  })();
+  });
 }
 
 export function dbGetThreadContextUsage(threadId: string): ThreadContextUsage | null {

@@ -1,8 +1,10 @@
 import { useLayoutEffect, type RefObject } from "react";
 import { Trans } from "@lingui/react/macro";
 import type { AgentStatus, ProjectLocation, PromptSegment, Thread } from "@/shared/contracts";
+import { openThread } from "@/renderer/actions/threadActions";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
-import { useThread } from "@/renderer/state/useThread";
+import { useProject, useThread } from "@/renderer/state/useThread";
+import { ConsultationDock } from "@/renderer/components/consultations";
 import { ChatPane } from "./ChatPane/ChatPane";
 import { ChatRuntimeDebugPanel } from "./ChatPane/ChatRuntimeDebugPanel";
 import { guiChatFontCssVars } from "./ChatPane/chatFontVars";
@@ -38,6 +40,8 @@ export function GuiThreadContent(
 ) {
   const runtimeDebugOpen = import.meta.env.DEV && props.runtimeDebugOpen;
   const thread = useThread(props.threadId) ?? props.fallbackThread;
+  const project = useProject(thread.projectId);
+  const campaignGroupId = project?.campaignExtension?.campaignGroupId;
   const guiChatFontSize = useSharedSettings((s) => s.guiChatFontSize);
   useLayoutEffect(() => {
     clearUserMessageCollapsedHeightCache();
@@ -104,6 +108,9 @@ export function GuiThreadContent(
           ) : null}
         </div>
       </div>
+      {campaignGroupId ? (
+        <ConsultationDock threadId={thread.id} onOpenThread={(id) => openThread(id)} />
+      ) : null}
       {props.hideComposer ? null : (
         <ThreadComposerSection
           {...props}

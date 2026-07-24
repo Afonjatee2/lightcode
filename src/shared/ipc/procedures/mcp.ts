@@ -14,6 +14,9 @@ import {
   mcpProbePayloadSchema,
   type McpProbePayload,
   type McpProbeResult,
+  mcpToolCallPayloadSchema,
+  type McpToolCallPayload,
+  type McpToolCallResult,
   reloadAgentMcpServersPayloadSchema,
   type ReloadAgentMcpServersPayload,
 } from "../../contracts";
@@ -29,6 +32,11 @@ export const mcpProcedures = {
     "probeMcpServer",
     "supervisor",
     mcpProbePayloadSchema,
+  ),
+  callMcpTool: definePayloadProcedure<McpToolCallPayload, McpToolCallResult, "supervisor">(
+    "callMcpTool",
+    "supervisor",
+    mcpToolCallPayloadSchema,
   ),
   reloadAgentMcpServers: definePayloadProcedure<ReloadAgentMcpServersPayload, void, "supervisor">(
     "reloadAgentMcpServers",
