@@ -41,6 +41,11 @@ msgstr "(немає повідомлення)"
 msgid "{0, plural, one {# candidate} other {# candidates}}"
 msgstr "{0, plural, one {# кандидат} few {# кандидати} many {# кандидатів} other {# кандидата}}"
 
+#. placeholder {0}: state.iterations ?? 0
+#: src/renderer/components/thread/ThreadGoalDock.tsx
+msgid "{0, plural, one {# check} other {# checks}}"
+msgstr "{0, plural, one {# перевірка} few {# перевірки} many {# перевірок} other {# перевірки}}"
+
 #. placeholder {0}: details.changedFiles
 #. placeholder {0}: entry.files
 #. placeholder {0}: stats.files
@@ -90,8 +95,8 @@ msgstr "{0, plural, one {# інструмент} few {# інструменти} 
 
 #. placeholder {0}: state.iterations ?? 0
 #: src/renderer/components/thread/ThreadGoalDock.tsx
-msgid "{0, plural, one {# turn} other {# turns}}"
-msgstr "{0, plural, one {# хід} few {# ходи} many {# ходів} other {# ходу}}"
+#~ msgid "{0, plural, one {# turn} other {# turns}}"
+#~ msgstr "{0, plural, one {# хід} few {# ходи} many {# ходів} other {# ходу}}"
 
 #. placeholder {0}: candidates.length
 #: src/renderer/components/experiment/NewExperimentModal.tsx
@@ -713,11 +718,11 @@ msgid "Actions"
 msgstr "Дії"
 
 #. placeholder {0}: thread.title
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Actions for {0}"
 msgstr "Дії для {0}"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Actions for {title}"
 msgstr "Дії для {title}"
 
@@ -897,6 +902,10 @@ msgstr "Додати до обраного"
 msgid "Add to Home Screen"
 msgstr "Додати на головний екран"
 
+#: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
+msgid "Add to-do"
+msgstr "Додати завдання"
+
 #: src/renderer/views/MainView/parts/CampaignModeGate.tsx
 msgid "Advanced Mode (Code)"
 msgstr "Розширений режим (Код)"
@@ -1063,6 +1072,7 @@ msgstr "Усі проєкти"
 msgid "All sources"
 msgstr "Усі джерела"
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/helpers.ts
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Allow"
@@ -1086,6 +1096,7 @@ msgstr "Дозволити eval"
 msgid "Allow replacing conflicting managed skills"
 msgstr "Дозволити заміну конфліктних керованих навичок"
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Allow the browser to show notifications while the app is in the background."
 msgstr "Дозвольте браузеру показувати сповіщення, поки застосунок працює у фоновому режимі."
@@ -1195,7 +1206,8 @@ msgstr "Архівувати {0}"
 msgid "Archive All"
 msgstr "Архівувати все"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Archive all threads"
 msgstr "Архівувати всі потоки"
 
@@ -1208,7 +1220,8 @@ msgid "Archive thread"
 msgstr "Архівувати тред"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Archive Thread"
 msgstr "Архівувати тред"
@@ -1400,8 +1413,10 @@ msgid "Avatar color {color}"
 msgstr "Колір аватара {color}"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/mobile/views/NotesView.tsx
 #: src/mobile/views/pr/PrPageHeader.tsx
 #: src/mobile/views/TerminalView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/composer/ComposerAddMenu.tsx
@@ -1736,6 +1751,7 @@ msgid "Can't load ports"
 msgstr "Не вдалося завантажити порти"
 
 #. Dialog button: dismiss without deleting
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/GitActionSheet.tsx
@@ -1794,6 +1810,7 @@ msgstr "Скасувати видалення проєкту"
 msgid "cancelled"
 msgstr "скасовано"
 
+#: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 msgid "Cancelled"
 msgstr "Скасовано"
@@ -2224,10 +2241,11 @@ msgstr "Закрити ціль"
 msgid "Close group"
 msgstr "Закрити групу"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Close group actions"
 msgstr "Закрити дії групи"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/mobile/UserMessageActionsSheet.tsx
 #: src/mobile/views/GitActionSheet.tsx
 msgid "Close menu"
@@ -2287,6 +2305,7 @@ msgstr "Закрити пошук"
 msgid "Close Split"
 msgstr "Закрити розділення"
 
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
 msgid "Close subagent"
 msgstr "Закрити субагент"
@@ -2312,7 +2331,7 @@ msgid "Close thread"
 msgstr "Закрити тред"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Close thread actions"
 msgstr "Закрити дії потоку"
 
@@ -2826,7 +2845,7 @@ msgstr "Розмова"
 #: src/mobile/UserMessageActionsSheet.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/CopyTextButton.tsx
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copied"
 msgstr "Скопійовано"
@@ -2882,7 +2901,7 @@ msgstr "Не вдалося скопіювати"
 msgid "Copy ignored files"
 msgstr "Копіювати ігноровані файли"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 #: src/renderer/views/ProfileOverlay/parts/ShareDialog.tsx
 msgid "Copy image"
 msgstr "Копіювати зображення"
@@ -3453,7 +3472,8 @@ msgid "Delete thread"
 msgstr "Видалити тред"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Delete Thread"
 msgstr "Видалити тред"
@@ -3462,12 +3482,14 @@ msgstr "Видалити тред"
 msgid "Delete thread?"
 msgstr "Видалити тред?"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 msgid "Delete to-do"
 msgstr "Видалити завдання"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorktreeGroup.tsx
 msgid "Delete Worktree"
 msgstr "Видалити worktree"
@@ -3769,7 +3791,7 @@ msgstr "Завершено"
 msgid "Done · Waiting for your input"
 msgstr "Готово · Очікується ваш ввід"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 msgid "Download image"
 msgstr "Завантажити зображення"
 
@@ -3914,6 +3936,10 @@ msgstr "Зусилля та контекст"
 msgid "Effort levels"
 msgstr "Рівні зусиль"
 
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
+msgid "Effort levels for {modelName}"
+msgstr "Рівні зусиль для {modelName}"
+
 #. About page label: Electron framework version
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Electron"
@@ -3949,6 +3975,7 @@ msgstr "Увімкнути підтримку мовного сервера дл
 msgid "Enable microphone access in your system settings, then try again."
 msgstr "Увімкніть доступ до мікрофона в налаштуваннях системи та спробуйте ще раз."
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Enable notifications"
@@ -4297,6 +4324,7 @@ msgstr "Factory Droid"
 msgid "failed"
 msgstr "не вдалося"
 
+#: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "Failed"
@@ -4402,6 +4430,7 @@ msgstr "Файл занадто великий для відображення (
 msgid "File uses an unsupported encoding."
 msgstr "Файл використовує непідтримуване кодування."
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 msgid "Files"
@@ -4518,6 +4547,14 @@ msgstr "Першокласна інтеграція Kimi Code CLI з викор�
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class OpenCode integration using Poracode's native SDK runtime."
 msgstr "Першокласна інтеграція OpenCode з використанням нативного середовища виконання SDK Poracode."
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+msgid "First-class Pi integration using a real terminal and Pi's native SDK runtime."
+msgstr "Повноцінна інтеграція Pi зі справжнім терміналом і нативним SDK-рантаймом Pi."
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+msgid "First-class Qoder CLI integration using Poracode's native terminal and ACP runtimes."
+msgstr "Повноцінна інтеграція Qoder CLI з нативними термінальним і ACP-рантаймами Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Qwen Code integration using Poracode's native terminal and ACP runtimes."
@@ -4730,6 +4767,7 @@ msgid "Get task"
 msgstr "Отримати завдання"
 
 #: src/mobile/settingsSections.ts
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
@@ -5016,7 +5054,7 @@ msgstr "Шлях до файлу ідентифікації"
 msgid "Idle"
 msgstr "Очікування"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Image"
 msgstr "Зображення"
@@ -5118,6 +5156,10 @@ msgstr "Сканування камерою в застосунку працює
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Inactive"
 msgstr "Неактивно"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
+msgid "Inherit global"
+msgstr "Успадковувати глобальні"
 
 #. Badge on an exclude pattern inherited from a lower scope
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
@@ -5322,10 +5364,11 @@ msgid "Kill bash"
 msgstr "Завершити bash"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
-msgid "Kimi"
-msgstr "Kimi"
+#~ msgid "Kimi"
+#~ msgstr "Kimi"
 
 #: src/renderer/components/providers/kimi/manifest.ts
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
 msgid "Kimi Code"
 msgstr "Kimi Code"
 
@@ -5541,6 +5584,7 @@ msgid "Loading threads"
 msgstr "Завантаження потоків"
 
 #: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/HostFolderPicker.tsx
 #: src/renderer/app.tsx
@@ -5704,7 +5748,8 @@ msgstr "Керується провайдером"
 msgid "Manual order"
 msgstr "Ручний порядок"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Mark all done"
 msgstr "Позначити все як виконане"
 
@@ -5726,7 +5771,8 @@ msgid "Mark done"
 msgstr "Позначити виконаним"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Mark Done"
 msgstr "Позначити виконаним"
@@ -6316,6 +6362,10 @@ msgstr "Новий рядок"
 msgid "New MCP server"
 msgstr "Новий сервер MCP"
 
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
+msgid "new model"
+msgstr "нова модель"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "New phones, tablets, and browsers appear here after pairing."
 msgstr "Нові телефони, планшети й браузери з’являться тут після сполучення."
@@ -6379,7 +6429,8 @@ msgid "New thread from this to-do"
 msgstr "Новий тред із цієї задачі"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "New thread in worktree"
 msgstr "Новий потік у worktree"
 
@@ -6810,7 +6861,7 @@ msgstr "На цьому віддаленому комп’ютері не вст
 msgid "No supported agents detected"
 msgstr "Підтримуваних агентів не виявлено"
 
-#: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "No thread selected"
 msgstr "Потік не вибрано"
@@ -6887,10 +6938,16 @@ msgstr "Вхід не виконано"
 msgid "Not supported"
 msgstr "Не підтримується"
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 msgid "Notes"
 msgstr "Нотатки"
+
+#: src/mobile/ThreadTitleRow.tsx
+#: src/mobile/views/NotesView.tsx
+msgid "Notes & to-dos"
+msgstr "Нотатки й завдання"
 
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
 msgid "Nothing tracked yet. It'll appear here as you use it."
@@ -7117,7 +7174,7 @@ msgstr "Відкрити перегляд Git"
 msgid "Open git review as a right-side panel or a full page."
 msgstr "Відкривати перегляд Git як праву панель або повну сторінку."
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 msgid "Open image preview"
 msgstr "Відкрити перегляд зображення"
 
@@ -7188,7 +7245,7 @@ msgstr "Відкрити PR #{prNumber}"
 msgid "Open PR on GitHub"
 msgstr "Відкрити PR на GitHub"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 msgid "Open preview"
 msgstr "Відкрити перегляд"
 
@@ -7232,12 +7289,14 @@ msgstr "Відкрити Tailscale"
 
 #: src/mobile/ThreadTitleRow.tsx
 #: src/mobile/views/TerminalView.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Open terminal"
 msgstr "Открыть терминал"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Open terminal in worktree"
 msgstr "Открыть терминал в worktree"
 
@@ -7545,7 +7604,11 @@ msgstr "дозвіл"
 msgid "Permission-restricted content hidden"
 msgstr "Контент з обмеженим доступом приховано"
 
-#: src/mobile/routeComponents.tsx
+#: src/renderer/components/providers/pi/manifest.ts
+msgid "Pi"
+msgstr "Pi"
+
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "Pick a thread from the list to follow the agent from here."
 msgstr "Виберіть потік зі списку, щоб стежити за агентом звідси."
@@ -7567,7 +7630,8 @@ msgid "Picker returned no attachment"
 msgstr "Вибір не повернув вкладення"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Pin to top"
 msgstr "Закріпити вгорі"
@@ -7670,8 +7734,10 @@ msgstr "Переспрямування портів не увімкнено"
 
 #: src/mobile/chrome.ts
 #: src/mobile/NarrowShell.tsx
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/mobile/WideShell.tsx
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 msgid "Ports"
 msgstr "Порти"
 
@@ -7997,6 +8063,10 @@ msgstr "Надсилайте оновлення на спарені мобіль
 msgid "Q4 Brand Launch"
 msgstr "Запуск бренду в Q4"
 
+#: src/renderer/components/providers/qoder/manifest.ts
+msgid "Qoder CLI"
+msgstr "Qoder CLI"
+
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionSwitcher.tsx
 msgid "Questions"
 msgstr "Питання"
@@ -8007,12 +8077,16 @@ msgid "Quota reached"
 msgstr "Квоту вичерпано"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
-msgid "Qwen"
-msgstr "Qwen"
+#~ msgid "Qwen"
+#~ msgstr "Qwen"
 
 #: src/renderer/components/providers/qwen/manifest.ts
 msgid "Qwen Code"
 msgstr "Qwen Code"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
+msgid "Qwen Token Plan"
+msgstr "Qwen Token Plan"
 
 #: src/renderer/components/providers/usageFormat.ts
 msgid "Ran out"
@@ -8347,10 +8421,13 @@ msgid "Remove worktree?"
 msgstr "Видалити worktree?"
 
 #: src/mobile/ThreadTitleRow.tsx
+#: src/mobile/TodoActionsSheet.tsx
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/FilesView.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Rename"
 msgstr "Перейменувати"
@@ -8498,6 +8575,10 @@ msgstr "Змінити розмір панелі git"
 msgid "Resize notes and to-dos"
 msgstr "Змінити розмір нотаток і завдань"
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+msgid "Resize right panel"
+msgstr "Змінити розмір правої панелі"
+
 #: src/renderer/components/layout/SplitPaneContainer.tsx
 msgid "Resize row"
 msgstr "Змінити розмір рядка"
@@ -8559,6 +8640,7 @@ msgstr "Продовжити"
 #: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
+#: src/renderer/views/GitReviewOverlay/parts/GitStackedDiff.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Retry"
 msgstr "Повторить"
@@ -8707,6 +8789,8 @@ msgstr "Клацніть правою кнопкою, щоб перемкнут�
 msgid "Role:"
 msgstr "Роль:"
 
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
@@ -9734,6 +9818,7 @@ msgstr "Почати новий тред як панель, а не сторін
 msgid "Start a new thread from the selected text"
 msgstr "Створити новий тред із виділеного тексту"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 msgid "Start a new thread from this to-do"
 msgstr "Створити новий тред із цього завдання"
@@ -9910,6 +9995,8 @@ msgstr "Зберігається на цьому пристрої; на комп
 #~ msgid "Stored on this phone; the desktop keeps its own values."
 #~ msgstr "Збережено на цьому телефоні; десктоп зберігає власні значення."
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
 msgid "Subagent"
 msgstr "Субагент"
@@ -10164,6 +10251,7 @@ msgid "Tell the target provider what to do next..."
 msgstr "Укажіть цільовому провайдеру, що робити далі..."
 
 #: src/mobile/settingsSections.ts
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
@@ -10632,6 +10720,7 @@ msgstr "Генерація заголовків"
 msgid "Title, commit, and conflict models"
 msgstr "Модели для заголовков, коммитов и конфликтов"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
 msgid "To-dos"
 msgstr "Завдання"
@@ -10701,6 +10790,10 @@ msgstr "Обмеження інструментів неможливо імпо�
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Tool search"
 msgstr "Пошук інструментів"
+
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+msgid "Tools"
+msgstr "Інструменти"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Total installs"
@@ -10850,6 +10943,10 @@ msgstr "Не вдалося встановити хуки {0}."
 #: src/renderer/actions/agentLoginActions.ts
 msgid "Unable to install {0}."
 msgstr "Не вдалося встановити {0}."
+
+#: src/renderer/views/GitReviewOverlay/parts/GitStackedDiff.tsx
+msgid "Unable to load diff."
+msgstr "Не вдалося завантажити diff."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Unable to load remote access pairing."
@@ -11096,7 +11193,8 @@ msgstr "Вивантажувати неактивні треди через (х�
 msgid "Unload Thread"
 msgstr "Вивантажити тред"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Unmark all done"
 msgstr "Снять отметку выполнения со всех"
 
@@ -11105,7 +11203,8 @@ msgid "Unmark done"
 msgstr "Зняти позначку «готово»"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Unmark Done"
 msgstr "Зняти позначку «готово»"
@@ -11119,7 +11218,8 @@ msgid "Unphased:"
 msgstr "Без фази:"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Unpin"
 msgstr "Відкріпити"
@@ -11243,6 +11343,7 @@ msgstr "Потрібно вказати URL."
 #: src/mobile/NarrowShell.tsx
 #: src/mobile/settingsSections.ts
 #: src/mobile/ThreadUsageIndicator.tsx
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/WideShell.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/providers/ProviderUsageRail.tsx

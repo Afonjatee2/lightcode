@@ -41,6 +41,11 @@ msgstr "(メッセージはありません)"
 msgid "{0, plural, one {# candidate} other {# candidates}}"
 msgstr "{0, plural, one {候補 # 件} other {候補 # 件}}"
 
+#. placeholder {0}: state.iterations ?? 0
+#: src/renderer/components/thread/ThreadGoalDock.tsx
+msgid "{0, plural, one {# check} other {# checks}}"
+msgstr "{0, plural, other {# 件のチェック}}"
+
 #. placeholder {0}: details.changedFiles
 #. placeholder {0}: entry.files
 #. placeholder {0}: stats.files
@@ -90,8 +95,8 @@ msgstr "{0, plural, one {# 個のツール} other {# 個のツール}}"
 
 #. placeholder {0}: state.iterations ?? 0
 #: src/renderer/components/thread/ThreadGoalDock.tsx
-msgid "{0, plural, one {# turn} other {# turns}}"
-msgstr "{0, plural, other {# ターン}}"
+#~ msgid "{0, plural, one {# turn} other {# turns}}"
+#~ msgstr "{0, plural, other {# ターン}}"
 
 #. placeholder {0}: candidates.length
 #: src/renderer/components/experiment/NewExperimentModal.tsx
@@ -712,11 +717,11 @@ msgid "Actions"
 msgstr "アクション"
 
 #. placeholder {0}: thread.title
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Actions for {0}"
 msgstr "{0} のアクション"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Actions for {title}"
 msgstr "{title} のアクション"
 
@@ -896,6 +901,10 @@ msgstr "お気に入りに追加"
 msgid "Add to Home Screen"
 msgstr "ホーム画面に追加"
 
+#: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
+msgid "Add to-do"
+msgstr "To-do を追加"
+
 #: src/renderer/views/MainView/parts/CampaignModeGate.tsx
 msgid "Advanced Mode (Code)"
 msgstr "詳細モード（コード）"
@@ -1062,6 +1071,7 @@ msgstr "すべてのプロジェクト"
 msgid "All sources"
 msgstr "すべてのソース"
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/helpers.ts
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Allow"
@@ -1085,6 +1095,7 @@ msgstr "評価を許可する"
 msgid "Allow replacing conflicting managed skills"
 msgstr "競合する管理対象スキルの置き換えを許可"
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Allow the browser to show notifications while the app is in the background."
 msgstr "アプリがバックグラウンドにある間、ブラウザに通知の表示を許可します。"
@@ -1194,7 +1205,8 @@ msgstr "アーカイブ{0}"
 msgid "Archive All"
 msgstr "すべてをアーカイブする"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Archive all threads"
 msgstr "すべてのスレッドをアーカイブ"
 
@@ -1207,7 +1219,8 @@ msgid "Archive thread"
 msgstr "スレッドをアーカイブ"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Archive Thread"
 msgstr "アーカイブスレッド"
@@ -1399,8 +1412,10 @@ msgid "Avatar color {color}"
 msgstr "アバターの色：{color}"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/mobile/views/NotesView.tsx
 #: src/mobile/views/pr/PrPageHeader.tsx
 #: src/mobile/views/TerminalView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/composer/ComposerAddMenu.tsx
@@ -1735,6 +1750,7 @@ msgid "Can't load ports"
 msgstr "ポートを読み込めません"
 
 #. Dialog button: dismiss without deleting
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/GitActionSheet.tsx
@@ -1793,6 +1809,7 @@ msgstr "プロジェクトの削除をキャンセル"
 msgid "cancelled"
 msgstr "キャンセルされました"
 
+#: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 msgid "Cancelled"
 msgstr "キャンセル済み"
@@ -2223,10 +2240,11 @@ msgstr "ゴールを閉じる"
 msgid "Close group"
 msgstr "グループを閉じる"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Close group actions"
 msgstr "グループのアクションを閉じる"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/mobile/UserMessageActionsSheet.tsx
 #: src/mobile/views/GitActionSheet.tsx
 msgid "Close menu"
@@ -2286,6 +2304,7 @@ msgstr "検索を閉じる"
 msgid "Close Split"
 msgstr "分割を閉じる"
 
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
 msgid "Close subagent"
 msgstr "サブエージェントを閉じる"
@@ -2311,7 +2330,7 @@ msgid "Close thread"
 msgstr "スレッドを閉じる"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
 msgid "Close thread actions"
 msgstr "スレッドのアクションを閉じる"
 
@@ -2825,7 +2844,7 @@ msgstr "会話"
 #: src/mobile/UserMessageActionsSheet.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/CopyTextButton.tsx
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copied"
 msgstr "コピーされました"
@@ -2881,7 +2900,7 @@ msgstr "コピーに失敗しました"
 msgid "Copy ignored files"
 msgstr "無視されたファイルをコピーする"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 #: src/renderer/views/ProfileOverlay/parts/ShareDialog.tsx
 msgid "Copy image"
 msgstr "画像をコピー"
@@ -3452,7 +3471,8 @@ msgid "Delete thread"
 msgstr "スレッドの削除"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Delete Thread"
 msgstr "スレッドの削除"
@@ -3461,12 +3481,14 @@ msgstr "スレッドの削除"
 msgid "Delete thread?"
 msgstr "スレッドを削除しますか?"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 msgid "Delete to-do"
 msgstr "To-Doを削除する"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorktreeGroup.tsx
 msgid "Delete Worktree"
 msgstr "ワークツリーの削除"
@@ -3768,7 +3790,7 @@ msgstr "完了"
 msgid "Done · Waiting for your input"
 msgstr "完了 · 入力を待っています"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 msgid "Download image"
 msgstr "画像をダウンロード"
 
@@ -3913,6 +3935,10 @@ msgstr "エフォートとコンテキスト"
 msgid "Effort levels"
 msgstr "推論レベル"
 
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
+msgid "Effort levels for {modelName}"
+msgstr "{modelName} の努力レベル"
+
 #. About page label: Electron framework version
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Electron"
@@ -3948,6 +3974,7 @@ msgstr "型チェック、補完、診断に対する言語サーバーのサポ
 msgid "Enable microphone access in your system settings, then try again."
 msgstr "システム設定でマイクへのアクセスを有効にしてから、もう一度試してください。"
 
+#: src/mobile/push/WebPushPermissionPrompt.tsx
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Enable notifications"
@@ -4296,6 +4323,7 @@ msgstr "Factory Droid"
 msgid "failed"
 msgstr "失敗しました"
 
+#: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "Failed"
@@ -4401,6 +4429,7 @@ msgstr "ファイルが大きすぎて表示できません（{0, plural, one {#
 msgid "File uses an unsupported encoding."
 msgstr "ファイルはサポートされていないエンコーディングを使用しています。"
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 msgid "Files"
@@ -4517,6 +4546,14 @@ msgstr "Poracode のネイティブ ランタイムを使用したファース�
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class OpenCode integration using Poracode's native SDK runtime."
 msgstr "Poracode のネイティブ SDK ランタイムを使用したファーストクラスの OpenCode 統合。"
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+msgid "First-class Pi integration using a real terminal and Pi's native SDK runtime."
+msgstr "実ターミナルと Pi ネイティブ SDK ランタイムによる第一級の Pi 統合。"
+
+#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
+msgid "First-class Qoder CLI integration using Poracode's native terminal and ACP runtimes."
+msgstr "Poracode ネイティブのターミナルおよび ACP ランタイムによる第一級の Qoder CLI 統合。"
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Qwen Code integration using Poracode's native terminal and ACP runtimes."
@@ -4729,6 +4766,7 @@ msgid "Get task"
 msgstr "タスクの取得"
 
 #: src/mobile/settingsSections.ts
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
@@ -5015,7 +5053,7 @@ msgstr "秘密鍵ファイルのパス"
 msgid "Idle"
 msgstr "アイドル状態"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Image"
 msgstr "画像"
@@ -5117,6 +5155,10 @@ msgstr "アプリ内のカメラスキャンは HTTPS でのみ動作します�
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Inactive"
 msgstr "非アクティブ"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
+msgid "Inherit global"
+msgstr "グローバルを継承"
 
 #. Badge on an exclude pattern inherited from a lower scope
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
@@ -5321,10 +5363,11 @@ msgid "Kill bash"
 msgstr "bash を終了"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
-msgid "Kimi"
-msgstr "Kimi"
+#~ msgid "Kimi"
+#~ msgstr "Kimi"
 
 #: src/renderer/components/providers/kimi/manifest.ts
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
 msgid "Kimi Code"
 msgstr "Kimi Code"
 
@@ -5540,6 +5583,7 @@ msgid "Loading threads"
 msgstr "スレッドを読み込み中"
 
 #: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/HostFolderPicker.tsx
 #: src/renderer/app.tsx
@@ -5703,7 +5747,8 @@ msgstr "プロバイダーが管理"
 msgid "Manual order"
 msgstr "手動並び替え"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Mark all done"
 msgstr "すべて完了にする"
 
@@ -5725,7 +5770,8 @@ msgid "Mark done"
 msgstr "完了マークを付ける"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Mark Done"
 msgstr "完了マークを付ける"
@@ -6314,6 +6360,10 @@ msgstr "改行"
 msgid "New MCP server"
 msgstr "新しいMCPサーバー"
 
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
+msgid "new model"
+msgstr "新しいモデル"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "New phones, tablets, and browsers appear here after pairing."
 msgstr "新しい電話、タブレット、ブラウザーはペアリング後にここに表示されます。"
@@ -6377,7 +6427,8 @@ msgid "New thread from this to-do"
 msgstr "この ToDo からの新しいスレッド"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "New thread in worktree"
 msgstr "worktree で新規スレッド"
 
@@ -6808,7 +6859,7 @@ msgstr "このリモートマシンには対応エージェントがインスト
 msgid "No supported agents detected"
 msgstr "サポートされているエージェントが検出されませんでした"
 
-#: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "No thread selected"
 msgstr "スレッドが選択されていません"
@@ -6885,10 +6936,16 @@ msgstr "サインインしていません"
 msgid "Not supported"
 msgstr "サポートされていません"
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 msgid "Notes"
 msgstr "注意事項"
+
+#: src/mobile/ThreadTitleRow.tsx
+#: src/mobile/views/NotesView.tsx
+msgid "Notes & to-dos"
+msgstr "メモと To-do"
 
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
 msgid "Nothing tracked yet. It'll appear here as you use it."
@@ -7115,7 +7172,7 @@ msgstr "Git レビューを開く"
 msgid "Open git review as a right-side panel or a full page."
 msgstr "git review を右側のパネルまたはページ全体として開きます。"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 msgid "Open image preview"
 msgstr "画像のプレビューを開く"
 
@@ -7186,7 +7243,7 @@ msgstr "PR #{prNumber}を開く"
 msgid "Open PR on GitHub"
 msgstr "GitHub で PR を開く"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 msgid "Open preview"
 msgstr "プレビューを開く"
 
@@ -7230,12 +7287,14 @@ msgstr "Tailscaleを開く"
 
 #: src/mobile/ThreadTitleRow.tsx
 #: src/mobile/views/TerminalView.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Open terminal"
 msgstr "ターミナルを開く"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Open terminal in worktree"
 msgstr "worktree でターミナルを開く"
 
@@ -7543,7 +7602,11 @@ msgstr "許可"
 msgid "Permission-restricted content hidden"
 msgstr "権限制限コンテンツは非表示"
 
-#: src/mobile/routeComponents.tsx
+#: src/renderer/components/providers/pi/manifest.ts
+msgid "Pi"
+msgstr "Pi"
+
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "Pick a thread from the list to follow the agent from here."
 msgstr "ここからエージェントを追うには、一覧からスレッドを選択してください。"
@@ -7565,7 +7628,8 @@ msgid "Picker returned no attachment"
 msgstr "ピッカーは添付ファイルを返しませんでした"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Pin to top"
 msgstr "トップにピン留めする"
@@ -7668,8 +7732,10 @@ msgstr "ポート転送が有効になっていません"
 
 #: src/mobile/chrome.ts
 #: src/mobile/NarrowShell.tsx
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/mobile/WideShell.tsx
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 msgid "Ports"
 msgstr "ポート"
 
@@ -7995,6 +8061,10 @@ msgstr "スレッドが完了したり対応が必要になったりしたとき
 msgid "Q4 Brand Launch"
 msgstr "Q4ブランドローンチ"
 
+#: src/renderer/components/providers/qoder/manifest.ts
+msgid "Qoder CLI"
+msgstr "Qoder CLI"
+
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionSwitcher.tsx
 msgid "Questions"
 msgstr "質問"
@@ -8005,12 +8075,16 @@ msgid "Quota reached"
 msgstr "クォータに達しました"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
-msgid "Qwen"
-msgstr "Qwen"
+#~ msgid "Qwen"
+#~ msgstr "Qwen"
 
 #: src/renderer/components/providers/qwen/manifest.ts
 msgid "Qwen Code"
 msgstr "Qwen Code"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
+msgid "Qwen Token Plan"
+msgstr "Qwen Token Plan"
 
 #: src/renderer/components/providers/usageFormat.ts
 msgid "Ran out"
@@ -8345,10 +8419,13 @@ msgid "Remove worktree?"
 msgstr "ワークツリーを削除しますか?"
 
 #: src/mobile/ThreadTitleRow.tsx
+#: src/mobile/TodoActionsSheet.tsx
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/FilesView.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Rename"
 msgstr "名前の変更"
@@ -8496,6 +8573,10 @@ msgstr "gitパネルのサイズを変更する"
 msgid "Resize notes and to-dos"
 msgstr "メモと ToDo のサイズを変更する"
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+msgid "Resize right panel"
+msgstr "右パネルのサイズを変更"
+
 #: src/renderer/components/layout/SplitPaneContainer.tsx
 msgid "Resize row"
 msgstr "行のサイズを変更する"
@@ -8557,6 +8638,7 @@ msgstr "再開"
 #: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
+#: src/renderer/views/GitReviewOverlay/parts/GitStackedDiff.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Retry"
 msgstr "再試行"
@@ -8705,6 +8787,8 @@ msgstr "右クリックでリングを切り替え"
 msgid "Role:"
 msgstr "役割:"
 
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
@@ -9732,6 +9816,7 @@ msgstr "新しいスレッドをページではなくパネルとして開始す
 msgid "Start a new thread from the selected text"
 msgstr "選択したテキストから新しいスレッドを開始します"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 msgid "Start a new thread from this to-do"
 msgstr "この ToDo から新しいスレッドを開始します"
@@ -9908,6 +9993,8 @@ msgstr "このデバイスに保存されます。デスクトップ側の値は
 #~ msgid "Stored on this phone; the desktop keeps its own values."
 #~ msgstr "このスマートフォンに保存されます。デスクトップ側は独自の値を保持します。"
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
 msgid "Subagent"
 msgstr "サブエージェント"
@@ -10162,6 +10249,7 @@ msgid "Tell the target provider what to do next..."
 msgstr "ターゲットプロバイダーに次に何をすべきかを伝えます..."
 
 #: src/mobile/settingsSections.ts
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
@@ -10630,6 +10718,7 @@ msgstr "タイトルの生成"
 msgid "Title, commit, and conflict models"
 msgstr "タイトル、コミット、競合用モデル"
 
+#: src/mobile/TodoActionsSheet.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
 msgid "To-dos"
 msgstr "やるべきこと"
@@ -10699,6 +10788,10 @@ msgstr "ツール制限はインポートできません"
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Tool search"
 msgstr "ツール検索"
+
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+msgid "Tools"
+msgstr "ツール"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Total installs"
@@ -10848,6 +10941,10 @@ msgstr "{0}フックをインストールできません。"
 #: src/renderer/actions/agentLoginActions.ts
 msgid "Unable to install {0}."
 msgstr "{0}をインストールできません。"
+
+#: src/renderer/views/GitReviewOverlay/parts/GitStackedDiff.tsx
+msgid "Unable to load diff."
+msgstr "差分を読み込めませんでした。"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Unable to load remote access pairing."
@@ -11094,7 +11191,8 @@ msgstr "アイドル状態のスレッドをアンロードするまでの時間
 msgid "Unload Thread"
 msgstr "スレッドをアンロード"
 
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 msgid "Unmark all done"
 msgstr "すべての完了を解除"
 
@@ -11103,7 +11201,8 @@ msgid "Unmark done"
 msgstr "完了のマークを外す"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Unmark Done"
 msgstr "完了のマークを外す"
@@ -11117,7 +11216,8 @@ msgid "Unphased:"
 msgstr "フェーズなし:"
 
 #: src/mobile/ThreadTitleRow.tsx
-#: src/mobile/views/ThreadsView.tsx
+#: src/mobile/views/threadActionSurfaces.tsx
+#: src/mobile/views/threadContextMenus.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Unpin"
 msgstr "固定を解除する"
@@ -11241,6 +11341,7 @@ msgstr "URLは必須です。"
 #: src/mobile/NarrowShell.tsx
 #: src/mobile/settingsSections.ts
 #: src/mobile/ThreadUsageIndicator.tsx
+#: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/WideShell.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/providers/ProviderUsageRail.tsx

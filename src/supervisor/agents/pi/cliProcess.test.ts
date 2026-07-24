@@ -19,6 +19,18 @@ function resolveSystemPi(): string | undefined {
 
 const SYSTEM_PI = resolveSystemPi();
 
+/** Upstream Pi argv uses `--approve`; older installed CLIs reject unknown flags. */
+function systemPiSupportsApprove(executable: string): boolean {
+  try {
+    const help = execFileSync(executable, ["--help"], { encoding: "utf8" });
+    return /\s--approve\b/.test(help);
+  } catch {
+    return false;
+  }
+}
+
+const SYSTEM_PI_SUPPORTS_APPROVE = SYSTEM_PI !== undefined && systemPiSupportsApprove(SYSTEM_PI);
+
 interface ProcessResult {
   stdout: string;
   stderr: string;
@@ -76,7 +88,9 @@ function openAiChunk(content: string, finishReason: string | null = null): strin
   });
 }
 
-describe.runIf(process.platform === "darwin" && SYSTEM_PI !== undefined)("Pi CLI process", () => {
+describe.runIf(
+  process.platform === "darwin" && SYSTEM_PI !== undefined && SYSTEM_PI_SUPPORTS_APPROVE,
+)("Pi CLI process", () => {
   let root: string;
   let agentDir: string;
   let projectDir: string;
