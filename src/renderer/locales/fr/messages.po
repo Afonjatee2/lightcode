@@ -195,6 +195,11 @@ msgstr "{0} est déjà à jour."
 msgid "{0} is comparing the anonymized diffs…"
 msgstr "{0} compare les diffs anonymisés…"
 
+#. placeholder {0}: copy.fileName
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+msgid "{0} is larger than 100 MB. The agent may have trouble reading it."
+msgstr "{0} dépasse 100 Mo. L'agent pourrait avoir du mal à le lire."
+
 #. placeholder {0}: summary.maxLabel
 #: src/renderer/components/thread/ThreadContextDock.tsx
 msgid "{0} limit"
@@ -1263,6 +1268,11 @@ msgstr "Attacher le dock todo au compositeur"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
 msgid "Attached browser selection."
 msgstr "Sélection du navigateur ci-jointe."
+
+#. placeholder {0}: relativePaths.join(" ")
+#: src/renderer/views/CampaignWorkspace/parts/campaignComposerAttachments.ts
+msgid "Attached files: {0}"
+msgstr "Fichiers joints : {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
@@ -3763,6 +3773,7 @@ msgid "Drives"
 msgstr "Lecteurs"
 
 #: src/renderer/components/thread/ThreadComposer.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "Drop here to attach"
 msgstr "Déposez ici pour joindre"
 

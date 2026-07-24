@@ -79,6 +79,7 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "copyImageToClipboard",
   "createProjectDirectory",
   "ensureCampaignWorkspaceDir",
+  "copyCampaignConsultationAttachments",
   "remoteHttpRequest",
   "openExternal",
   "openExternalNative",

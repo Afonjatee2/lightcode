@@ -195,6 +195,11 @@ msgstr "{0}はすでに最新です。"
 msgid "{0} is comparing the anonymized diffs…"
 msgstr "{0} が匿名化された差分を比較しています…"
 
+#. placeholder {0}: copy.fileName
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+msgid "{0} is larger than 100 MB. The agent may have trouble reading it."
+msgstr "{0}は100 MBを超えています。エージェントが読み取れない可能性があります。"
+
 #. placeholder {0}: summary.maxLabel
 #: src/renderer/components/thread/ThreadContextDock.tsx
 msgid "{0} limit"
@@ -1262,6 +1267,11 @@ msgstr "todo ドックをコンポーザーにアタッチする"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
 msgid "Attached browser selection."
 msgstr "ブラウザの選択範囲を添付しました。"
+
+#. placeholder {0}: relativePaths.join(" ")
+#: src/renderer/views/CampaignWorkspace/parts/campaignComposerAttachments.ts
+msgid "Attached files: {0}"
+msgstr "添付ファイル: {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
@@ -3762,6 +3772,7 @@ msgid "Drives"
 msgstr "ドライブ"
 
 #: src/renderer/components/thread/ThreadComposer.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "Drop here to attach"
 msgstr "ここにドロップして添付します"
 

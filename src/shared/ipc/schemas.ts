@@ -94,6 +94,24 @@ export interface EnsureCampaignWorkspaceDirResult {
   location: z.infer<typeof projectLocationSchema>;
 }
 
+export const copyCampaignConsultationAttachmentsPayloadSchema = z.object({
+  projectId: z.string().min(1),
+  name: z.string().optional(),
+  sourcePaths: z.array(z.string().min(1)).min(1),
+});
+export type CopyCampaignConsultationAttachmentsPayload = z.infer<
+  typeof copyCampaignConsultationAttachmentsPayloadSchema
+>;
+export interface CopiedCampaignConsultationAttachment {
+  relativePath: string;
+  fileName: string;
+  sizeBytes: number;
+  largeFile: boolean;
+}
+export interface CopyCampaignConsultationAttachmentsResult {
+  copies: CopiedCampaignConsultationAttachment[];
+}
+
 export const readThreadPayloadSchema = z.object({
   threadId: z.string().min(1),
 });

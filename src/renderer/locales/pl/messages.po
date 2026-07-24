@@ -195,6 +195,11 @@ msgstr "{0} jest już aktualny."
 msgid "{0} is comparing the anonymized diffs…"
 msgstr "{0} porównuje zanonimizowane różnice…"
 
+#. placeholder {0}: copy.fileName
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+msgid "{0} is larger than 100 MB. The agent may have trouble reading it."
+msgstr "{0} ma więcej niż 100 MB. Agent może mieć problem z odczytem."
+
 #. placeholder {0}: summary.maxLabel
 #: src/renderer/components/thread/ThreadContextDock.tsx
 msgid "{0} limit"
@@ -1263,6 +1268,11 @@ msgstr "Przypnij panel zadań do kompozytora"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
 msgid "Attached browser selection."
 msgstr "Załączono zaznaczenie z przeglądarki."
+
+#. placeholder {0}: relativePaths.join(" ")
+#: src/renderer/views/CampaignWorkspace/parts/campaignComposerAttachments.ts
+msgid "Attached files: {0}"
+msgstr "Załączone pliki: {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
@@ -3763,6 +3773,7 @@ msgid "Drives"
 msgstr "Dyski"
 
 #: src/renderer/components/thread/ThreadComposer.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "Drop here to attach"
 msgstr "Upuść tutaj, aby dołączyć"
 
