@@ -951,6 +951,14 @@ msgstr "Add to Home Screen"
 msgid "Add to-do"
 msgstr "Add to-do"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "added"
+msgstr "added"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Added"
+msgstr "Added"
+
 #: src/renderer/views/MainView/parts/CampaignModeGate.tsx
 msgid "Advanced Mode (Code)"
 msgstr "Advanced Mode (Code)"
@@ -1076,6 +1084,7 @@ msgstr "Alerts when threads need you"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/skills/SkillsManager.tsx
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
@@ -1559,6 +1568,7 @@ msgstr "Back to overview"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Back to thread"
 msgstr "Back to thread"
 
@@ -1993,6 +2003,14 @@ msgstr "Cannot create a default worktree path without a branch name"
 msgid "Cannot switch branches — commit or stash your changes first"
 msgstr "Cannot switch branches — commit or stash your changes first"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Cell-level provenance"
+msgstr "Cell-level provenance"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Change"
+msgstr "Change"
+
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 msgid "Change project folder"
 msgstr "Change project folder"
@@ -2004,6 +2022,14 @@ msgstr "Change shortcut"
 #: src/renderer/views/MainView/parts/AppOverlays.tsx
 msgid "Change User"
 msgstr "Change User"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "changed"
+msgstr "changed"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Changed"
+msgstr "Changed"
 
 #. Link to the list of release notes
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
@@ -2705,9 +2731,18 @@ msgstr "Compacting context"
 msgid "Compare this fingerprint with the one shown by your server."
 msgstr "Compare this fingerprint with the one shown by your server."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Compare to published plan"
+msgstr "Compare to published plan"
+
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #~ msgid "Comparing candidates…"
 #~ msgstr "Comparing candidates…"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanIntelligencePane.tsx
+msgid "Comparing plan versions…"
+msgstr "Comparing plan versions…"
 
 #: src/renderer/components/consultations/ConsultationPanelCard.tsx
 msgid "complete"
@@ -3051,6 +3086,10 @@ msgstr "Control Centre MCP Profile"
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
 msgstr "Control Centre needs authorization. Reconnect it in MCP settings."
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Control Centre reports the revised plan matches the published plan."
+msgstr "Control Centre reports the revised plan matches the published plan."
+
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Control plane"
 msgstr "Control plane"
@@ -3338,6 +3377,10 @@ msgstr "Create a pull request for candidate {0} ({label})"
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Create a useful routine with one click, then adjust it anytime."
 msgstr "Create a useful routine with one click, then adjust it anytime."
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Create approval proposal"
+msgstr "Create approval proposal"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Create Campaign Workspace"
@@ -4758,6 +4801,7 @@ msgid "Fetch"
 msgstr "Fetch"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Field"
 msgstr "Field"
 
@@ -5936,6 +5980,10 @@ msgstr "Light"
 msgid "Lightcode data import is unavailable with a custom data folder."
 msgstr "Lightcode data import is unavailable with a custom data folder."
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Line item"
+msgstr "Line item"
+
 #: src/renderer/components/skills/SkillImportModal.tsx
 msgid "Link to source"
 msgstr "Link to source"
@@ -6155,6 +6203,10 @@ msgstr "Looking for dev servers…"
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 msgid "Losing worktrees and branches will be removed. Their session history will remain."
 msgstr "Losing worktrees and branches will be removed. Their session history will remain."
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Low confidence"
+msgstr "Low confidence"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Low risk"
@@ -6380,6 +6432,10 @@ msgstr "MCP tool calls"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "MCP transport type"
 msgstr "MCP transport type"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Media plan attachments detected in this thread."
+msgstr "Media plan attachments detected in this thread."
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Medium risk"
@@ -7048,6 +7104,10 @@ msgstr "No camera found"
 msgid "No changes"
 msgstr "No changes"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "No changes detected"
+msgstr "No changes detected"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/GitDiffContent.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/parts/SingleFileDiff.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/ConflictFileCard.tsx
@@ -7344,6 +7404,10 @@ msgstr "No repositories found."
 msgid "No results"
 msgstr "No results"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "No rows match this filter."
+msgstr "No rows match this filter."
+
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "No runs yet."
 msgstr "No runs yet."
@@ -7577,6 +7641,10 @@ msgstr "Only when unfocused"
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Only you can approve — nothing executes without it"
 msgstr "Only you can approve — nothing executes without it"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Only you can approve — nothing executes without it."
+msgstr "Only you can approve — nothing executes without it."
 
 #: src/renderer/notifications.ts
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
@@ -8086,6 +8154,14 @@ msgstr "Parent folder on the server"
 msgid "Parent folder, e.g. /home/me/projects"
 msgstr "Parent folder, e.g. /home/me/projects"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Parsed and compared against the published plan"
+msgstr "Parsed and compared against the published plan"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Parser confidence"
+msgstr "Parser confidence"
+
 #: src/renderer/utils/prStatus.ts
 msgid "Passed"
 msgstr "Passed"
@@ -8226,6 +8302,14 @@ msgstr "Plan"
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Plan · Fan out · Review"
 msgstr "Plan · Fan out · Review"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanIntelligencePane.tsx
+msgid "Plan comparison failed"
+msgstr "Plan comparison failed"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Plan diff and provenance"
+msgstr "Plan diff and provenance"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Plan fact"
@@ -8514,6 +8598,10 @@ msgstr "Prompt"
 msgid "Prompts"
 msgstr "Prompts"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Proposal created — review it in the approval docket."
+msgstr "Proposal created — review it in the approval docket."
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Proposal lifecycle"
 msgstr "Proposal lifecycle"
@@ -8588,6 +8676,14 @@ msgstr "Public URL"
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Public URL updated."
 msgstr "Public URL updated."
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Published"
+msgstr "Published"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Published value"
+msgstr "Published value"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/useWorktreeActions.ts
 msgid "Pull"
@@ -9072,6 +9168,14 @@ msgstr "Remove the linked skill “{0}”? Its source folder will not be deleted
 msgid "Remove worktree?"
 msgstr "Remove worktree?"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "removed"
+msgstr "removed"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Removed"
+msgstr "Removed"
+
 #: src/mobile/ThreadTitleRow.tsx
 #: src/mobile/TodoActionsSheet.tsx
 #: src/mobile/views/DesktopsView.tsx
@@ -9402,6 +9506,10 @@ msgstr "Review comment"
 msgid "Review decision"
 msgstr "Review decision"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Review in approvals"
+msgstr "Review in approvals"
+
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Review mode"
 msgstr "Review mode"
@@ -9438,6 +9546,14 @@ msgstr "Reviewing"
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #~ msgid "Reviewing each candidate's changes to recommend a winner."
 #~ msgstr "Reviewing each candidate's changes to recommend a winner."
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Revised"
+msgstr "Revised"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Revised value"
+msgstr "Revised value"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Revoke {name}"
@@ -10382,6 +10498,14 @@ msgstr "Sorted by severity · click through to the campaign thread"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Source branch {branch} moved before the worktree was created"
 msgstr "Source branch {branch} moved before the worktree was created"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Source cell"
+msgstr "Source cell"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Source cell unattributed"
+msgstr "Source cell unattributed"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Source health"
@@ -11949,6 +12073,10 @@ msgstr "Unable to update the thread."
 msgid "Unassigned"
 msgstr "Unassigned"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Unattributed"
+msgstr "Unattributed"
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Unavailable"
 msgstr "Unavailable"
@@ -11956,6 +12084,10 @@ msgstr "Unavailable"
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Unavailable project"
 msgstr "Unavailable project"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "unchanged"
+msgstr "unchanged"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 msgid "Ungroup"

@@ -951,6 +951,14 @@ msgstr "Додати на головний екран"
 msgid "Add to-do"
 msgstr "Додати завдання"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "added"
+msgstr "додано"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Added"
+msgstr "Додано"
+
 #: src/renderer/views/MainView/parts/CampaignModeGate.tsx
 msgid "Advanced Mode (Code)"
 msgstr "Розширений режим (Код)"
@@ -1076,6 +1084,7 @@ msgstr "Сповіщення, коли потокам потрібна ваша 
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/skills/SkillsManager.tsx
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
@@ -1559,6 +1568,7 @@ msgstr "Назад до огляду"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Back to thread"
 msgstr "Назад до гілки"
 
@@ -1993,6 +2003,14 @@ msgstr "Неможливо створити шлях worktree за замовч�
 msgid "Cannot switch branches — commit or stash your changes first"
 msgstr "Неможливо перемкнути гілки — спочатку закомітьте зміни або помістіть їх у stash"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Cell-level provenance"
+msgstr "Походження на рівні комірки"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Change"
+msgstr "Зміна"
+
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 msgid "Change project folder"
 msgstr "Змінити папку проєкту"
@@ -2004,6 +2022,14 @@ msgstr "Змінити комбінацію клавіш"
 #: src/renderer/views/MainView/parts/AppOverlays.tsx
 msgid "Change User"
 msgstr "Змінити користувача"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "changed"
+msgstr "змінено"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Changed"
+msgstr "Змінено"
 
 #. Link to the list of release notes
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
@@ -2705,9 +2731,18 @@ msgstr "Стиснення контексту"
 msgid "Compare this fingerprint with the one shown by your server."
 msgstr "Порівняйте цей відбиток із відбитком, показаним на вашому сервері."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Compare to published plan"
+msgstr "Порівняти з опублікованим планом"
+
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #~ msgid "Comparing candidates…"
 #~ msgstr "Порівняння кандидатів…"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanIntelligencePane.tsx
+msgid "Comparing plan versions…"
+msgstr "Порівняння версій плану…"
 
 #: src/renderer/components/consultations/ConsultationPanelCard.tsx
 msgid "complete"
@@ -3051,6 +3086,10 @@ msgstr "Профіль MCP Control Centre"
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
 msgstr "Центру керування потрібна авторизація. Перепідключіть його в налаштуваннях MCP."
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Control Centre reports the revised plan matches the published plan."
+msgstr "Control Centre повідомляє, що переглянутий план збігається з опублікованим."
+
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Control plane"
 msgstr "Панель керування"
@@ -3338,6 +3377,10 @@ msgstr "Створити pull request для кандидата {0} ({label})"
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Create a useful routine with one click, then adjust it anytime."
 msgstr "Створіть корисний розпорядок одним клацанням і змінюйте його будь-коли."
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Create approval proposal"
+msgstr "Створити пропозицію на затвердження"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Create Campaign Workspace"
@@ -4758,6 +4801,7 @@ msgid "Fetch"
 msgstr "Отримати"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Field"
 msgstr "Поле"
 
@@ -5936,6 +5980,10 @@ msgstr "Світла"
 msgid "Lightcode data import is unavailable with a custom data folder."
 msgstr "Імпорт даних Lightcode недоступний за використання власної папки даних."
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Line item"
+msgstr "Позиція"
+
 #: src/renderer/components/skills/SkillImportModal.tsx
 msgid "Link to source"
 msgstr "Зв’язати з джерелом"
@@ -6155,6 +6203,10 @@ msgstr "Пошук серверів розробки…"
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 msgid "Losing worktrees and branches will be removed. Their session history will remain."
 msgstr "Worktree та гілки кандидатів, які не перемогли, буде видалено. Історію їхніх сеансів буде збережено."
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Low confidence"
+msgstr "Низька впевненість"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Low risk"
@@ -6380,6 +6432,10 @@ msgstr "Виклики інструментів MCP"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "MCP transport type"
 msgstr "Тип транспорту MCP"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Media plan attachments detected in this thread."
+msgstr "У цій гілці виявлено вкладення медіаплану."
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Medium risk"
@@ -7048,6 +7104,10 @@ msgstr "Камеру не знайдено"
 msgid "No changes"
 msgstr "Немає змін"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "No changes detected"
+msgstr "Змін не виявлено"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/GitDiffContent.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/parts/SingleFileDiff.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/ConflictFileCard.tsx
@@ -7344,6 +7404,10 @@ msgstr "Репозиторії не знайдено."
 msgid "No results"
 msgstr "Немає результатів"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "No rows match this filter."
+msgstr "Жоден рядок не відповідає цьому фільтру."
+
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "No runs yet."
 msgstr "Запусків ще немає."
@@ -7577,6 +7641,10 @@ msgstr "Лише коли немає фокусу"
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Only you can approve — nothing executes without it"
 msgstr "Лише ви можете затвердити — без затвердження нічого не виконається"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Only you can approve — nothing executes without it."
+msgstr "Лише ви можете затвердити — без цього нічого не виконується."
 
 #: src/renderer/notifications.ts
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
@@ -8086,6 +8154,14 @@ msgstr "Батьківська папка на сервері"
 msgid "Parent folder, e.g. /home/me/projects"
 msgstr "Батьківська папка, напр. /home/me/projects"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Parsed and compared against the published plan"
+msgstr "Розібрано та порівняно з опублікованим планом"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Parser confidence"
+msgstr "Впевненість парсера"
+
 #: src/renderer/utils/prStatus.ts
 msgid "Passed"
 msgstr "Пройдено"
@@ -8226,6 +8302,14 @@ msgstr "План"
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Plan · Fan out · Review"
 msgstr "План · Розподіл · Перевірка"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanIntelligencePane.tsx
+msgid "Plan comparison failed"
+msgstr "Не вдалося порівняти план"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Plan diff and provenance"
+msgstr "Відмінності плану та походження"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Plan fact"
@@ -8514,6 +8598,10 @@ msgstr "Промпт"
 msgid "Prompts"
 msgstr "Запити"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Proposal created — review it in the approval docket."
+msgstr "Пропозицію створено — перегляньте її в досьє затвердження."
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Proposal lifecycle"
 msgstr "Життєвий цикл пропозиції"
@@ -8588,6 +8676,14 @@ msgstr "Публічний URL"
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Public URL updated."
 msgstr "Публічний URL оновлено."
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Published"
+msgstr "Опубліковано"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Published value"
+msgstr "Опубліковане значення"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/useWorktreeActions.ts
 msgid "Pull"
@@ -9072,6 +9168,14 @@ msgstr "Видалити пов’язану навичку «{0}»? Її вих
 msgid "Remove worktree?"
 msgstr "Видалити worktree?"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "removed"
+msgstr "видалено"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Removed"
+msgstr "Видалено"
+
 #: src/mobile/ThreadTitleRow.tsx
 #: src/mobile/TodoActionsSheet.tsx
 #: src/mobile/views/DesktopsView.tsx
@@ -9402,6 +9506,10 @@ msgstr "Коментар до рев'ю"
 msgid "Review decision"
 msgstr "Рішення щодо рев'ю"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Review in approvals"
+msgstr "Переглянути в затвердженнях"
+
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Review mode"
 msgstr "Review mode"
@@ -9438,6 +9546,14 @@ msgstr "На перевірці"
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #~ msgid "Reviewing each candidate's changes to recommend a winner."
 #~ msgstr "Перегляд змін кожного кандидата, щоб порекомендувати переможця."
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Revised"
+msgstr "Переглянуто"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Revised value"
+msgstr "Переглянуте значення"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Revoke {name}"
@@ -10382,6 +10498,14 @@ msgstr "За важливістю · перейти до гілки кампан
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Source branch {branch} moved before the worktree was created"
 msgstr "Вихідна гілка {branch} перемістилася до створення worktree"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Source cell"
+msgstr "Вихідна комірка"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Source cell unattributed"
+msgstr "Вихідну комірку не вказано"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Source health"
@@ -11949,6 +12073,10 @@ msgstr "Не удалось обновить поток."
 msgid "Unassigned"
 msgstr "Не призначено"
 
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "Unattributed"
+msgstr "Не вказано"
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Unavailable"
 msgstr "Недоступно"
@@ -11956,6 +12084,10 @@ msgstr "Недоступно"
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Unavailable project"
 msgstr "Недоступний проєкт"
+
+#: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
+msgid "unchanged"
+msgstr "без змін"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 msgid "Ungroup"
