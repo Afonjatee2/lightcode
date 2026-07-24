@@ -165,6 +165,16 @@ msgstr "{0} 자격 증명이 저장되었습니다."
 msgid "{0} devices"
 msgstr "기기 {0}개"
 
+#. placeholder {0}: summary.failed
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} failed"
+msgstr "{0}개 실패"
+
+#. placeholder {0}: summary.healthy
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} healthy"
+msgstr "{0}개 정상"
+
 #. placeholder {0}: props.agentLabel
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "{0} hooks installed for {envName}."
@@ -254,6 +264,11 @@ msgstr "{0}회 실행"
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
 msgid "{0} runs"
 msgstr "{0}회 실행"
+
+#. placeholder {0}: summary.stale
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} stale"
+msgstr "{0}개 오래됨"
 
 #. placeholder {0}: evidenceFreshness.staleSourceCount
 #: src/renderer/components/consultations/ContextWarnings.tsx
@@ -1036,6 +1051,10 @@ msgstr "모두 실패"
 msgid "All files"
 msgstr "모든 파일"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "All other live campaigns"
+msgstr "기타 모든 진행 중 캠페인"
+
 #: src/mobile/views/ThreadsView.tsx
 msgid "All projects"
 msgstr "모든 프로젝트"
@@ -1222,12 +1241,24 @@ msgstr "스테이징되지 않은 모든 변경 사항을 되돌리시겠습니�
 msgid "Arguments"
 msgstr "인수"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask"
+msgstr "질문"
+
 #. placeholder {0}: agentStatus?.label ?? agentFallbackLabel
 #. placeholder {0}: project.name
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/views/QuickComposerOverlay/QuickComposerOverlay.tsx
 msgid "Ask {0} anything about this workspace"
 msgstr "이 작업 공간에 대해 {0}에게 무엇이든 물어보세요"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask anything about your campaigns"
+msgstr "캠페인에 대해 무엇이든 질문하세요"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask anything about your campaigns…"
+msgstr "캠페인에 대해 무엇이든 질문하세요…"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Ask each time"
@@ -1695,6 +1726,8 @@ msgid "Campaign workspace \"{0}\" created."
 msgstr "캠페인 작업 영역 \"{0}\"이(가) 생성되었습니다."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarCampaignsSection.tsx
+#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 msgid "Campaigns"
 msgstr "캠페인"
 
@@ -2766,6 +2799,7 @@ msgstr "제어 센터를 사용할 수 없습니다. 수동으로 캠페인 작�
 msgid "Control Centre MCP Profile"
 msgstr "Control Centre MCP 프로필"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
@@ -3033,6 +3067,10 @@ msgstr "스킬을 업데이트하지 못했습니다."
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 msgid "Create"
 msgstr "생성"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Create a campaign project to see your operations overview."
+msgstr "운영 개요를 보려면 캠페인 프로젝트를 만드세요."
 
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
@@ -4665,6 +4703,10 @@ msgstr "PR 요약 생성"
 msgid "Generate with AI"
 msgstr "AI로 생성"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Generated"
+msgstr "생성됨"
+
 #: src/renderer/components/thread/ChatPane/parts/items/imageViewSource.ts
 msgid "Generated image"
 msgstr "생성된 이미지"
@@ -5449,6 +5491,10 @@ msgstr "마켓플레이스 로드 중…"
 msgid "Loading notes…"
 msgstr "메모 로드 중…"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Loading operations overview…"
+msgstr "운영 개요 로드 중…"
+
 #: src/renderer/components/pdf/PdfViewer.tsx
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 #~ msgid "Loading PDF…"
@@ -6173,6 +6219,10 @@ msgstr "네이티브 지원"
 msgid "Needs approval"
 msgstr "승인 필요"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Needs attention"
+msgstr "주의 필요"
+
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Needs Attention"
@@ -6211,6 +6261,7 @@ msgstr "새 작업 이름"
 msgid "New branch name..."
 msgstr "새 브랜치 이름..."
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "New Campaign Project"
 msgstr "새 캠페인 프로젝트"
@@ -6643,6 +6694,10 @@ msgstr "열린 알림이 없습니다."
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No other agents installed"
 msgstr "다른 에이전트가 설치되어 있지 않습니다."
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "No other live campaigns."
+msgstr "다른 진행 중 캠페인이 없습니다."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "No paired devices yet."
@@ -8031,6 +8086,10 @@ msgstr "최근 설치"
 #: src/renderer/views/HomeView.tsx
 msgid "Recent threads"
 msgstr "최근 스레드"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Recently resolved"
+msgstr "최근 해결됨"
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Recommendations:"
@@ -9553,6 +9612,10 @@ msgstr "작업 트리가 생성되기 전에 소스 브랜치 {branch}이(가) �
 msgid "Source Health"
 msgstr "소스 상태"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Source health:"
+msgstr "소스 상태:"
+
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Sources"
 msgstr "소스"
@@ -10573,9 +10636,17 @@ msgstr "제목, 커밋 및 충돌 모델"
 msgid "To-dos"
 msgstr "할 일"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Today"
+msgstr "오늘"
+
 #: src/renderer/commands/registry.ts
 msgid "Toggle browser panel"
 msgstr "브라우저 패널 표시 전환"
+
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarCampaignsSection.tsx
+msgid "Toggle campaigns section"
+msgstr "캠페인 섹션 전환"
 
 #: src/renderer/commands/composerCommands.ts
 #: src/renderer/components/providers/codex/index.tsx
@@ -11410,6 +11481,10 @@ msgstr "{methodName} 인증을 기다리는 중입니다. 감지된 에이전트
 #: src/renderer/components/thread/ThreadPendingSteerStrip.tsx
 msgid "waiting for agent to stop"
 msgstr "에이전트가 중지되기를 기다리는 중"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Waiting for approval"
+msgstr "승인 대기 중"
 
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "Waiting for workflow to spawn agents…"

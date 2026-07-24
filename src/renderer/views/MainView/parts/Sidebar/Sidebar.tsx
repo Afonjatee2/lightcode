@@ -5,6 +5,7 @@ import {
   Download,
   GitPullRequest,
   House,
+  Megaphone,
   PanelLeft,
   PanelLeftClose,
   RefreshCw,
@@ -31,6 +32,8 @@ import { useSidebar } from "@/renderer/views/MainView/parts/AppShell/AppShell";
 import { SIDEBAR_MIN_WIDTH } from "@/renderer/views/MainView/parts/AppShell/parts/useResizablePanels";
 import { SidebarPanelDragButton } from "@/renderer/views/MainView/parts/Sidebar/parts/SidebarPanelDragButton";
 import { SidebarProjectSection } from "@/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectSection";
+import { SidebarCampaignsSection } from "@/renderer/views/MainView/parts/Sidebar/parts/SidebarCampaignsSection";
+import { partitionSidebarProjects } from "@/renderer/views/MainView/parts/Sidebar/parts/partitionSidebarProjects";
 import { SidebarRemoteServers } from "@/renderer/views/MainView/parts/Sidebar/parts/SidebarRemoteServers";
 import { useRemoteServersStore } from "@/renderer/state/remoteServersStore";
 import { readBridge } from "@/renderer/bridge";
@@ -216,11 +219,10 @@ function CollapsedThreadRail() {
 
 export function Sidebar() {
   const { t } = useLingui();
-  const projectIds = useAppStore(
-    useShallow((state) =>
-      state.projects.filter((project) => !isHomeProject(project)).map((project) => project.id),
-    ),
+  const { codeProjectIds, campaignProjectIds } = useAppStore(
+    useShallow((state) => partitionSidebarProjects(state.projects)),
   );
+  const projectIds = codeProjectIds;
   const homeProject = useAppStore((state) => state.projects.find(isHomeProject));
   const homeScopeEnabled = useSharedSettings((s) => s.homeScopeEnabled);
   const remoteAccessEnabled = useSharedSettings((s) => s.remoteAccessEnabled);
@@ -243,6 +245,7 @@ export function Sidebar() {
   const setWorktreeCollapsed = useSidebarUiStore((s) => s.setWorktreeCollapsed);
   const { isCollapsed, collapse, expand } = useSidebar();
   const openHome = useAppStore((s) => s.openHome);
+  const openCampaignToday = useAppStore((s) => s.openCampaignToday);
   const openPullRequests = useAppStore((s) => s.openPullRequests);
   const openSchedules = useAppStore((s) => s.openSchedules);
   const appView = useAppStore((s) => s.view);
@@ -346,6 +349,15 @@ export function Sidebar() {
             <ProviderUsageRail orientation="column" />
             <UpdateButtons iconOnly />
             <WhatsNewButton iconOnly />
+            {campaignProjectIds.length > 0 ? (
+              <SidebarButton
+                iconOnly
+                icon={<Megaphone className="size-4" />}
+                label={t`Campaigns`}
+                isActive={appView.kind === "campaignToday"}
+                onPress={() => startTransition(() => openCampaignToday())}
+              />
+            ) : null}
             <SidebarButton
               iconOnly
               icon={<GitPullRequest className="size-4" />}
@@ -392,7 +404,9 @@ export function Sidebar() {
         style={{ minWidth: SIDEBAR_MIN_WIDTH }}
       >
         <div ref={setScrollContainer} className={sidebarBodyScrollClass()} style={scrollFadeStyle}>
-          {projectIds.length === 0 && !(homeScopeEnabled && homeProject) ? (
+          {projectIds.length === 0 &&
+          campaignProjectIds.length === 0 &&
+          !(homeScopeEnabled && homeProject) ? (
             <div className="pt-4">
               <p className="text-center text-sm text-muted">
                 <Trans>Add a project to start</Trans>
@@ -432,6 +446,11 @@ export function Sidebar() {
                   )}
                 </section>
               ) : null}
+              <SidebarCampaignsSection
+                campaignProjectIds={campaignProjectIds}
+                sortMode={sortMode}
+                codeProjectCount={projectIds.length}
+              />
               {projectIds.map((projectId, projectIndex) => (
                 <SidebarProjectSection
                   key={projectId}
