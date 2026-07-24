@@ -1,6 +1,6 @@
 {
   "name": "poracode",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "private": true,
   "description": "The universal desktop orchestrator for AI agents. Run terminal-native and structured chat agents side-by-side.",
   "homepage": "https://poracode.com/",
@@ -16,6 +16,7 @@
     "postinstall": "electron-rebuild --only better-sqlite3 && node scripts/ensure-native-deps.mjs && pnpm run codex-protocol:gen",
     "setup:native": "electron-rebuild --only better-sqlite3 && node scripts/ensure-native-deps.mjs",
     "dev": "concurrently -k -n renderer,electron,app -c cyan,magenta,yellow \"pnpm run dev:renderer\" \"pnpm run dev:electron\" \"pnpm run dev:app\"",
+    "dev:test": "cross-env VITE_PORACODE_SKIP_WELCOME=1 pnpm run dev",
     "devtools": "node scripts/dev-react-devtools.mjs",
     "dev:devtools": "cross-env PORACODE_REACT_DEVTOOLS=1 concurrently -n react-devtools,app -c green,gray \"pnpm run devtools\" \"pnpm run dev\"",
     "website:dev": "pnpm --dir website dev",
@@ -75,7 +76,7 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^1.2.1",
-    "@anthropic-ai/claude-agent-sdk": "^0.3.205",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.218",
     "@aparajita/capacitor-secure-storage": "^8.0.0",
     "@capacitor/app": "^8.1.0",
     "@capacitor/push-notifications": "^8.1.1",

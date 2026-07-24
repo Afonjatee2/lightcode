@@ -323,6 +323,8 @@ export function createRemoteSocketCoordinator(
       started = true;
       window.addEventListener("online", handleOnline);
       window.addEventListener("offline", handleOffline);
+      window.addEventListener("pageshow", handleVisibility);
+      window.addEventListener("focus", handleVisibility);
       document.addEventListener("visibilitychange", handleVisibility);
       heartbeat = window.setInterval(() => {
         if (document.visibilityState === "visible") sendHealthPing();
@@ -346,6 +348,8 @@ export function createRemoteSocketCoordinator(
       window.clearInterval(heartbeat);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("pageshow", handleVisibility);
+      window.removeEventListener("focus", handleVisibility);
       document.removeEventListener("visibilitychange", handleVisibility);
       setBrowserSocketSender(null);
       setTerminalSocketSender(null);

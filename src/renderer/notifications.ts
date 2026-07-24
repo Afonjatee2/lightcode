@@ -6,6 +6,10 @@ import { useAppStore } from "@/renderer/state/appStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useExperimentStore } from "@/renderer/state/experimentStore";
 import { isRemoteSession, readBridge } from "@/renderer/bridge";
+import {
+  isBrowserWebPushActive,
+  requestBrowserNotificationPermission,
+} from "@/renderer/browserNotificationPermission";
 import { i18n } from "@/renderer/i18n/i18n";
 
 type NotificationCategory = "done" | "needsAttention" | "error";
@@ -28,6 +32,10 @@ type SupervisorThreadStateEvent = {
   threadId: string;
   status: ThreadStatus;
   attention: ThreadAttention;
+  /** The turn settled because the user stopped it or an interrupt-backed steer
+   * replaced it. That is an acknowledgement of the user's own action, not a
+   * completion that should alert another device. */
+  forceCloseActiveTurn?: boolean;
 };
 
 const NOTIFICATION_SOUND_URL = "./notification.mp3";
@@ -153,7 +161,7 @@ function ensureBrowserNotificationPermission(): Promise<NotificationPermission> 
     return Promise.resolve(Notification.permission);
   }
   if (!permissionRequest) {
-    permissionRequest = Notification.requestPermission();
+    permissionRequest = requestBrowserNotificationPermission();
   }
   return permissionRequest;
 }
@@ -166,6 +174,10 @@ function showBrowserNotification(
   status: ThreadStatus,
 ): void {
   if (!canUseBrowserNotifications()) return;
+  // An installed PWA with an active Push API subscription is notified by its
+  // service worker, including while the page is suspended. Avoid a duplicate
+  // page-created notification when the live socket is still awake.
+  if (isBrowserWebPushActive()) return;
 
   const detail = getStatusDetail(category, status);
   const body = `${threadTitle}\n${detail}`;
@@ -241,6 +253,8 @@ export function handleThreadStateNotification(
   oldThread: Thread | undefined,
   newThread?: Pick<Thread, "status" | "attention">,
 ): void {
+  if (event.forceCloseActiveTurn) return;
+
   const settings = useSharedSettings.getState();
 
   if (!settings.notificationsEnabled) return;

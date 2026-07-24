@@ -97,6 +97,47 @@ describe("RemoteDesktopClient", () => {
     expect(authorization).toBe("Bearer lc_access_test");
   });
 
+  it("reads and writes encoded project notes paths", async () => {
+    const requests: Array<{ url: string; method: string; body: unknown }> = [];
+    const notes = {
+      projectId: "project one",
+      doc: { type: "doc", content: [] },
+      todos: [],
+      updatedAt: "2026-07-23T00:00:00.000Z",
+    };
+    const client = new RemoteDesktopClient(
+      "https://relay.example.test/s/server-1/",
+      "lc_access_test",
+      async (url, init) => {
+        requests.push({
+          url: String(url),
+          method: init?.method ?? "GET",
+          body: typeof init?.body === "string" ? (JSON.parse(init.body) as unknown) : undefined,
+        });
+        return new Response(JSON.stringify((init?.method ?? "GET") === "GET" ? { notes } : {}), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    );
+
+    await expect(client.projectNotes(notes.projectId)).resolves.toEqual(notes);
+    await expect(client.setProjectNotes(notes)).resolves.toBeUndefined();
+
+    expect(requests).toEqual([
+      {
+        url: "https://relay.example.test/s/server-1/api/projects/project%20one/notes",
+        method: "GET",
+        body: undefined,
+      },
+      {
+        url: "https://relay.example.test/s/server-1/api/projects/project%20one/notes",
+        method: "POST",
+        body: notes,
+      },
+    ]);
+  });
+
   it("requests a tail snapshot and encodes older runtime page cursors", async () => {
     const requestedUrls: string[] = [];
     const client = new RemoteDesktopClient(
@@ -120,12 +161,18 @@ describe("RemoteDesktopClient", () => {
       }),
     ).resolves.toEqual({ items: [], nextCursor: null });
     await client.threadHistory("thread one").catch(() => undefined);
+    await client
+      .threadHistory("thread one", { targetTimelineEntryCount: 20 })
+      .catch(() => undefined);
 
     expect(requestedUrls[0]).toBe(
       "https://relay.example.test/s/server-1/api/threads/thread%20one/history/items?limit=500&beforePosition=42&targetTimelineEntryCount=40",
     );
     expect(requestedUrls[1]).toBe(
       "https://relay.example.test/s/server-1/api/threads/thread%20one/history?runtimePage=1",
+    );
+    expect(requestedUrls[2]).toBe(
+      "https://relay.example.test/s/server-1/api/threads/thread%20one/history?runtimePage=1&targetTimelineEntryCount=20",
     );
   });
 

@@ -17,8 +17,13 @@ const fixtures = vi.hoisted(() => ({
   } as Project,
   composerProps: [] as Array<{
     onSubmitInput?: (prompt: string) => Promise<void>;
+    autoFocusComposer?: boolean;
     composerPlaceholder?: string;
     submitOnEnter?: boolean;
+  }>,
+  guiThreadProps: [] as Array<{
+    initialScrollRevealDelayMs?: number;
+    onInitialScrollSettled?: () => void;
   }>,
   desktopPointer: false,
   keyboardOffset: 0,
@@ -84,6 +89,7 @@ vi.mock("../GitSummaryParts", () => ({
 vi.mock("@/renderer/components/thread/ThreadComposerSection", () => ({
   ThreadComposerSection: (props: {
     onSubmitInput?: (prompt: string) => Promise<void>;
+    autoFocusComposer?: boolean;
     composerPlaceholder?: string;
   }) => {
     fixtures.composerProps.push(props);
@@ -104,7 +110,13 @@ vi.mock("@/renderer/components/thread/ThreadComposerSection", () => ({
 }));
 
 vi.mock("@/renderer/components/thread/ThreadContent", () => ({
-  GuiThreadContent: () => <div data-testid="gui-thread-content" />,
+  GuiThreadContent: (props: {
+    initialScrollRevealDelayMs?: number;
+    onInitialScrollSettled?: () => void;
+  }) => {
+    fixtures.guiThreadProps.push(props);
+    return <div data-testid="gui-thread-content" />;
+  },
 }));
 
 vi.mock("@/renderer/components/thread/useThreadDockState", () => ({
@@ -163,6 +175,7 @@ describe("mobile ThreadView", () => {
     bridgeMock.subagentUnsubscribe.mockClear();
     toastDanger.mockClear();
     fixtures.composerProps.length = 0;
+    fixtures.guiThreadProps.length = 0;
     fixtures.desktopPointer = false;
     fixtures.keyboardOffset = 0;
     fixtures.agentStatuses = [];
@@ -172,10 +185,11 @@ describe("mobile ThreadView", () => {
       runtimeRequestsByThread: {},
       runtimeStructuralVersionByThread: {},
       openSubAgentByThread: {},
+      pendingComposerFocusThreadId: null,
     });
   });
 
-  it("enables Enter-to-send only for desktop-like PWA input", () => {
+  it("enables desktop composer behavior only for desktop-like PWA input", () => {
     const thread = makeTerminalThread();
     const props = {
       thread,
@@ -184,18 +198,43 @@ describe("mobile ThreadView", () => {
       onSubmitInput: () => Promise.resolve(),
     };
 
-    const { unmount } = render(<ThreadView {...props} />);
+    const { container, unmount } = render(<ThreadView {...props} />);
     expect(fixtures.composerProps.at(-1)?.submitOnEnter).toBe(false);
+    expect(fixtures.composerProps.at(-1)?.autoFocusComposer).toBe(false);
+    expect(container.querySelector(".m-thread-compose-dock")).not.toHaveAttribute("data-expanded");
     unmount();
 
     fixtures.desktopPointer = true;
-    render(<ThreadView {...props} />);
+    const desktopView = render(<ThreadView {...props} />);
     expect(fixtures.composerProps.at(-1)?.submitOnEnter).toBe(true);
+    expect(fixtures.composerProps.at(-1)?.autoFocusComposer).toBe(true);
+    expect(desktopView.container.querySelector(".m-thread-compose-dock")).toHaveAttribute(
+      "data-expanded",
+    );
   });
 
-  it("mounts the subagent overlay for terminal threads", async () => {
+  it("requests composer focus when the desktop PWA switches threads in place", () => {
+    fixtures.desktopPointer = true;
+    const firstThread = makeTerminalThread();
+    const props = {
+      thread: firstThread,
+      terminalScrollback: "",
+      onThreadAction: () => undefined,
+      onSubmitInput: () => Promise.resolve(),
+    };
+    const view = render(<ThreadView {...props} />);
+    useAppStore.getState().clearComposerFocusRequest(firstThread.id);
+
+    const nextThread = { ...firstThread, id: "thread-2", title: "Next thread" };
+    view.rerender(<ThreadView {...props} thread={nextThread} />);
+
+    expect(useAppStore.getState().pendingComposerFocusThreadId).toBe(nextThread.id);
+  });
+
+  it("hands terminal subagents to the routed host instead of mounting an overlay", async () => {
     const thread = makeTerminalThread();
     const parentItem = makeSubAgentItem("agent-1");
+    const onOpenSubAgent = vi.fn<(parentItemId: string) => void>();
 
     useAppStore.setState({
       runtimeItemIdsByThread: { [thread.id]: [parentItem.id] },
@@ -214,18 +253,16 @@ describe("mobile ThreadView", () => {
         terminalScrollback=""
         onThreadAction={() => undefined}
         onSubmitInput={() => Promise.resolve()}
+        onOpenSubAgent={onOpenSubAgent}
       />,
     );
 
-    expect(
-      await screen.findByRole("dialog", {
-        name: "Agent (rubber-duck): Checking mobile parity",
-      }),
-    ).toBeInTheDocument();
-    expect(bridgeMock.subagentSubscribe).toHaveBeenCalledWith({
-      threadId: thread.id,
-      parentItemId: parentItem.id,
+    await waitFor(() => {
+      expect(onOpenSubAgent).toHaveBeenCalledWith(parentItem.id);
     });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(bridgeMock.subagentSubscribe).not.toHaveBeenCalled();
+    expect(useAppStore.getState().openSubAgentByThread[thread.id]).toBeNull();
   });
 
   it("reports failed terminal thread reloads", async () => {
@@ -328,6 +365,30 @@ describe("mobile ThreadView", () => {
     expect(fixtures.composerProps.at(-1)?.composerPlaceholder).toBe("Follow up...");
   });
 
+  it("mounts GUI history only after the remote snapshot is ready", () => {
+    const thread = { ...makeTerminalThread(), presentationMode: "gui" } as Thread;
+    const props = {
+      thread,
+      terminalScrollback: "",
+      loading: true,
+      onThreadAction: () => undefined,
+      onSubmitInput: () => Promise.resolve(),
+    };
+    const view = render(<ThreadView {...props} />);
+
+    expect(screen.queryByTestId("gui-thread-content")).toBeNull();
+
+    view.rerender(<ThreadView {...props} loading={false} />);
+
+    expect(screen.getByTestId("gui-thread-content")).toBeInTheDocument();
+    expect(fixtures.guiThreadProps.at(-1)?.initialScrollRevealDelayMs).toBe(50);
+    expect(view.container.querySelector(".m-thread-content")).toHaveClass("invisible");
+
+    act(() => fixtures.guiThreadProps.at(-1)?.onInitialScrollSettled?.());
+
+    expect(view.container.querySelector(".m-thread-content")).not.toHaveClass("invisible");
+  });
+
   it("shows model and effort text with the compact active-thread icons", () => {
     fixtures.agentStatuses = [makeCodexStatus()];
     const thread = {
@@ -355,6 +416,10 @@ describe("mobile ThreadView", () => {
     const summary = view.container.querySelector(".m-compose-summary");
     expect(summary?.querySelector(".poracode-provider-icon")).not.toBeNull();
     expect(summary?.querySelector(".lucide-zap")).not.toBeNull();
+    // Fast is only summarized when on, so its chip carries the fill modifier
+    // (the real toolbar fills via the toggle's selected state, which this inert
+    // summary never has).
+    expect(summary?.querySelector(".m-compose-summary__item--fast .lucide-zap")).not.toBeNull();
     expect(summary?.querySelector(".poracode-composer-mode-icon")).not.toBeNull();
     expect(summary?.querySelector(".poracode-composer-permission-icon")).not.toBeNull();
     expect(summary).toHaveTextContent("GPT-5");

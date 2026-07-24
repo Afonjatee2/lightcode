@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { type PoracodeChannel, normalizeChannel } from "@/shared/channel";
 import type { RemoteThreadCommand } from "@/shared/contracts";
+import type { RemoteAccessPairingInfo } from "@/shared/remote";
 import type { SharedSettings } from "@/shared/settings";
 import {
   createInvokeBridge,
@@ -10,6 +11,7 @@ import {
   type BrowserEvent,
   type PoracodeBridge,
   type PoracodeWindowKind,
+  type ProjectStateChangedEvent,
   type QuickComposerSubmission,
   type SupervisorEvent,
   type ThreadOpenRequestedEvent,
@@ -160,6 +162,15 @@ const bridge: PoracodeBridge = {
       ipcRenderer.removeListener(IPC_EVENT_CHANNELS.remoteThreadCommand, handler);
     };
   },
+  onRemoteAccessPairingChanged(listener) {
+    const handler = (_event: Electron.IpcRendererEvent, info: RemoteAccessPairingInfo) => {
+      listener(info);
+    };
+    ipcRenderer.on(IPC_EVENT_CHANNELS.remoteAccessPairingChanged, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_EVENT_CHANNELS.remoteAccessPairingChanged, handler);
+    };
+  },
   onSharedSettingsChanged(listener) {
     const handler = (_event: Electron.IpcRendererEvent, settings: SharedSettings) => {
       listener(settings);
@@ -167,6 +178,15 @@ const bridge: PoracodeBridge = {
     ipcRenderer.on(IPC_EVENT_CHANNELS.sharedSettingsChanged, handler);
     return () => {
       ipcRenderer.removeListener(IPC_EVENT_CHANNELS.sharedSettingsChanged, handler);
+    };
+  },
+  onProjectStateChanged(listener) {
+    const handler = (_event: Electron.IpcRendererEvent, payload: ProjectStateChangedEvent) => {
+      listener(payload);
+    };
+    ipcRenderer.on(IPC_EVENT_CHANNELS.projectStateChanged, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_EVENT_CHANNELS.projectStateChanged, handler);
     };
   },
   onThreadOpenRequested(listener) {

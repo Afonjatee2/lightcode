@@ -126,6 +126,8 @@ describe("native ACP registry aliases", () => {
       "github-copilot-cli": "copilot",
       "grok-build": "grok",
       opencode: "opencode",
+      "pi-acp": "pi",
+      qoder: "qoder",
     });
   });
 
@@ -142,6 +144,7 @@ describe("native ACP registry aliases", () => {
       "gemini",
       "github-copilot",
       "github-copilot-cli",
+      "qoder",
     ]);
     expect(
       [...APP_SUPPORTED_ACP_AGENT_IDS].every((id) => KNOWN_NATIVE_FAMILY_ACP_AGENT_IDS.has(id)),

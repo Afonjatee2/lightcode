@@ -118,6 +118,11 @@ export async function applyRemoteThreadCommand(
         updatedAt: new Date().toISOString(),
       }));
       return false;
+    case "acknowledge":
+      updateRemoteThread(command.threadId, (thread) =>
+        thread.status === "finished" ? { ...thread, status: "idle" } : thread,
+      );
+      return false;
     case "set-done":
       if (command.done) {
         await closeThreadBestEffort(ctx, command.threadId);

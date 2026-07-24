@@ -60,16 +60,24 @@ values exist. After configuration, verify a direct 200 response with
 The production push gateway runs in the same Vercel project. Configure these as
 encrypted production environment variables before testing notifications:
 
-| Variable           | Value                                                          |
-| ------------------ | -------------------------------------------------------------- |
-| `FCM_PROJECT_ID`   | Firebase project ID                                            |
-| `FCM_CLIENT_EMAIL` | Firebase service-account email                                 |
-| `FCM_PRIVATE_KEY`  | Firebase service-account private key                           |
-| `APNS_KEY_ID`      | Apple Push Notifications key ID                                |
-| `APNS_TEAM_ID`     | Apple Developer Team ID                                        |
-| `APNS_AUTH_KEY`    | Full Apple Push Notifications `.p8` contents                   |
-| `APNS_TOPIC`       | `com.lightcodeapp.mobile`                                      |
-| `APNS_ENV`         | `production` (the default; use `sandbox` only for development) |
+| Variable                     | Value                                                           |
+| ---------------------------- | --------------------------------------------------------------- |
+| `FCM_PROJECT_ID`             | Firebase project ID                                             |
+| `FCM_CLIENT_EMAIL`           | Firebase service-account email                                  |
+| `FCM_PRIVATE_KEY`            | Firebase service-account private key                            |
+| `APNS_KEY_ID`                | Apple Push Notifications key ID                                 |
+| `APNS_TEAM_ID`               | Apple Developer Team ID                                         |
+| `APNS_AUTH_KEY`              | Full Apple Push Notifications `.p8` contents                    |
+| `APNS_TOPIC`                 | `com.lightcodeapp.mobile`                                       |
+| `APNS_ENV`                   | `production` (the default; use `sandbox` only for development)  |
+| `WEB_PUSH_VAPID_PUBLIC_KEY`  | Public VAPID key used by installed PWAs                         |
+| `WEB_PUSH_VAPID_PRIVATE_KEY` | Matching private VAPID key; keep encrypted                      |
+| `WEB_PUSH_VAPID_SUBJECT`     | Optional contact URI; defaults to `mailto:support@poracode.com` |
+
+Generate the VAPID pair once with
+`pnpm --dir website exec web-push generate-vapid-keys --json`. Keep the same
+pair across deployments: rotating it forces every installed PWA to create a
+new browser subscription the next time it connects.
 
 ## GitHub release configuration
 

@@ -294,6 +294,19 @@ export class AgentStatusService {
     return status?.capabilities;
   }
 
+  /** Return the last detected installed version for one native or WSL provider. */
+  getCachedVersion(kind: AgentKind, wslDistro?: string): string | undefined {
+    const cached = this.readCachedStatuses(wslDistro ? [wslDistro] : []);
+    if (!cached.fromCache) return undefined;
+    const statuses = wslDistro ? cached.wsl : cached.windows;
+    return statuses.find(
+      (status) =>
+        status.kind === kind &&
+        status.installed &&
+        (wslDistro === undefined || status.envDistro?.toLowerCase() === wslDistro.toLowerCase()),
+    )?.version;
+  }
+
   async refreshAgentStatuses(payload: GetAgentStatusesPayload): Promise<AgentStatusesResponse> {
     const wslDistros = [...new Set(payload.wslDistros)];
     // An explicit refresh is the signal that something changed on disk (an

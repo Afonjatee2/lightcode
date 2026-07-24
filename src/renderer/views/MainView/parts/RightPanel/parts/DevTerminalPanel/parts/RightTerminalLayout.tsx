@@ -2,6 +2,7 @@ import { PanelRightClose, Plus, Trash2 } from "lucide-react";
 import { Tabs } from "@heroui/react";
 import { useLingui } from "@lingui/react/macro";
 import type { Project, TerminalSize } from "@/shared/contracts";
+import type { TerminalFeedListener } from "@/shared/remote/terminalFeed";
 import { useDevTerminalStore, type DevTerminalTab } from "@/renderer/state/devTerminalStore";
 import { PanelHeaderProjectName } from "@/renderer/components/layout/PanelHeaderProjectName";
 import {
@@ -25,6 +26,7 @@ export function RightTerminalLayout(props: {
   handleCloseTab: (tab: DevTerminalTab) => void;
   handleSelectionChange: (key: string | number) => void;
   onTerminalResize?: (terminalId: string, size: TerminalSize) => void;
+  watchTerminal?: (terminalId: string, listener: TerminalFeedListener) => () => void;
 }) {
   const { t } = useLingui();
   const {
@@ -42,6 +44,7 @@ export function RightTerminalLayout(props: {
     handleCloseTab,
     handleSelectionChange,
     onTerminalResize,
+    watchTerminal,
   } = props;
 
   return (
@@ -113,6 +116,7 @@ export function RightTerminalLayout(props: {
           focusRequestId={focusRequestId}
           markTabActive={markTabActive}
           updateTabTitle={updateTabTitle}
+          {...(watchTerminal ? { watchTerminal } : {})}
           {...(onTerminalResize ? { onTerminalResize } : {})}
         />
         {emptyState}

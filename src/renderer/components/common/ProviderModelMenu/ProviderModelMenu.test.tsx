@@ -138,6 +138,10 @@ describe("ProviderModelMenu", () => {
 
     const listbox = await screen.findByRole("listbox", { name: "Models" });
     expect(listbox).toHaveClass("no-scrollbar");
+    expect(listbox.querySelector(".poracode-model-menu-bottom-spacer")).toHaveAttribute(
+      "data-scroll-end-gap",
+      "6",
+    );
     expect(screen.queryByText("Model 500")).not.toBeInTheDocument();
 
     fireEvent.scroll(listbox, { target: { scrollTop: 500 * 28 } });

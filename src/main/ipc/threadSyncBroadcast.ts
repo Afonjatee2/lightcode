@@ -17,11 +17,32 @@ import type { Thread } from "@/shared/contracts";
  * (→ remote refresh) for changes nobody can see.
  */
 export function diffSyncedThreadIds(before: readonly Thread[], after: readonly Thread[]): string[] {
+  return diffSyncedThreads(before, after).changedThreadIds;
+}
+
+export interface SyncedThreadDiff {
+  readonly changedThreadIds: string[];
+  /**
+   * Threads whose unread-completion marker was explicitly cleared by opening
+   * them on the desktop. Remote clients must not infer this from every `idle`
+   * snapshot because ordinary runtime completion also persists as `idle`.
+   */
+  readonly viewedThreadIds: string[];
+}
+
+export function diffSyncedThreads(
+  before: readonly Thread[],
+  after: readonly Thread[],
+): SyncedThreadDiff {
   const beforeById = new Map(before.map((thread) => [thread.id, thread]));
   const changed: string[] = [];
+  const viewed: string[] = [];
   for (const thread of after) {
     const prior = beforeById.get(thread.id);
     beforeById.delete(thread.id);
+    if (prior?.status === "finished" && thread.status === "idle") {
+      viewed.push(thread.id);
+    }
     if (
       !prior ||
       prior.title !== thread.title ||
@@ -37,5 +58,5 @@ export function diffSyncedThreadIds(before: readonly Thread[], after: readonly T
   for (const id of beforeById.keys()) {
     changed.push(id);
   }
-  return changed;
+  return { changedThreadIds: changed, viewedThreadIds: viewed };
 }

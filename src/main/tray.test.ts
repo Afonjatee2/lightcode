@@ -23,6 +23,7 @@ const imageMock = vi.hoisted(() => {
   const image = {
     isEmpty: vi.fn<() => boolean>(() => false),
     resize: vi.fn<(size: { width: number; height: number }) => unknown>(),
+    setTemplateImage: vi.fn<(value: boolean) => void>(),
   };
   image.resize.mockReturnValue(image);
   return image;
@@ -237,5 +238,23 @@ describe("resolveTrayIconPath", () => {
     vi.runAllTimers();
     expect(getThreads).toHaveBeenCalledTimes(readCount + 2);
     expect(buildFromTemplateMock).toHaveBeenCalledTimes(buildCount + 1);
+  });
+
+  it.skipIf(process.platform !== "darwin")("uses the macOS template glyph without resizing", () => {
+    existsSyncMock.mockImplementation((path) => path.endsWith("tray-icon-mac.png"));
+
+    const resolved = resolveTrayIconPath("stable");
+    expect(resolved).toMatch(/build[\\/]tray-icon-mac\.png$/u);
+
+    const handle = createTray({
+      appName: "Poracode",
+      channel: "stable",
+      onShow: vi.fn<() => void>(),
+      onQuit: vi.fn<() => void>(),
+    });
+
+    expect(handle.available).toBe(true);
+    expect(imageMock.setTemplateImage).toHaveBeenCalledWith(true);
+    expect(imageMock.resize).not.toHaveBeenCalled();
   });
 });

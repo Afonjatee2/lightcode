@@ -168,21 +168,27 @@ export const ToolCallGroup = memo(function ToolCallGroup({
               {sameFileEditSummary ? (
                 <SameFileEditGroupTitle summary={sameFileEditSummary} />
               ) : (
-                sections.map((section, idx) => (
-                  <Fragment key={section.category}>
-                    {idx > 0 ? (
-                      <span aria-hidden="true" className="select-none opacity-40">
-                        ·
+                sections.map((section, idx) => {
+                  const diffLabel = formatDiffSummaryLabel(section.diffSummary);
+                  return (
+                    <Fragment key={section.category}>
+                      {idx > 0 ? (
+                        <span aria-hidden="true" className="select-none opacity-40">
+                          ·
+                        </span>
+                      ) : null}
+                      <span className="flex shrink-0 items-center gap-1">
+                        <section.Icon className="size-3" />
+                        <code className="font-mono tabular-nums !text-[color:var(--muted)]">
+                          {section.count} {section.label}
+                        </code>
+                        {diffLabel ? (
+                          <span className="shrink-0 tabular-nums font-medium">{diffLabel}</span>
+                        ) : null}
                       </span>
-                    ) : null}
-                    <span className="flex shrink-0 items-center gap-1">
-                      <section.Icon className="size-3" />
-                      <code className="font-mono tabular-nums !text-[color:var(--muted)]">
-                        {section.count} {section.label}
-                      </code>
-                    </span>
-                  </Fragment>
-                ))
+                    </Fragment>
+                  );
+                })
               )}
             </div>
             <Disclosure.Indicator className={chatRowIndicatorClass} />

@@ -13,7 +13,7 @@ import {
   formatCodexPlanLabel,
   parseCodexLoginStatusOutput,
 } from "./detection";
-import { CodexStructuredSession, shouldReloadCodexMcpServers } from "./acp";
+import { CodexStructuredSession } from "./acp";
 import { CodexRpcResponseError, type CodexAppServerRpcListener } from "./appServerRpc";
 import type { CodexThreadStatus } from "./acpProtocol";
 import type { OscNotification, OscTitle } from "@/shared/osc";
@@ -30,6 +30,15 @@ import { buildCodexTurnInput } from "./acpTurn";
 import { CodexStdioTransport } from "./stdioTransport";
 import { CodexSubAgentRouter } from "./subAgentRouting";
 import type { StructuredSessionUpdate } from "../base";
+
+describe("createCodexAdapter skill roots", () => {
+  it("declares Codex's native shared .agents root", () => {
+    const support = createCodexAdapter().skillSupport;
+
+    expect(support?.roots.map((root) => root.id)).toEqual(["codex", "agents"]);
+    expect(support?.projectionRoots).toBeUndefined();
+  });
+});
 
 describe("deriveCodexStructuredState", () => {
   it("maps active approval state to needs_approval", () => {
@@ -858,25 +867,6 @@ describe("CodexStructuredSession", () => {
     return session as unknown as CodexStructuredSession;
   }
 
-  it("reloads for built-in MCP servers as well as user-defined servers", () => {
-    expect(
-      shouldReloadCodexMcpServers([
-        {
-          id: "crossagents",
-          name: "crossagents",
-          timeoutMs: 300_000,
-          transport: {
-            type: "http",
-            url: "http://127.0.0.1:9200/mcp",
-            headers: { Authorization: "Bearer test-token" },
-          },
-        },
-      ]),
-    ).toBe(true);
-    expect(shouldReloadCodexMcpServers([])).toBe(false);
-    expect(shouldReloadCodexMcpServers(undefined)).toBe(false);
-  });
-
   function dispatchNotification(session: CodexStructuredSession, payload: unknown): void {
     const message = parseCodexSocketMessage(payload);
     if (message.kind !== "notification") {
@@ -1390,10 +1380,9 @@ describe("CodexStructuredSession", () => {
     );
   });
 
-  it("reloads built-in MCP servers at the turn boundary without delaying thread creation", async () => {
+  it("starts turns without reloading launch-time MCP servers", async () => {
     const requests: CodexRequestRecord[] = [];
     const structuredSession = makeStructuredSession(requests);
-    (structuredSession as unknown as Record<string, unknown>)["hasMcpServers"] = true;
     (structuredSession as unknown as Record<string, unknown>)["rpc"] = {
       request: async (
         method: string,
@@ -1418,15 +1407,14 @@ describe("CodexStructuredSession", () => {
     expect(requests).toEqual([expect.objectContaining({ method: "thread/start" })]);
 
     await structuredSession.startTurn("hello", { model: "gpt-5.5" });
+    await structuredSession.startTurn("continue", { model: "gpt-5.5" });
 
     expect(requests).toEqual([
       expect.objectContaining({ method: "thread/start" }),
-      {
-        method: "config/mcpServer/reload",
-        params: undefined,
-      },
+      expect.objectContaining({ method: "turn/start" }),
       expect.objectContaining({ method: "turn/start" }),
     ]);
+    expect(requests.map((request) => request.method)).not.toContain("config/mcpServer/reload");
   });
 
   it("wires RPC notifications and transport lifecycle callbacks into the session", () => {

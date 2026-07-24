@@ -77,6 +77,20 @@ export const agentUpdateInfoSchema = z.object({
   homebrewCask: z.string().min(1).optional(),
   brew: z.string().min(1).optional(),
   winget: z.string().min(1).optional(),
+  /**
+   * The provider's own install script, re-run non-interactively, per platform.
+   * For agents distributed by a `curl … | bash` / `irm … | iex` installer
+   * rather than a package manager (and whose CLI `update`/`upgrade` is an
+   * interactive TUI with no headless flag). Preferred over the npm last-resort
+   * so the update refreshes the existing install in place instead of spawning a
+   * conflicting global npm install. `posix` also serves WSL.
+   */
+  installer: z
+    .object({
+      posix: agentUpdateCommandSchema,
+      windows: agentUpdateCommandSchema,
+    })
+    .optional(),
   latestVersionUrls: z.array(z.string().url()).optional(),
 });
 export type AgentUpdateInfo = z.infer<typeof agentUpdateInfoSchema>;
@@ -155,6 +169,7 @@ const agentPresentationCapabilityOverrideSchema = z
     approvalPolicies: z.array(labeledOptionSchema),
     sandboxModes: z.array(labeledOptionSchema),
     defaultApprovalPolicy: z.string().optional(),
+    defaultApprovalsReviewer: z.string().optional(),
     defaultSandboxMode: z.string().optional(),
     supportsResume: z.boolean(),
     supportsDirectInput: z.boolean(),
@@ -226,6 +241,8 @@ export const agentCapabilitySchema = z.object({
   sandboxModes: z.array(labeledOptionSchema).default([]),
   /** First-draft approval policy when the user has no saved preference. Falls back to the first entry in `approvalPolicies` if unset. */
   defaultApprovalPolicy: z.string().optional(),
+  /** First-draft approval reviewer when the user has no saved preference. */
+  defaultApprovalsReviewer: z.string().optional(),
   /** First-draft sandbox mode when the user has no saved preference. Falls back to the first entry in `sandboxModes` if unset. */
   defaultSandboxMode: z.string().optional(),
   supportsResume: z.boolean().default(false),

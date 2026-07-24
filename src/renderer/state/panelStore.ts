@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { ProjectLocation } from "@/shared/contracts";
 import { persistStoreSlice, readPersistedSlice } from "@/renderer/utils/persistStoreSlice";
 import type { ThreadSortMode } from "@/renderer/views/MainView/parts/Sidebar/parts/sortMode";
 import { useFileEditorStore } from "./fileEditorStore";
@@ -30,7 +31,21 @@ export interface FilesPanelContext {
   rootLabel: string;
 }
 
-export type RightPanelTab = "git" | "files" | "terminal" | "browser" | "usage" | "notes";
+export interface SubAgentPanelContext {
+  threadId: string;
+  parentItemId: string;
+  projectLocation?: ProjectLocation;
+}
+
+export type RightPanelTab =
+  | "git"
+  | "files"
+  | "terminal"
+  | "browser"
+  | "usage"
+  | "notes"
+  | "ports"
+  | "subagent";
 
 interface PanelState {
   gitReviewContext: GitReviewContext | null;
@@ -38,6 +53,8 @@ interface PanelState {
   gitOverlayOpen: boolean;
   prReviewContext: PrReviewContext | null;
   filesPanelContext: FilesPanelContext | null;
+  subAgentPanelContext: SubAgentPanelContext | null;
+  subAgentPanelOpen: boolean;
   rightPanelTab: RightPanelTab;
   browserPanelOpen: boolean;
   usagePanelOpen: boolean;
@@ -63,6 +80,7 @@ interface PanelState {
   setGitOverlayOpen: (v: boolean) => void;
   setPrReviewContext: (ctx: PrReviewContext | null) => void;
   setFilesPanelContext: (ctx: FilesPanelContext | null) => void;
+  setSubAgentPanelContext: (ctx: SubAgentPanelContext | null) => void;
   setRightPanelTab: (tab: RightPanelTab) => void;
   setBrowserPanelOpen: (v: boolean) => void;
   setUsagePanelOpen: (v: boolean) => void;
@@ -102,6 +120,18 @@ const DEFAULT_DRAWER_WIDTH = 640;
 const MIN_DRAWER_WIDTH = 420;
 const MAX_DRAWER_WIDTH = 1400;
 
+function projectLocationsEqual(
+  a: ProjectLocation | undefined,
+  b: ProjectLocation | undefined,
+): boolean {
+  if (!a || !b) return a === b;
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "wsl" && b.kind === "wsl") {
+    return a.distro === b.distro && a.linuxPath === b.linuxPath && a.uncPath === b.uncPath;
+  }
+  return a.kind !== "wsl" && b.kind !== "wsl" && a.path === b.path;
+}
+
 function loadInitialGitContext(): GitReviewContext | null {
   try {
     const raw = localStorage.getItem(LEGACY_GIT_CONTEXT_KEY);
@@ -140,6 +170,8 @@ export const usePanelStore = create<PanelState>()((set) => ({
   gitOverlayOpen: false,
   prReviewContext: null,
   filesPanelContext: null,
+  subAgentPanelContext: null,
+  subAgentPanelOpen: false,
   rightPanelTab: "git",
   browserPanelOpen: false,
   usagePanelOpen: false,
@@ -208,8 +240,31 @@ export const usePanelStore = create<PanelState>()((set) => ({
       }
       return { filesPanelContext: ctx };
     }),
+  setSubAgentPanelContext: (ctx) =>
+    set((state) => {
+      const prev = state.subAgentPanelContext;
+      if (
+        (prev === null && ctx === null) ||
+        (prev !== null &&
+          ctx !== null &&
+          prev.threadId === ctx.threadId &&
+          prev.parentItemId === ctx.parentItemId &&
+          projectLocationsEqual(prev.projectLocation, ctx.projectLocation))
+      ) {
+        return ctx && !state.subAgentPanelOpen ? { subAgentPanelOpen: true } : {};
+      }
+      return { subAgentPanelContext: ctx, subAgentPanelOpen: ctx !== null };
+    }),
   setRightPanelTab: (tab) =>
-    set((state) => (state.rightPanelTab === tab ? {} : { rightPanelTab: tab })),
+    set((state) => {
+      const reopenSubAgent =
+        tab === "subagent" && state.subAgentPanelContext !== null && !state.subAgentPanelOpen;
+      if (state.rightPanelTab === tab && !reopenSubAgent) return {};
+      return {
+        rightPanelTab: tab,
+        ...(reopenSubAgent ? { subAgentPanelOpen: true } : {}),
+      };
+    }),
   // Toggling the docked right-panel browser is independent of the floating
   // overlay (drawer/fullscreen): hiding the panel must NOT tear down an active
   // overlay, otherwise maximizing the browser and then hiding the right panel
@@ -302,11 +357,13 @@ export const usePanelStore = create<PanelState>()((set) => ({
       // The floating browser overlay (drawer/fullscreen) is intentionally NOT
       // touched here: it is a standalone surface with its own close controls.
       // Closing the docked right panel — including the narrow-viewport auto-hide
-      // that fires when the window shrinks — must not tear it down, otherwise a
-      // maximized browser vanishes the moment the right panel auto-closes.
+      // that fires when the window shrinks — must not tear down a standalone
+      // browser overlay or the temporary subagent target. The latter has its own
+      // explicit close control in the panel header.
       if (
         state.gitReviewContext === null &&
         state.filesPanelContext === null &&
+        !state.subAgentPanelOpen &&
         !state.browserPanelOpen &&
         !state.usagePanelOpen &&
         !state.notesPanelOpen
@@ -316,6 +373,7 @@ export const usePanelStore = create<PanelState>()((set) => ({
       return {
         gitReviewContext: null,
         filesPanelContext: null,
+        subAgentPanelOpen: false,
         browserPanelOpen: false,
         usagePanelOpen: false,
         notesPanelOpen: false,

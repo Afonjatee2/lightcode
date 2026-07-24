@@ -14,6 +14,7 @@ import {
   remotePortUnforwardResultSchema,
   remotePortsStateSchema,
   remotePushRegistrationResultSchema,
+  remoteWebPushConfigResultSchema,
   remoteSettingsSchema,
   remoteSchedulesResponseSchema,
   remoteProjectCommandResultSchema,
@@ -48,6 +49,7 @@ import {
 import {
   DEFAULT_TERMINAL_SIZE,
   profileIdentitySchema,
+  projectNotesSchema,
   sendThreadInputPayloadSchema,
   type ProfileCoreStats,
   type ProfileDevicesResponse,
@@ -55,6 +57,7 @@ import {
   type ProfileIdentityResponse,
   type ProfileStatsRequest,
   type ProfileTokenStats,
+  type ProjectNotes,
   type ProjectLocation,
   type PromptSegment,
   type ProviderUsageResponse,
@@ -84,6 +87,10 @@ export class RemoteClientError extends Error {
     super(message, options);
     this.name = "RemoteClientError";
   }
+}
+
+export interface ThreadHistoryOptions {
+  readonly targetTimelineEntryCount?: number;
 }
 
 function parseJsonResponse(text: string, response: Response): unknown {
@@ -228,6 +235,7 @@ const LONG_RUNNING_GIT_PROCEDURES: ReadonlySet<string> = new Set([
 const settingsResponseSchema = z.object({ settings: remoteSettingsSchema });
 const browserStateResponseSchema = z.object({ state: remoteBrowserStateSchema });
 const attachmentUploadResponseSchema = z.object({ path: z.string().min(1) });
+const projectNotesResponseSchema = z.object({ notes: projectNotesSchema.nullable() });
 
 export class RemoteDesktopClient {
   private readonly fetchImpl: RemoteFetch;
@@ -338,6 +346,22 @@ export class RemoteDesktopClient {
       "provider usage",
     );
     return result as ProviderUsageResponse;
+  }
+
+  async projectNotes(projectId: string): Promise<ProjectNotes | null> {
+    const result = parseResponse(
+      projectNotesResponseSchema,
+      await this.requestJson(`/api/projects/${encodeURIComponent(projectId)}/notes`),
+      "project notes",
+    );
+    return result.notes;
+  }
+
+  async setProjectNotes(notes: ProjectNotes): Promise<void> {
+    await this.requestJson(`/api/projects/${encodeURIComponent(notes.projectId)}/notes`, {
+      method: "POST",
+      body: notes,
+    });
   }
 
   /** Remote-editable desktop settings (the AI helpers). */
@@ -483,9 +507,18 @@ export class RemoteDesktopClient {
     return result.state;
   }
 
-  async threadHistory(threadId: string): Promise<RemoteThreadSnapshot> {
+  async threadHistory(
+    threadId: string,
+    options: ThreadHistoryOptions = {},
+  ): Promise<RemoteThreadSnapshot> {
+    const search = new URLSearchParams({
+      runtimePage: "1",
+      ...(options.targetTimelineEntryCount !== undefined
+        ? { targetTimelineEntryCount: String(options.targetTimelineEntryCount) }
+        : {}),
+    });
     return remoteThreadSnapshotSchema.parse(
-      await this.requestJson(`/api/threads/${encodeURIComponent(threadId)}/history?runtimePage=1`),
+      await this.requestJson(`/api/threads/${encodeURIComponent(threadId)}/history?${search}`),
     );
   }
 
@@ -735,6 +768,11 @@ export class RemoteDesktopClient {
       await this.requestJson("/api/push/register", { method: "POST", body: registration }),
       "push registration",
     );
+  }
+
+  /** Resolve the VAPID application-server key used by installed web apps. */
+  async webPushConfig(): Promise<{ publicKey: string }> {
+    return remoteWebPushConfigResultSchema.parse(await this.requestJson("/api/push/config"));
   }
 
   /** Drop all push registrations for a device (sign-out / unpair). */

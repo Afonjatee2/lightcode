@@ -9,19 +9,18 @@ import {
 } from "react";
 import { toast } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { MessageCircle } from "lucide-react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useAppStore } from "@/renderer/state/appStore";
-import type { Thread } from "@/shared/contracts";
+import { SubAgentContent } from "@/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay";
 import { getBasename } from "@/shared/pathUtils";
-import { buildWorktreeLocation } from "@/shared/worktree";
+import { buildWorktreeLocation, resolveProjectLocation } from "@/shared/worktree";
 import { useGitSummariesStore } from "./gitSummaries";
 import { useMobileApp, useRemote } from "./remoteContext";
 import {
   buildFilesTarget,
   buildGitTarget,
+  openWorktreeDraft,
   preselectWorktreeDraft,
-  runThreadAction,
 } from "./navHelpers";
 import {
   clearPairingLaunch,
@@ -32,11 +31,13 @@ import {
   subscribePairingLaunch,
 } from "./pairing";
 import { MobileSetupEmptyState, type MobileSetupKind } from "./setupEmptyState";
-import { EmptyState } from "./components";
 import { isDesktopSettingsSection } from "./settingsSections";
 import type { MobileSshPairRequest } from "./views/DesktopsView";
 import { useGitSummaryHydration } from "./useGitSummaryHydration";
-import { useMediaQuery, WIDE_SHELL_QUERY } from "./useMediaQuery";
+import { DESKTOP_RIGHT_PANEL_QUERY, useMediaQuery, WIDE_SHELL_QUERY } from "./useMediaQuery";
+import { useDesktopPanelStore } from "./desktopPanelStore";
+import { useNarrowThreadHost } from "./narrowThreadHostContext";
+import { ThreadDetail } from "./ThreadDetail";
 import { DesktopsView } from "./views/DesktopsView";
 import { ManageProjectsView } from "./views/ManageProjectsView";
 import { MoreView } from "./views/MoreView";
@@ -48,10 +49,6 @@ const NewThreadFlow = lazy(() =>
 const QuickCompose = lazy(() =>
   import("./views/QuickCompose").then((module) => ({ default: module.QuickCompose })),
 );
-const ThreadView = lazy(() =>
-  import("./views/ThreadView").then((module) => ({ default: module.ThreadView })),
-);
-
 const BrowserView = lazy(() =>
   import("./views/BrowserView").then((module) => ({ default: module.BrowserView })),
 );
@@ -63,6 +60,9 @@ const WorkspaceView = lazy(() =>
 );
 const TerminalView = lazy(() =>
   import("./views/TerminalView").then((module) => ({ default: module.TerminalView })),
+);
+const NotesView = lazy(() =>
+  import("./views/NotesView").then((module) => ({ default: module.NotesView })),
 );
 const SettingsView = lazy(() =>
   import("./views/SettingsView").then((module) => ({ default: module.SettingsView })),
@@ -78,6 +78,8 @@ const UsagePanel = lazy(() =>
 // Typed route APIs (params/search) — decoupled from the route consts so this
 // file never imports router.tsx (which imports these components).
 const threadRouteApi = getRouteApi("/thread/$threadId");
+const subAgentRouteApi = getRouteApi("/subagent/$threadId/$parentItemId");
+const notesRouteApi = getRouteApi("/notes/$threadId");
 const settingsSectionRouteApi = getRouteApi("/settings/$section");
 const workspaceRouteApi = getRouteApi("/workspace/$threadId");
 const terminalRouteApi = getRouteApi("/terminal/$projectId");
@@ -124,115 +126,6 @@ function FullscreenLazyRoute(props: { readonly children: ReactNode }) {
   );
 }
 
-/**
- * Shared thread detail pane. Used by the /thread/:id route and, in the wide
- * layout, by the /threads route (where the list lives in the sidebar and the
- * detail shows the selected thread, or an empty state when none is selected).
- */
-function ThreadDetail(props: { readonly thread: Thread | null; readonly hideHeader: boolean }) {
-  const remote = useRemote();
-  const navigate = useNavigate();
-  const thread = props.thread;
-  const threadId = thread?.id ?? null;
-  // Ensure the displayed thread is actually OPEN, not just rendered: the wide
-  // shell auto-selects the most recent thread and deep links land here
-  // directly — neither goes through a list click. Opening marks the thread
-  // watched in the shared store (clearing a stale finished/done badge so live
-  // idle events don't keep re-earning it) and loads its history snapshot.
-  // openThread is idempotent and guards against duplicate in-flight loads, so
-  // the click path (store already watching, snapshot still fetching) is cheap.
-  //
-  // Also keyed on the active desktop id: on a cold deep-link load the thread is
-  // seeded from the localStorage mirror (so threadId is stable from the first
-  // render) while the desktop connection is still being established async.
-  // openThread bails when activeDesktop is null, so without this dep the effect
-  // never retries once the desktop connects and the history snapshot never
-  // loads — a blank transcript. The watched+hasSnapshot guard keeps the retry
-  // from redundantly reopening an already-loaded thread.
-  const activeDesktopId = remote.activeDesktop?.desktopId ?? null;
-  useEffect(() => {
-    if (!threadId) return;
-    const state = useAppStore.getState();
-    const watched = state.view.kind === "thread" && state.view.panes.includes(threadId);
-    const hasSnapshot = remote.selectedThreadSnapshot?.thread.id === threadId;
-    if (watched && hasSnapshot) return;
-    const target = remote.threads.find((entry) => entry.id === threadId);
-    if (target) void remote.openThread(target);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the displayed thread id + active desktop; openThread guards the racing click path
-  }, [threadId, activeDesktopId]);
-  if (!thread) {
-    return (
-      <section className="m-thread">
-        <EmptyState
-          icon={<MessageCircle className="size-5" />}
-          title={<Trans>No thread selected</Trans>}
-          hint={<Trans>Pick a thread from the list to follow the agent from here.</Trans>}
-        />
-      </section>
-    );
-  }
-  // Still fetching this thread's history when no snapshot matches it yet.
-  const loading = remote.selectedThreadSnapshot?.thread.id !== thread.id;
-  return (
-    <LazyRoute>
-      <ThreadView
-        thread={thread}
-        terminalScrollback={remote.selectedThreadSnapshot?.terminalScrollback}
-        terminalSize={remote.selectedThreadSnapshot?.terminalSize}
-        hideHeader={props.hideHeader}
-        loading={loading}
-        onThreadAction={(action) =>
-          runThreadAction(remote, thread, action, () => void navigate({ to: "/threads" }))
-        }
-        onSubmitInput={(prompt, segments) => remote.sendPrompt(prompt, segments)}
-        onOpenWorkspace={(tab) => {
-          void navigate({
-            to: "/workspace/$threadId",
-            params: { threadId: thread.id },
-            search: { tab },
-          });
-        }}
-        onOpenWorkspaceFile={(path, lineNumber) => {
-          void navigate({
-            to: "/workspace/$threadId",
-            params: { threadId: thread.id },
-            search: {
-              tab: "files",
-              file: path,
-              ...(lineNumber !== undefined ? { line: lineNumber } : {}),
-            },
-          });
-        }}
-        onOpenWorkspaceFolder={(path) => {
-          void navigate({
-            to: "/workspace/$threadId",
-            params: { threadId: thread.id },
-            search: { tab: "files", folder: path },
-          });
-        }}
-        onOpenTerminal={() => {
-          void navigate({
-            to: "/terminal/$projectId",
-            params: { projectId: thread.projectId },
-            search: {
-              fromThread: thread.id,
-              ...(thread.worktreePath ? { worktree: thread.worktreePath } : {}),
-            },
-          });
-        }}
-        onNewThreadInWorktree={(input) => {
-          preselectWorktreeDraft(input);
-          void navigate({ to: "/new" });
-        }}
-        onDeleteWorktreeGroup={(input) => {
-          void remote.deleteWorktreeGroup(input);
-          void navigate({ to: "/threads" });
-        }}
-      />
-    </LazyRoute>
-  );
-}
-
 export function ThreadsRoute() {
   const {
     remote,
@@ -246,7 +139,11 @@ export function ThreadsRoute() {
   const isWide = useMediaQuery(WIDE_SHELL_QUERY);
   // The home composer's expand state (kept here so the list's empty-state
   // "New thread" button grows the same bubble as a tap on it).
-  const [composeExpanded, setComposeExpanded] = useState(false);
+  const hasPendingWorktreeDraft = useAppStore(
+    (state) => Object.keys(state.pendingDraftWorktreeSelections).length > 0,
+  );
+  const [composeExpanded, setComposeExpanded] = useState(hasPendingWorktreeDraft);
+  const [restoreWorktreeSelectionToken, setRestoreWorktreeSelectionToken] = useState(0);
   const readyToCompose = remote.connection === "online" && remote.projects.length > 0;
   const needsDesktop = remote.connection !== "online";
   const setupKind: MobileSetupKind | null = readyToCompose
@@ -272,6 +169,12 @@ export function ThreadsRoute() {
   useEffect(() => {
     if (!isWide) useAppStore.getState().openHome();
   }, [isWide]);
+
+  // Worktree actions from another narrow route return here with a one-shot
+  // target already queued. Reveal the inline composer that will consume it.
+  useEffect(() => {
+    if (hasPendingWorktreeDraft) setComposeExpanded(true);
+  }, [hasPendingWorktreeDraft]);
 
   // Once a desktop is connected, warm the fullscreen chunks after first paint
   // so their push transition normally captures real content. Disconnected
@@ -322,7 +225,7 @@ export function ThreadsRoute() {
         onNew={() => setComposeExpanded(true)}
         onNewThreadInWorktree={(input) => {
           preselectWorktreeDraft(input);
-          void navigate({ to: "/new" });
+          setComposeExpanded(true);
         }}
         onOpenTerminal={(input) =>
           void navigate({
@@ -351,7 +254,11 @@ export function ThreadsRoute() {
         <Suspense fallback={null}>
           <QuickCompose
             expanded={composeExpanded}
-            onExpandedChange={setComposeExpanded}
+            restoreWorktreeSelectionToken={restoreWorktreeSelectionToken}
+            onExpandedChange={(expanded) => {
+              if (!expanded) setRestoreWorktreeSelectionToken((token) => token + 1);
+              setComposeExpanded(expanded);
+            }}
             onStarted={(threadId) => {
               setComposeExpanded(false);
               void navigate({ to: "/thread/$threadId", params: { threadId } });
@@ -367,11 +274,67 @@ export function ThreadRoute() {
   const { threadId } = threadRouteApi.useParams();
   const remote = useRemote();
   const isWide = useMediaQuery(WIDE_SHELL_QUERY);
+  const narrowShellOwnsThread = useNarrowThreadHost();
   // Opening (store watch + snapshot load) is owned by ThreadDetail's effect: it
   // also covers the fallback-selected thread on reloads, which a check against
   // remote.selectedThread here would wrongly consider already open.
   const thread = remote.threads.find((entry) => entry.id === threadId) ?? null;
+  if (!isWide && narrowShellOwnsThread) return null;
   return <ThreadDetail thread={thread} hideHeader={!isWide} />;
+}
+
+/** A history-backed subagent page on phones; desktop-width PWA shells migrate it into the panel. */
+export function SubAgentRoute() {
+  const { threadId, parentItemId } = subAgentRouteApi.useParams();
+  const remote = useRemote();
+  const navigate = useNavigate();
+  const useRightPanel = useMediaQuery(DESKTOP_RIGHT_PANEL_QUERY);
+  const thread = remote.threads.find((entry) => entry.id === threadId) ?? null;
+  const project = thread
+    ? (remote.projects.find((entry) => entry.id === thread.projectId) ?? null)
+    : null;
+  const activeDesktopId = remote.activeDesktop?.desktopId ?? null;
+  const hasSnapshot = remote.selectedThreadSnapshot?.thread.id === threadId;
+
+  useEffect(() => {
+    if (!thread || hasSnapshot) return;
+    void remote.openThread(thread);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on route target + connection; openThread deduplicates in-flight history loads
+  }, [activeDesktopId, hasSnapshot, threadId]);
+
+  useEffect(() => {
+    if (!useRightPanel) return;
+    useDesktopPanelStore.getState().showSubAgent(threadId, parentItemId);
+    void navigate({
+      to: "/thread/$threadId",
+      params: { threadId },
+      replace: true,
+    });
+  }, [navigate, parentItemId, threadId, useRightPanel]);
+
+  if (useRightPanel) return null;
+
+  const projectLocation =
+    thread && project ? resolveProjectLocation(project.location, thread.worktreePath) : undefined;
+
+  return (
+    <LazyRoute>
+      <section className="m-page m-subagent-page">
+        {hasSnapshot ? (
+          <SubAgentContent
+            threadId={threadId}
+            parentItemId={parentItemId}
+            hideHeader
+            {...(projectLocation ? { projectLocation } : {})}
+          />
+        ) : (
+          <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-muted">
+            <Trans>Loading…</Trans>
+          </div>
+        )}
+      </section>
+    </LazyRoute>
+  );
 }
 
 /**
@@ -619,6 +582,8 @@ export function WorkspaceRoute() {
   const { tab, file, folder, line } = workspaceRouteApi.useSearch();
   const remote = useRemote();
   const navigate = useNavigate();
+  const isWide = useMediaQuery(WIDE_SHELL_QUERY);
+  const useRightPanel = useMediaQuery(DESKTOP_RIGHT_PANEL_QUERY);
   const { t } = useLingui();
   const thread = remote.threads.find((entry) => entry.id === threadId) ?? null;
   const project = thread
@@ -639,7 +604,23 @@ export function WorkspaceRoute() {
     if (remote.booted && !hasTarget) void navigate({ to: "/threads" });
   }, [remote.booted, hasTarget, navigate]);
 
+  useEffect(() => {
+    if (!useRightPanel || !hasTarget) return;
+    const panel = useDesktopPanelStore.getState();
+    if (file) panel.showFile(threadId, file, line);
+    else if (folder) panel.showFolder(threadId, folder);
+    else panel.show(tab === "changes" ? "git" : "files", threadId);
+    void navigate({
+      to: "/thread/$threadId",
+      params: { threadId },
+      replace: true,
+    });
+  }, [file, folder, hasTarget, line, navigate, tab, threadId, useRightPanel]);
+
   if (!filesTarget) return null;
+  if (useRightPanel) {
+    return null;
+  }
   // The workspace belongs to a thread; closing returns there deterministically
   // (robust even on a fresh load with no back-history).
   return (
@@ -666,12 +647,17 @@ export function WorkspaceRoute() {
             });
             return;
           }
-          preselectWorktreeDraft({
+          const input = {
             projectId: filesTarget.project.id,
             worktreePath,
             worktreeBranch,
-          });
-          void navigate({ to: "/new" });
+          };
+          if (!isWide) {
+            preselectWorktreeDraft(input);
+            void navigate({ to: "/threads" });
+            return;
+          }
+          void openWorktreeDraft(input, () => navigate({ to: "/new" }));
         }}
         onLaunchConflictResolverThread={(input) => {
           remote
@@ -688,6 +674,51 @@ export function WorkspaceRoute() {
               toast.danger(error instanceof Error ? error.message : t`Unable to start the thread.`);
             });
         }}
+      />
+    </FullscreenLazyRoute>
+  );
+}
+
+export function NotesRoute() {
+  const { threadId } = notesRouteApi.useParams();
+  const remote = useRemote();
+  const navigate = useNavigate();
+  const useRightPanel = useMediaQuery(DESKTOP_RIGHT_PANEL_QUERY);
+  const thread = remote.threads.find((entry) => entry.id === threadId) ?? null;
+  const project = thread
+    ? (remote.projects.find((entry) => entry.id === thread.projectId) ?? null)
+    : null;
+
+  useEffect(() => {
+    if (remote.booted && !project) {
+      void navigate({ to: "/threads", replace: true });
+    }
+  }, [navigate, project, remote.booted]);
+
+  useEffect(() => {
+    if (!useRightPanel || !project) return;
+    useDesktopPanelStore.getState().show("notes", threadId);
+    void navigate({
+      to: "/thread/$threadId",
+      params: { threadId },
+      replace: true,
+    });
+  }, [navigate, project, threadId, useRightPanel]);
+
+  if (!project || useRightPanel) return null;
+
+  return (
+    <FullscreenLazyRoute>
+      <NotesView
+        key={project.id}
+        projectId={project.id}
+        projectName={project.name}
+        onClose={() =>
+          void navigate({
+            to: "/thread/$threadId",
+            params: { threadId },
+          })
+        }
       />
     </FullscreenLazyRoute>
   );

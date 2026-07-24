@@ -39,17 +39,14 @@ export function buildGitAddWorktreePayload(
   };
 }
 
-/**
- * Preselect an existing worktree in the shared draft store so the new-thread
- * composer opens targeting it (the composer reads `pendingDraftWorktreeSelection`
- * on mount). Mirrors desktop's `openNewThreadInWorktree`; the caller navigates
- * to `/new` after. For an existing worktree, the base branch is its own branch.
- */
-export function preselectWorktreeDraft(input: {
+interface WorktreeDraftTarget {
   readonly projectId: string;
   readonly worktreePath: string;
   readonly worktreeBranch: string;
-}): void {
+}
+
+/** Target the shared draft at an existing worktree. */
+export function preselectWorktreeDraft(input: WorktreeDraftTarget): void {
   useAppStore.getState().setPendingDraftWorktreeSelection(input.projectId, {
     branch: input.worktreeBranch,
     baseBranch: input.worktreeBranch,
@@ -57,6 +54,19 @@ export function preselectWorktreeDraft(input: {
     worktreePath: input.worktreePath,
   });
   useAppStore.getState().openDraft(input.projectId);
+}
+
+/**
+ * Navigate to the desktop-style full new-thread screen, then target its draft
+ * at an existing worktree. Publishing after navigation prevents the phone's
+ * still-mounted home composer from consuming the one-shot target.
+ */
+export async function openWorktreeDraft(
+  input: WorktreeDraftTarget,
+  navigateToDraft: () => Promise<unknown>,
+): Promise<void> {
+  await navigateToDraft();
+  preselectWorktreeDraft(input);
 }
 
 /**
@@ -83,9 +93,11 @@ export function screenStateTransition(type: "push" | "pop", update: () => void):
   doc.startViewTransition({ update: () => flushSync(update), types: [type] });
 }
 
-/** Extract the thread id from a `/thread/:id` pathname (decoded), or null. */
+/** Extract the selected thread from its detail or project-tool pathname. */
 export function threadIdFromPath(pathname: string): string | null {
-  const match = /^\/thread\/(.+)$/.exec(pathname);
+  const subAgentMatch = /^\/subagent\/([^/]+)\/[^/]+$/.exec(pathname);
+  if (subAgentMatch?.[1]) return decodeURIComponent(subAgentMatch[1]);
+  const match = /^\/(?:thread|workspace|notes)\/(.+)$/.exec(pathname);
   return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
@@ -105,10 +117,16 @@ export function threadIdFromPath(pathname: string): string | null {
  * `screen` transition type so the page chrome holds steady under the slide.
  */
 export function isFullscreenScreenPath(path: string): boolean {
-  return path.startsWith("/workspace/") || path.startsWith("/pr/") || path.startsWith("/terminal/");
+  return (
+    path.startsWith("/workspace/") ||
+    path.startsWith("/notes/") ||
+    path.startsWith("/pr/") ||
+    path.startsWith("/terminal/")
+  );
 }
 
 export function screenDepth(path: string): number {
+  if (path.startsWith("/subagent/")) return 2;
   if (path.startsWith("/thread/")) return 1;
   if (isFullscreenScreenPath(path)) return 2;
   // A desktop-syncing section is pushed from the Desktop Settings list (depth
@@ -183,13 +201,14 @@ export function buildGitTarget(remote: RemoteSession, threadId: string): GitTarg
   if (worktreePath) {
     return {
       project,
+      threadId,
       statusKey: worktreePath,
       worktreePath,
       worktreeBranch: summary?.branch,
       locationOverride: buildWorktreeLocation(project.location, worktreePath),
     };
   }
-  return { project };
+  return { project, threadId };
 }
 
 /** Resolve the project/worktree root the file tree should browse for a thread. */

@@ -176,6 +176,8 @@ export function resolveProviderDraftConfig(
     | "autopilot";
   const nextApproval = resolveApprovalPolicyValue(agent, normalizedPreferred?.approvalPolicy);
   const nextSandbox = resolveSandboxModeValue(agent, normalizedPreferred?.sandboxMode);
+  const nextReviewer =
+    normalizedPreferred?.approvalsReviewer ?? agent.capabilities.defaultApprovalsReviewer;
 
   return {
     model: nextModel,
@@ -185,9 +187,7 @@ export function resolveProviderDraftConfig(
     ...(nextThinking ? { thinking: nextThinking } : {}),
     mode: nextMode,
     approvalPolicy: nextApproval,
-    ...(normalizedPreferred?.approvalsReviewer !== undefined
-      ? { approvalsReviewer: normalizedPreferred.approvalsReviewer }
-      : {}),
+    ...(nextReviewer !== undefined ? { approvalsReviewer: nextReviewer } : {}),
     sandboxMode: nextSandbox,
   };
 }

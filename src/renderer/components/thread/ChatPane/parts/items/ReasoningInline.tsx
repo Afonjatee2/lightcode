@@ -79,7 +79,10 @@ export const ReasoningInline = memo(function ReasoningInline({ item }: Reasoning
           {preview ? (
             <>
               <ChatRowMetaSeparator />
-              <span className="min-w-0 flex-1 truncate italic text-[color:var(--muted)]">
+              {/* Italic ink leans past the text advance; `truncate`'s overflow
+                  clips at the padding box, so keep a small right padding or the
+                  last glyph's edge is shaved off. */}
+              <span className="min-w-0 flex-1 truncate pr-[0.2em] italic text-[color:var(--muted)]">
                 {preview}
               </span>
             </>

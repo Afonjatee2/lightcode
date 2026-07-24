@@ -1,5 +1,8 @@
 import type { WebSocket, WebSocketServer } from "ws";
 import type {
+  RemoteAccessScope,
+  RemoteAccessTokenResult,
+  RemoteClientMetadata,
   RemoteGitSummariesEvent,
   RemoteProjectsChangedEvent,
   RemoteThreadsChangedEvent,
@@ -43,6 +46,11 @@ export interface RemoteServerContext {
   /** Live in-memory event sequence; read through a getter so replays see the
    * current value rather than a snapshot taken at context-build time. */
   readonly seq: number;
+  exchangePairingCredential(input: {
+    readonly credential: string;
+    readonly scopes?: readonly RemoteAccessScope[];
+    readonly client?: RemoteClientMetadata;
+  }): RemoteAccessTokenResult;
   requireInfo(): RemoteAccessServerInfo;
   requireSettingsGateway(): NonNullable<RemoteAccessServerOptions["settings"]>;
   requireSchedulesGateway(): NonNullable<RemoteAccessServerOptions["schedules"]>;

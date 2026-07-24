@@ -5,10 +5,12 @@ import {
   cleanModels,
   DEEPSEEK_PRESET_ROWS,
   environmentFromRows,
-  KIMI_PRESET_ROWS,
+  KIMI_CODE_PRESET_ROWS,
   MINIMAX_PRESET_ROWS,
+  modelEffortsFromRows,
+  modelsFromConfig,
   profileUsesExternalProvider,
-  QWEN_PRESET_ROWS,
+  QWEN_TOKEN_PLAN_PRESET_ROWS,
   rowsFromEnvironment,
   ZAI_PRESET_ROWS,
   type EnvRow,
@@ -45,6 +47,32 @@ describe("ClaudeProfileSettingsModel", () => {
         { rowId: "3", id: " ", label: "Ignored" },
       ]),
     ).toEqual([{ id: "glm-5.2", label: "GLM 5.2" }]);
+  });
+
+  it("hydrates explicit model efforts while other model rows inherit globally", () => {
+    let counter = 0;
+    const rows = modelsFromConfig(
+      [{ id: "one" }, { id: "two" }, { id: "three" }],
+      { one: ["high"], two: [] },
+      () => `r${(counter += 1)}`,
+    );
+
+    expect(rows[0]?.efforts).toEqual(new Set(["high"]));
+    expect(rows[1]?.efforts).toEqual(new Set());
+    expect(rows[2]).not.toHaveProperty("efforts");
+  });
+
+  it("serializes only explicit per-model efforts within the global allow-list", () => {
+    expect(
+      modelEffortsFromRows(
+        [
+          { rowId: "1", id: " one ", label: "", efforts: new Set(["low", "max"]) },
+          { rowId: "2", id: "two", label: "" },
+          { rowId: "3", id: "three", label: "", efforts: new Set() },
+        ],
+        new Set(["low", "high"]),
+      ),
+    ).toEqual({ one: ["low"], three: [] });
   });
 
   it("does not mark an empty effort list as an external-provider override", () => {
@@ -98,32 +126,66 @@ describe("ClaudeProfileSettingsModel", () => {
       expect(byKey.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe("512000");
     });
 
-    it("adds the canonical Kimi env with K3 for every Claude Code model tier", () => {
+    it("adds the canonical Kimi Code membership env with K3 1M", () => {
       const byKey = Object.fromEntries(
-        applyPresetEnvRows(KIMI_PRESET_ROWS, [], nextRowId).map((row) => [row.key, row.value]),
+        applyPresetEnvRows(KIMI_CODE_PRESET_ROWS, [], nextRowId).map((row) => [row.key, row.value]),
       );
-      expect(byKey.ANTHROPIC_BASE_URL).toBe("https://api.moonshot.ai/anthropic");
-      expect(byKey.ANTHROPIC_MODEL).toBe("kimi-k3");
-      expect(byKey.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe("kimi-k3");
-      expect(byKey.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe("kimi-k3");
-      expect(byKey.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe("kimi-k3");
-      expect(byKey.CLAUDE_CODE_SUBAGENT_MODEL).toBe("kimi-k3");
-      expect(byKey.ENABLE_TOOL_SEARCH).toBe("false");
+      expect(byKey.ANTHROPIC_BASE_URL).toBe("https://api.kimi.com/coding/");
+      expect(byKey.ANTHROPIC_API_KEY).toBe("");
+      expect(byKey.ANTHROPIC_MODEL).toBe("k3[1m]");
+      expect(byKey.ANTHROPIC_DEFAULT_FABLE_MODEL).toBe("k3[1m]");
+      expect(byKey.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe("k3[1m]");
+      expect(byKey.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe("k3[1m]");
+      expect(byKey.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe("k3[1m]");
+      expect(byKey.CLAUDE_CODE_SUBAGENT_MODEL).toBe("k3[1m]");
+      expect(byKey.CLAUDE_CODE_EFFORT_LEVEL).toBe("high");
       expect(byKey.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe("1048576");
+      expect(byKey.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBe("1048576");
     });
 
-    it("adds the current Alibaba Cloud Coding Plan endpoint and Qwen model mapping", () => {
+    it("uses the distinct Alibaba Token Plan endpoint", () => {
       const byKey = Object.fromEntries(
-        applyPresetEnvRows(QWEN_PRESET_ROWS, [], nextRowId).map((row) => [row.key, row.value]),
+        applyPresetEnvRows(QWEN_TOKEN_PLAN_PRESET_ROWS, [], nextRowId).map((row) => [
+          row.key,
+          row.value,
+        ]),
       );
       expect(byKey.ANTHROPIC_BASE_URL).toBe(
-        "https://coding-intl.dashscope.aliyuncs.com/apps/anthropic",
+        "https://token-plan.ap-southeast-1.maas.aliyuncs.com/apps/anthropic",
       );
       expect(byKey.ANTHROPIC_MODEL).toBe("qwen3.8-max-preview");
-      expect(byKey.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe("qwen3.8-max-preview");
+      expect(byKey.ANTHROPIC_DEFAULT_FABLE_MODEL).toBe("qwen3.8-max-preview");
       expect(byKey.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe("qwen3.8-max-preview");
-      expect(byKey.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe("qwen3.8-max-preview");
-      expect(byKey.CLAUDE_CODE_SUBAGENT_MODEL).toBe("qwen3.8-max-preview");
+      expect(byKey.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe("qwen3.6-flash");
+      expect(byKey.CLAUDE_CODE_SUBAGENT_MODEL).toBe("qwen3.7-max");
+      expect(byKey.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBe("983616");
+    });
+
+    it("moves the old Kimi preset token to the Kimi Code API key variable", () => {
+      const rows: EnvRow[] = [
+        {
+          rowId: "auth-token",
+          key: "ANTHROPIC_AUTH_TOKEN",
+          value: "lc-safe:v1:sealed",
+          sensitive: true,
+          sealed: "lc-safe:v1:sealed",
+          replacing: false,
+        },
+      ];
+
+      const result = applyPresetEnvRows(
+        KIMI_CODE_PRESET_ROWS,
+        rows,
+        nextRowId,
+        ["ANTHROPIC_AUTH_TOKEN"],
+        { ANTHROPIC_API_KEY: ["ANTHROPIC_AUTH_TOKEN"] },
+      );
+      expect(result.some((row) => row.key === "ANTHROPIC_AUTH_TOKEN")).toBe(false);
+      expect(result.find((row) => row.key === "ANTHROPIC_API_KEY")).toMatchObject({
+        value: "lc-safe:v1:sealed",
+        sealed: "lc-safe:v1:sealed",
+        sensitive: true,
+      });
     });
 
     it("corrects stale preset values but keeps an existing token and extra rows", () => {

@@ -38,6 +38,7 @@ export interface GroupSection {
   count: number;
   label: string;
   Icon: LucideIcon;
+  diffSummary?: NonNullable<FileChangePayload["diffSummary"]>;
 }
 
 export interface SameFileEditGroupSummary {
@@ -48,9 +49,20 @@ export interface SameFileEditGroupSummary {
 
 export function summarizeToolCalls(items: readonly RuntimeChatItem[]): GroupSection[] {
   const counts = new Map<GroupCategory, number>();
+  let editAdded = 0;
+  let editRemoved = 0;
+  let hasMissingEditDiffSummary = false;
   for (const item of items) {
     const category = categorizeItem(item);
     counts.set(category, (counts.get(category) ?? 0) + 1);
+    if (category !== "edited") continue;
+    const diffSummary = readEditDiffSummary(item);
+    if (!diffSummary) {
+      hasMissingEditDiffSummary = true;
+      continue;
+    }
+    editAdded += diffSummary.added;
+    editRemoved += diffSummary.removed;
   }
   return [...counts.entries()]
     .sort(
@@ -64,6 +76,9 @@ export function summarizeToolCalls(items: readonly RuntimeChatItem[]): GroupSect
         count,
         label: count === 1 ? meta.singular : meta.plural,
         Icon: meta.Icon,
+        ...(category === "edited" && count > 1 && !hasMissingEditDiffSummary
+          ? { diffSummary: { added: editAdded, removed: editRemoved } }
+          : {}),
       };
     });
 }

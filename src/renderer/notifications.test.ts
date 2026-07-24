@@ -316,6 +316,26 @@ describe("handleThreadStateNotification PWA path", () => {
     expect(notifications[0]!.close).toHaveBeenCalledOnce();
   });
 
+  it("does not notify when a desktop stop or steer force-closes the active turn", () => {
+    const { notifications } = installBrowserNotification();
+    const oldThread = thread({ status: "working", attention: "working" });
+
+    handleThreadStateNotification(
+      {
+        type: "thread-state",
+        threadId: oldThread.id,
+        status: "idle",
+        attention: "none",
+        forceCloseActiveTurn: true,
+      },
+      oldThread,
+      { status: "finished", attention: "none" },
+    );
+
+    expect(notifications).toHaveLength(0);
+    expect(bridgeMock.showNotification).not.toHaveBeenCalled();
+  });
+
   it("requests browser notification permission before showing the notification", async () => {
     const { BrowserNotification, notifications } = installBrowserNotification("default");
     const oldThread = thread({ status: "working", attention: "working" });

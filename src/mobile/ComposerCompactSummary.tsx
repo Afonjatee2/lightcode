@@ -101,7 +101,9 @@ export function ComposerCompactSummary(props: {
       <span className="m-compose-summary__model">{modelLabel}</span>
       {effortLabel ? <span className="m-compose-summary__effort">{effortLabel}</span> : null}
       {fastEnabled ? (
-        <span className="m-compose-summary__item">{resolveComposerControlIcon(fastControl)}</span>
+        <span className="m-compose-summary__item m-compose-summary__item--fast">
+          {resolveComposerControlIcon(fastControl)}
+        </span>
       ) : null}
       {modeControl ? (
         <span className="m-compose-summary__item">{resolveComposerControlIcon(modeControl)}</span>

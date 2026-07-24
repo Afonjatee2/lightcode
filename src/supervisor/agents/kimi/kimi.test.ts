@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectLocation, ThreadConfig } from "@/shared/contracts";
+import { resolveSharedUpdateCommand } from "@/shared/agents/updateResolver";
 import { createKnownSessionRef } from "../base";
 import { createKimiAdapter, resolveKimiEmptyResponseError } from "./index";
 
@@ -17,26 +18,47 @@ describe("createKimiAdapter shape", () => {
 
   it("re-exposes the update spec on the adapter", () => {
     expect(adapter.update?.npm).toBe("@moonshot-ai/kimi-code");
-    expect(adapter.update?.builtIn).toEqual({ binary: "kimi", args: ["upgrade"] });
+    // `kimi upgrade` is an interactive TUI, so there is no `builtIn` updater;
+    // the update re-runs the non-interactive install script instead.
+    expect(adapter.update?.builtIn).toBeUndefined();
+    expect(adapter.update?.installer?.posix).toEqual({
+      binary: "sh",
+      args: ["-c", "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash"],
+    });
   });
 
-  it("updates through the detected executable when it is outside PATH", () => {
+  it("resolves a non-interactive installer update instead of the interactive `kimi upgrade`", () => {
+    // The adapter no longer overrides the shared resolver — it drives the
+    // update from the detection spec's `installer`, keeping supervisor and the
+    // renderer preview in sync.
+    expect(adapter.buildUpdateCommand).toBeUndefined();
     expect(
-      adapter.buildUpdateCommand?.(
-        { envKind: "wsl", wslDistro: "Ubuntu" },
-        {
-          kind: "kimi",
-          label: "Kimi Code",
-          installed: true,
-          executablePath: "/home/demo/.kimi-code/bin/kimi",
-          authState: "authenticated",
-          capabilities: adapter.capabilities,
-        },
-      ),
+      resolveSharedUpdateCommand({
+        update: adapter.update,
+        executablePath: "/home/demo/.kimi-code/bin/kimi",
+        envKind: "wsl",
+      }),
     ).toEqual({
-      binary: "/home/demo/.kimi-code/bin/kimi",
-      args: ["upgrade"],
-      strategy: "built-in",
+      binary: "sh",
+      args: ["-c", "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash"],
+      strategy: "installer",
+    });
+    expect(
+      resolveSharedUpdateCommand({
+        update: adapter.update,
+        executablePath: "C:\\Users\\demo\\.kimi-code\\bin\\kimi.exe",
+        envKind: "windows",
+      }),
+    ).toEqual({
+      binary: "powershell.exe",
+      args: [
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "irm https://code.kimi.com/kimi-code/install.ps1 | iex",
+      ],
+      strategy: "installer",
     });
   });
 

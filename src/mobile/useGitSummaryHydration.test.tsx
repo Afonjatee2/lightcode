@@ -1,13 +1,14 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useGitStore } from "@/renderer/state/gitStore";
-import type { GitStatusResult, Project, Thread } from "@/shared/contracts";
+import type { GitStatusResult, PrData, Project, Thread } from "@/shared/contracts";
 import type { RemoteThreadGitSummary } from "@/shared/remote";
 import { useGitSummariesStore } from "./gitSummaries";
 import { useGitSummaryHydration } from "./useGitSummaryHydration";
 
 const bridge = vi.hoisted(() => ({
   getGitStatus: vi.fn<(payload: unknown) => Promise<GitStatusResult>>(),
+  ghGetPrForBranch: vi.fn<(payload: unknown) => Promise<PrData | null>>(),
 }));
 
 vi.mock("@/renderer/bridge", () => ({
@@ -70,9 +71,25 @@ function makeSummary(branch: string): RemoteThreadGitSummary {
   };
 }
 
+function makePr(overrides: Partial<PrData> = {}): PrData {
+  return {
+    number: 42,
+    state: "open",
+    title: "Fix mobile PR status",
+    url: "https://github.test/repo/pull/42",
+    baseBranch: "main",
+    isDraft: false,
+    checksStatus: "SUCCESS",
+    updatedAt: "2026-07-23T12:00:00.000Z",
+    ...overrides,
+  };
+}
+
 describe("useGitSummaryHydration", () => {
   beforeEach(() => {
     bridge.getGitStatus.mockReset();
+    bridge.ghGetPrForBranch.mockReset();
+    bridge.ghGetPrForBranch.mockResolvedValue(null);
     useGitSummariesStore.getState().reset();
     useGitStore.setState({ statuses: {}, worktreeStatuses: {}, prData: {} });
   });
@@ -118,5 +135,45 @@ describe("useGitSummaryHydration", () => {
     expect(after.remoteByThread).toBe(before.remoteByThread);
     expect(after.byThread).toBe(before.byThread);
     expect(after.byThread["thread-1"]).toBe(before.byThread["thread-1"]);
+  });
+
+  it("refreshes a streamed worktree PR into the full git cache and its mobile badge", async () => {
+    const project = makeProject();
+    const worktreePath = "/repo/.poracode/worktrees/mobile";
+    const thread = makeThread({
+      worktreePath,
+      worktreeBranch: "feature/mobile",
+      prNumber: 42,
+    });
+    const staleSummary: RemoteThreadGitSummary = {
+      ...makeSummary("feature/mobile"),
+      pr: {
+        number: 42,
+        state: "open",
+        title: "Old title",
+        url: "https://github.test/repo/pull/42",
+        isDraft: false,
+        checksStatus: "FAILURE",
+      },
+    };
+    const latestPr = makePr();
+    bridge.ghGetPrForBranch.mockResolvedValue(latestPr);
+    useGitSummariesStore.getState().setAll({ [thread.id]: staleSummary });
+
+    renderHook(() => useGitSummaryHydration(thread, project));
+
+    await waitFor(() => {
+      expect(useGitStore.getState().prData[worktreePath]).toEqual(latestPr);
+    });
+    expect(bridge.ghGetPrForBranch).toHaveBeenCalledWith({
+      projectLocation: project.location,
+      branch: "feature/mobile",
+    });
+    expect(useGitStore.getState().ghAvailable[project.id]).toBe(true);
+    expect(useGitSummariesStore.getState().byThread[thread.id]?.pr).toMatchObject({
+      number: 42,
+      title: "Fix mobile PR status",
+      checksStatus: "SUCCESS",
+    });
   });
 });

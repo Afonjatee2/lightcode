@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ProjectNotes } from "@/shared/contracts";
 import type { RemoteDesktopClient } from "./remoteClient";
 import { installRemoteBridge, setRemoteBridgeClient } from "./bridge";
 
-describe("remote attachment bridge", () => {
+describe("remote bridge", () => {
   afterEach(() => {
     setRemoteBridgeClient(null);
     vi.restoreAllMocks();
@@ -38,5 +39,40 @@ describe("remote attachment bridge", () => {
       fileName: "notes.md",
       data: new Uint8Array([104, 101, 108, 108, 111]),
     });
+  });
+
+  it("leaves unavailable optional bridge metadata undefined", () => {
+    Object.defineProperty(window, "poracode", {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+
+    installRemoteBridge();
+
+    expect(window.poracode.homeDir).toBeUndefined();
+  });
+
+  it("forwards project notes to the paired desktop", async () => {
+    const notes: ProjectNotes = {
+      projectId: "project-1",
+      doc: null,
+      todos: [],
+      updatedAt: "2026-07-23T00:00:00.000Z",
+    };
+    const projectNotes = vi.fn<(projectId: string) => Promise<ProjectNotes | null>>(
+      async () => notes,
+    );
+    const setProjectNotes = vi.fn<(next: ProjectNotes) => Promise<void>>(async () => undefined);
+    setRemoteBridgeClient(
+      { projectNotes, setProjectNotes } as unknown as RemoteDesktopClient,
+      "darwin",
+    );
+    installRemoteBridge();
+
+    await expect(window.poracode.dbGetProjectNotes("project-1")).resolves.toEqual(notes);
+    await expect(window.poracode.dbSetProjectNotes(notes)).resolves.toBeUndefined();
+    expect(projectNotes).toHaveBeenCalledWith("project-1");
+    expect(setProjectNotes).toHaveBeenCalledWith(notes);
   });
 });

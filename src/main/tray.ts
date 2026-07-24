@@ -50,15 +50,32 @@ function toMenuItem(
 
 export function resolveTrayIconPath(channel: PoracodeChannel): string | null {
   const suffix = channel === "nightly" ? "-nightly" : "";
-  const isWindows = process.platform === "win32";
-  const iconName = isWindows ? "tray-icon" : "icon";
-  const extension = isWindows ? "ico" : "png";
+  const buildDir = join(__dirname, "..", "..", "build");
   const candidates: string[] = [];
-  if (app.isPackaged) {
-    candidates.push(join(process.resourcesPath, isWindows ? "tray-icon.ico" : "app-icon.png"));
+  if (process.platform === "win32") {
+    if (app.isPackaged) {
+      candidates.push(join(process.resourcesPath, "tray-icon.ico"));
+    } else {
+      candidates.push(join(buildDir, `tray-icon${suffix}.ico`));
+      candidates.push(join(buildDir, "tray-icon.ico"));
+    }
+  } else if (process.platform === "darwin") {
+    // macOS menu bar: prefer the monochrome template glyph, then the full tile.
+    if (app.isPackaged) {
+      candidates.push(join(process.resourcesPath, "tray-icon-mac.png"));
+      candidates.push(join(process.resourcesPath, "app-icon.png"));
+    } else {
+      candidates.push(join(buildDir, "tray-icon-mac.png"));
+      candidates.push(join(buildDir, `icon${suffix}.png`));
+      candidates.push(join(buildDir, "icon.png"));
+    }
   } else {
-    candidates.push(join(__dirname, "..", "..", "build", `${iconName}${suffix}.${extension}`));
-    candidates.push(join(__dirname, "..", "..", "build", `${iconName}.${extension}`));
+    if (app.isPackaged) {
+      candidates.push(join(process.resourcesPath, "app-icon.png"));
+    } else {
+      candidates.push(join(buildDir, `icon${suffix}.png`));
+      candidates.push(join(buildDir, "icon.png"));
+    }
   }
   for (const candidate of candidates) {
     if (existsSync(candidate)) {
@@ -102,7 +119,15 @@ export function createTray(options: CreateTrayOptions): TrayHandle {
       setQuickComposerShortcut: () => {},
     };
   }
-  const trayImage = process.platform === "darwin" ? image.resize({ width: 18, height: 18 }) : image;
+  const isMacTemplate = process.platform === "darwin" && iconPath.endsWith("tray-icon-mac.png");
+  let trayImage = image;
+  if (isMacTemplate) {
+    // Template images are tinted per menu-bar appearance and auto-scaled by macOS;
+    // resizing would drop the @2x representation.
+    image.setTemplateImage(true);
+  } else if (process.platform === "darwin") {
+    trayImage = image.resize({ width: 18, height: 18 });
+  }
   const tray = new Tray(trayImage);
   tray.setToolTip(appName);
 

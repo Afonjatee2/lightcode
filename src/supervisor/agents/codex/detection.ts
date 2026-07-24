@@ -200,6 +200,7 @@ export const codexDefaultCapabilities: AgentCapability = {
   presentationMode: "terminal",
   presentationModes: ["terminal", "gui"],
   defaultApprovalPolicy: "on-request",
+  defaultApprovalsReviewer: "auto_review",
   defaultSandboxMode: "workspace-write",
   bypassPermissions: { approvalPolicy: "never", sandboxMode: "danger-full-access" },
   // MCP config rides the `-c` launch argv in both presentations — baked in at

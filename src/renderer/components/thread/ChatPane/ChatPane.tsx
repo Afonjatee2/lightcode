@@ -30,6 +30,7 @@ import {
   openFileInEditor,
   resolveWorktreeBranch,
 } from "@/renderer/utils/gitHelpers";
+import { showSubAgentPanel } from "@/renderer/actions/panelActions";
 import { ChatFindBar, type ScrollToIndex } from "@/renderer/components/find/ChatFindBar";
 import { ChatPaneActionsContext, type ChatPaneActions } from "./chatPaneActionsContext";
 import { ChatScrollControls, type ChatScrollControlsHandle } from "./ChatScrollControls";
@@ -37,7 +38,7 @@ import { selectVisibleThreadTimelineEntries, type ChatTimelineEntry } from "./ch
 import { shouldMarkUserScrollIntentFromPointerTarget } from "./chatScrollGeometry";
 import { normalizeChatProjectPath } from "./chatPathUtils";
 import { MessageList, type CheckpointRevertActions } from "./parts/MessageList";
-import { SubAgentOverlay } from "./parts/items/SubAgentOverlay";
+import { SubAgentOpenController } from "./parts/items/SubAgentOverlay";
 
 interface ChatPaneProps {
   thread: Thread;
@@ -46,10 +47,15 @@ interface ChatPaneProps {
   layoutChangeToken?: string | null;
   onOpenProjectRelativePath?: ((path: string, lineNumber?: number) => void) | undefined;
   onRevealProjectFolderInTree?: ((path: string) => void) | undefined;
+  onOpenSubAgent?:
+    | ((parentItemId: string, projectLocation: ProjectLocation | undefined) => void)
+    | undefined;
   canShowProjectEntryInExplorer?: boolean | undefined;
   paneActionsOverride?: ChatPaneActions | undefined;
   checkpointActions?: CheckpointRevertActions | undefined;
   checkpointProjectLocation?: ProjectLocation | undefined;
+  initialScrollRevealDelayMs?: number | undefined;
+  onInitialScrollSettled?: (() => void) | undefined;
 }
 
 const EMPTY_COMPLETED_TURNS: NonNullable<
@@ -79,6 +85,7 @@ export function ChatPane(props: ChatPaneProps) {
     layoutChangeToken,
     onOpenProjectRelativePath,
     onRevealProjectFolderInTree,
+    onOpenSubAgent,
     canShowProjectEntryInExplorer,
     paneActionsOverride,
     checkpointActions,
@@ -337,6 +344,9 @@ export function ChatPane(props: ChatPaneProps) {
             onVirtualizerLayoutChange={() =>
               scrollControlsRef.current?.beginVirtualizerLayoutChange()
             }
+            onLiveVirtualizerLayoutChange={() =>
+              scrollControlsRef.current?.beginLiveVirtualizerLayoutChange()
+            }
             registerVirtualScrollToBottom={(handler) => {
               virtualScrollToBottomRef.current = handler;
             }}
@@ -406,17 +416,30 @@ export function ChatPane(props: ChatPaneProps) {
             key={`scroll:${threadId}`}
             ref={scrollControlsRef}
             scrollRef={scrollRef}
+            contentRef={contentRef}
             layoutChangeToken={layoutChangeToken}
+            tailEntryId={timelineEntries.at(-1)?.id ?? null}
             threadId={threadId}
             tailLoaderVisible={showTailLoader}
             initialScrollSettled={isInitialScrollSettled}
+            initialScrollRevealDelayMs={props.initialScrollRevealDelayMs ?? 0}
             virtualScrollToBottomRef={virtualScrollToBottomRef}
-            onInitialScrollSettled={() => setInitialScrollSettledThreadId(threadId)}
+            onInitialScrollSettled={() => {
+              setInitialScrollSettledThreadId(threadId);
+              props.onInitialScrollSettled?.();
+            }}
           />
-          <SubAgentOverlay
+          <SubAgentOpenController
             key={`subagent:${threadId}`}
             threadId={threadId}
-            {...(project ? { projectLocation: project.location } : {})}
+            {...(targetContext ? { projectLocation: targetContext.projectLocation } : {})}
+            onOpen={(parentItemId, projectLocation) => {
+              if (onOpenSubAgent) {
+                onOpenSubAgent(parentItemId, projectLocation);
+                return;
+              }
+              showSubAgentPanel(threadId, parentItemId, projectLocation);
+            }}
           />
           <ChatFindBar
             threadId={threadId}

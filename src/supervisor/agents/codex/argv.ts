@@ -20,6 +20,7 @@ import {
 } from "./plugin/install";
 import { resolveCodexWindowsLaunchBinary } from "./windowsExecutable";
 import { buildCodexMcp } from "../userMcp";
+import { buildCodexMcpSkillConflictArgs } from "./mcpSkillConflicts";
 
 const CODEX_GOALS_FEATURE_FLAG = "goals";
 const codexGoalsSupportCache = new Map<string, boolean>();
@@ -109,7 +110,9 @@ export function buildCodexArgvFor(
   launchOptions?: AgentLaunchOptions,
 ): AgentArgvSpec {
   const binary = resolveCodexWindowsLaunchBinary(location) ?? "codex";
-  const mcp = buildCodexMcp(launchOptions?.mcpServers ?? []);
+  const mcpServers = launchOptions?.mcpServers ?? [];
+  const mcp = buildCodexMcp(mcpServers);
+  const mcpArgs = [...buildCodexMcpSkillConflictArgs(location, mcpServers), ...mcp.args];
   const mcpEnv = mcp.env;
   const hasMcpEnv = Object.keys(mcpEnv).length > 0;
   const enableGoals = isCodexGoalsSupported(location);
@@ -118,7 +121,7 @@ export function buildCodexArgvFor(
     prompt: "",
     enableGoals,
     ...(launchOptions ? { launchOptions } : {}),
-    mcpArgs: mcp.args,
+    mcpArgs,
   };
   // When the structured session owns thread lifecycle, the TUI resumes the
   // server-created thread. Config is controlled by the server, not the CLI.
@@ -166,11 +169,14 @@ export function buildCodexAppServerCommand(
 ): CommandSpec {
   const wslExecPath = options?.wslExecPath;
   const wslNodePath = options?.wslNodePath;
-  const mcp = buildCodexMcp(options?.mcpServers ?? []);
+  const mcpServers = options?.mcpServers ?? [];
+  const mcp = buildCodexMcp(mcpServers);
+  const mcpSkillConflictArgs = buildCodexMcpSkillConflictArgs(location, mcpServers);
   const mcpEnv = mcp.env;
   const hasMcpEnv = Object.keys(mcpEnv).length > 0;
   const args = [
     ...(isCodexGoalsSupported(location, wslExecPath) ? ["--enable", CODEX_GOALS_FEATURE_FLAG] : []),
+    ...mcpSkillConflictArgs,
     ...mcp.args,
     "app-server",
   ];

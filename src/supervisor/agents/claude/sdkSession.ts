@@ -24,7 +24,6 @@ import type {
 } from "@/shared/contracts";
 import { areAgentSlashCommandsEqual } from "@/shared/contracts";
 import { terminateChildProcessTree } from "@/shared/processTree";
-import { buildPromptContentBlocks } from "@/shared/promptContent";
 import { buildClaudeMcpServers } from "../userMcp";
 import {
   createKnownSessionRef,
@@ -277,45 +276,13 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
   }
 
   /**
-   * Steer the running turn by streaming a new user message into the SDK's input
-   * queue WITHOUT interrupting — the probed-safe steering mechanism: the running
-   * turn continues, background subagents are unaffected, and the message steers
-   * the current turn or is answered in the next one. No `turn.started` is
-   * emitted mid-turn (the message joins the open turn); if no turn is in flight
-   * (raced idle) we fall back to `startTurn` so turn accounting stays correct.
+   * Preserve Claude's foreground Bash commands and subagents before the shared
+   * steer lifecycle interrupts the main turn. The SDK turns them into
+   * background tasks, while Poracode stages the replacement prompt and opens it
+   * as a fresh turn after the interrupted result settles.
    */
-  async steerTurn(
-    prompt: string,
-    config: ThreadConfig,
-    segments?: PromptSegment[],
-    options?: StartTurnOptions,
-  ): Promise<void> {
-    if (this.disposed) return;
-    if (!this.currentTurnInFlight) {
-      await this.startTurn(prompt, config, segments, options);
-      return;
-    }
-    this.currentConfig = config;
-    // Optimistic user_message item only (no turn.started) so the chat paints the
-    // steer immediately; mirrors the emission startClaudeTurn performs.
-    const userItemId = options?.userMessageItemId ?? `user-${randomUUID()}`;
-    this.emitRuntimeEvents([
-      {
-        type: "item.started",
-        threadId: this.input.threadId,
-        itemId: userItemId,
-        itemType: "user_message",
-        payload: { content: buildPromptContentBlocks(prompt, segments) },
-      },
-      { type: "item.completed", threadId: this.input.threadId, itemId: userItemId },
-    ]);
-    const query = await this.requireQuery();
-    // The SDK never hot-swaps a running turn, but if the steer message ends up
-    // starting the NEXT turn (current turn settles before consuming it), the
-    // model change must already be applied — no startTurn runs for that message.
-    await this.syncModel(query, config);
-    const message = await buildSdkUserMessage(prompt, segments, options?.inlineInstructions);
-    this.promptQueue.push(message);
+  async prepareSteerInterrupt(): Promise<void> {
+    await this.queryRuntime?.backgroundTasks();
   }
 
   /**

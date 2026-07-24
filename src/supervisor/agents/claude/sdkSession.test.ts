@@ -106,6 +106,7 @@ function createFakeQuery(initCommands: Array<Record<string, string>> = []) {
       agents: [],
       apiUsage: null,
     });
+  const backgroundTasks = vi.fn<(toolUseId?: string) => Promise<boolean>>().mockResolvedValue(true);
 
   const runtime = {
     async next(): Promise<IteratorResult<SDKMessage>> {
@@ -140,6 +141,7 @@ function createFakeQuery(initCommands: Array<Record<string, string>> = []) {
     supportedCommands: vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
     supportedModels: vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
     getContextUsage,
+    backgroundTasks,
     close: vi.fn<() => void>(() => {
       closed = true;
       resolveNext?.({ done: true, value: undefined });
@@ -151,6 +153,7 @@ function createFakeQuery(initCommands: Array<Record<string, string>> = []) {
     setModel,
     setPermissionMode,
     getContextUsage,
+    backgroundTasks,
     emitMessage(message: SDKMessage): void {
       const resolve = resolveNext;
       resolveNext = undefined;
@@ -265,13 +268,6 @@ function sdkTaskNotification(
     task_id: taskId,
     status,
   } as unknown as SDKMessage;
-}
-
-function promptQueueForLatestQuery(): AsyncIterator<{ message: { content: unknown } }> {
-  const queryArg = mockSdk.query.mock.calls.at(-1)?.[0] as {
-    prompt: AsyncIterable<{ message: { content: unknown } }>;
-  };
-  return queryArg.prompt[Symbol.asyncIterator]();
 }
 
 describe("ClaudeSdkSession", () => {
@@ -709,53 +705,11 @@ describe("ClaudeSdkSession", () => {
     await session.dispose();
   });
 
-  it("steerTurn enqueues onto the running turn without interrupting or reopening", async () => {
+  it("prepares a steer interrupt by backgrounding foreground tasks", async () => {
     const fake = createFakeQuery();
     mockSdk.query.mockReturnValue(fake.runtime);
-    const runtimeEvents: RuntimeEvent[] = [];
     const session = await ClaudeSdkSession.create({
       threadId: "thread-claude-steer",
-      projectLocation,
-      config,
-      presentationMode: "gui",
-    });
-    session.setListener({
-      onRuntimeEvent: (event) => runtimeEvents.push(event),
-      onUpdate: () => {},
-      onError: () => {},
-      onClose: () => {},
-    });
-
-    await session.openThread(config);
-    await session.startTurn("first", config);
-    await flushAsyncWork();
-    const queue = promptQueueForLatestQuery();
-    expect((await queue.next()).value?.message.content).toBe("first");
-
-    const turnStartsBeforeSteer = runtimeEvents.filter((e) => e.type === "turn.started").length;
-    runtimeEvents.length = 0;
-
-    await session.steerTurn!("steer this", config);
-
-    // No interrupt, no new turn.started; an optimistic user_message item is painted.
-    expect(fake.runtime.interrupt).not.toHaveBeenCalled();
-    expect(runtimeEvents.filter((e) => e.type === "turn.started").length).toBe(0);
-    expect(turnStartsBeforeSteer).toBe(1);
-    expect(
-      runtimeEvents.filter((e) => e.type === "item.started" && e.itemType === "user_message")
-        .length,
-    ).toBe(1);
-    // The steer message was pushed onto the SDK input queue.
-    expect((await queue.next()).value?.message.content).toBe("steer this");
-
-    await session.dispose();
-  });
-
-  it("steerTurn applies a changed model so a next-turn steer uses the new one", async () => {
-    const fake = createFakeQuery();
-    mockSdk.query.mockReturnValue(fake.runtime);
-    const session = await ClaudeSdkSession.create({
-      threadId: "thread-claude-steer-model",
       projectLocation,
       config,
       presentationMode: "gui",
@@ -770,48 +724,12 @@ describe("ClaudeSdkSession", () => {
     await session.openThread(config);
     await session.startTurn("first", config);
     await flushAsyncWork();
-    fake.setModel.mockClear();
+    expect("steerTurn" in session).toBe(false);
 
-    // setModel never affects the in-flight turn, but the steer message may
-    // start the NEXT turn, so the model change must be applied before pushing.
-    await session.steerTurn!("steer this", { model: "opus" });
-    expect(fake.setModel).toHaveBeenCalledWith("opus");
+    await session.prepareSteerInterrupt!();
 
-    // Unchanged model on a later steer must not re-send the control request.
-    await session.steerTurn!("again", { model: "opus" });
-    expect(fake.setModel).toHaveBeenCalledTimes(1);
-
-    await session.dispose();
-  });
-
-  it("steerTurn falls back to startTurn semantics when no turn is in flight", async () => {
-    const fake = createFakeQuery();
-    mockSdk.query.mockReturnValue(fake.runtime);
-    const runtimeEvents: RuntimeEvent[] = [];
-    const session = await ClaudeSdkSession.create({
-      threadId: "thread-claude-steer-idle",
-      projectLocation,
-      config,
-      presentationMode: "gui",
-    });
-    session.setListener({
-      onRuntimeEvent: (event) => runtimeEvents.push(event),
-      onUpdate: () => {},
-      onError: () => {},
-      onClose: () => {},
-    });
-
-    const openedSessionId = await session.openThread(config);
-    await session.startTurn("first", config);
-    await flushAsyncWork();
-    fake.emitMessage(sdkAssistantMessage(openedSessionId, "assistant-uuid-1", "done"));
-    fake.emitMessage(sdkSuccessResult(openedSessionId));
-    await flushAsyncWork();
-    runtimeEvents.length = 0;
-
-    // Raced idle: steer opens a fresh turn just like startTurn.
-    await session.steerTurn!("second", config);
-    expect(runtimeEvents.filter((e) => e.type === "turn.started").length).toBe(1);
+    expect(fake.backgroundTasks).toHaveBeenCalledTimes(1);
+    expect(fake.runtime.interrupt).not.toHaveBeenCalled();
 
     await session.dispose();
   });

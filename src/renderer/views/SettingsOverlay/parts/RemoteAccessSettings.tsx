@@ -682,14 +682,19 @@ export function RemoteAccessSettings() {
 
   useEffect(() => {
     let cancelled = false;
+    let pairingChanged = false;
+    const unsubscribe = readBridge().onRemoteAccessPairingChanged((info) => {
+      pairingChanged = true;
+      setState(pairingViewStateFromInfo(info));
+    });
     async function loadInitialPairing() {
       try {
         const next = await readPairingViewState();
-        if (!cancelled) {
+        if (!cancelled && !pairingChanged) {
           setState(next);
         }
       } catch (error) {
-        if (!cancelled) {
+        if (!cancelled && !pairingChanged) {
           setState({
             info: null,
             error: friendlyError(error, t`Unable to load remote access pairing.`),
@@ -700,13 +705,15 @@ export function RemoteAccessSettings() {
     void loadInitialPairing();
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [t]);
 
   const refresh = async () => {
     setIsRefreshing(true);
     try {
-      setState(await readPairingViewState());
+      const info = await readBridge().refreshRemoteAccessPairing();
+      setState(pairingViewStateFromInfo(info));
     } catch (error) {
       const message = friendlyError(error, t`Unable to load remote access pairing.`);
       setState({ info: null, error: message });

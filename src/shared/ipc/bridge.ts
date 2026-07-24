@@ -1,5 +1,6 @@
 import type { PoracodeChannel } from "../channel";
 import type { RemoteThreadCommand } from "../contracts";
+import type { RemoteAccessPairingInfo } from "../remote";
 import type { SharedSettings } from "../settings";
 import { createChannel } from "./core";
 import {
@@ -12,6 +13,7 @@ import {
 } from "./procedureMap";
 import type {
   BrowserEvent,
+  ProjectStateChangedEvent,
   SupervisorEvent,
   ThreadOpenRequestedEvent,
   UpdateStatus,
@@ -55,8 +57,11 @@ export type PoracodeBridge = PoracodeInvokeBridge & {
   onBrowserEvent(listener: (event: BrowserEvent) => void): () => void;
   /** Thread-metadata mutations issued by paired remote clients (mobile PWA). */
   onRemoteThreadCommand(listener: (command: RemoteThreadCommand) => void): () => void;
+  /** Active remote-access code or paired-device state changed in main. */
+  onRemoteAccessPairingChanged(listener: (info: RemoteAccessPairingInfo) => void): () => void;
   /** Shared settings rewritten outside this renderer (e.g. by a remote client). */
   onSharedSettingsChanged(listener: (settings: SharedSettings) => void): () => void;
+  onProjectStateChanged(listener: (event: ProjectStateChangedEvent) => void): () => void;
   onThreadOpenRequested(listener: (event: ThreadOpenRequestedEvent) => void): () => void;
   submitQuickComposer(submission: QuickComposerSubmission): Promise<void>;
   dismissQuickComposer(): Promise<void>;
@@ -116,7 +121,9 @@ export const IPC_EVENT_CHANNELS = {
   updateStatus: createChannel("updateStatus"),
   browserEvent: createChannel("browserEvent"),
   remoteThreadCommand: createChannel("remoteThreadCommand"),
+  remoteAccessPairingChanged: createChannel("remoteAccessPairingChanged"),
   sharedSettingsChanged: createChannel("sharedSettingsChanged"),
+  projectStateChanged: createChannel("projectStateChanged"),
   threadOpenRequested: createChannel("threadOpenRequested"),
   quickComposerSubmit: createChannel("quickComposerSubmit"),
   quickComposerDismissRequested: createChannel("quickComposerDismissRequested"),

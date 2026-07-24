@@ -81,7 +81,10 @@ import {
   PoracodeCampaignContextProvider,
   createParentThreadLoader,
 } from "./consultations";
-import { FixtureCampaignContextProvider, type CampaignContextProvider } from "@/shared/consultations";
+import {
+  FixtureCampaignContextProvider,
+  type CampaignContextProvider,
+} from "@/shared/consultations";
 import { closeDatabase, getSqlite, initDatabase } from "@/main/db/connection";
 import { dbGetProject } from "@/main/db";
 
@@ -222,7 +225,6 @@ export class SupervisorRuntime {
       getAgentStatusService: () => this.agentStatusService,
     });
     this.agentRegistryService.refreshAgentRegistryAdapters();
-    this.skillsService = new SkillsService({ adapters: this.adapters });
     mkdirSync(paths.cacheDir, { recursive: true });
     mkdirSync(this.logsDir, { recursive: true });
 
@@ -243,6 +245,11 @@ export class SupervisorRuntime {
       settingsPath: this.settingsPath,
       statusCachePath: paths.statusCachePath,
       emit,
+    });
+    this.skillsService = new SkillsService({
+      adapters: this.adapters,
+      resolveAgentVersion: (kind, wslDistro) =>
+        this.agentStatusService.getCachedVersion(kind, wslDistro),
     });
 
     // Boot the CLI hook plugin coordinator BEFORE the thread session manager so
@@ -365,12 +372,12 @@ export class SupervisorRuntime {
           this.threadSessionManager.appendSubagentRuntimeEvent(parentThreadId, event),
       },
     });
-    // Orchestrator lane of the Crossagents MCP: creates first-class child
-    // threads. Creation is main-orchestrated — the manager emits an
-    // `orchestrator-thread-created` supervisor event; main upserts the DB row,
-    // mirrors it to the renderer, and calls startThread back into this
-    // process. Host closures resolve the thread session manager lazily, same
-    // as the run manager above.
+
+    // Consultation child-thread lane: creates first-class child threads for
+    // campaign consultations. Creation is main-orchestrated — the manager emits
+    // an `orchestrator-thread-created` supervisor event; main upserts the DB
+    // row, mirrors it to the renderer, and calls startThread back into this
+    // process. Host closures resolve the thread session manager lazily.
     this.orchestratorThreadManager = new OrchestratorThreadManager({
       adapters: this.adapters,
       getStatusCapabilities: (kind) => this.agentStatusService.getCachedCapabilities(kind),
@@ -383,15 +390,8 @@ export class SupervisorRuntime {
         readThreadHistory: (threadId) => this.threadSessionManager.readThreadHistory(threadId),
         sendThreadInput: (payload) => this.threadSessionManager.sendThreadInput(payload),
         interruptThread: (threadId) => this.threadSessionManager.interruptThread({ threadId }),
-        // Tear down the child's runtime session to free a cap slot. Reuses the
-        // same closeThread that removes the session from the TSM map (which is
-        // what makes getOrchestratorThreadState — and thus the live-child count
-        // — drop the child). The persisted thread row + worktree remain.
         closeThread: (threadId) => this.threadSessionManager.closeThread({ threadId }),
       },
-      // Same worktree pipeline the renderer-driven `gitAddWorktree` procedure
-      // uses, with placement resolved from global settings (per-project
-      // overrides live in the renderer DB and aren't visible here).
       createWorktree: async ({ location, branch, baseBranch }) => {
         const placement = resolveWorktreePlacement(
           this.sharedSettingsCache.read(),
@@ -414,16 +414,12 @@ export class SupervisorRuntime {
         );
         return { path: result.path };
       },
-      // Roll back a worktree created by a create_thread call that then failed to
-      // launch (force removal + branch delete), so a ticket-keyed retry isn't
-      // poisoned by a leftover branch.
       removeWorktree: async ({ location, path }) => {
         await this.gitService.removeWorktree(location, path, true, true);
       },
     });
     this.crossagentMcpIngress = new CrossagentMcpIngress({
       runManager: this.subagentRunManager,
-      orchestrator: this.orchestratorThreadManager,
       getSpawnableAgents: async () => {
         const { windows } = await this.agentStatusService.getAgentStatuses({ wslDistros: [] });
         return buildSpawnableAgents(this.adapters, windows);
@@ -493,8 +489,8 @@ export class SupervisorRuntime {
       repository: consultationRepository,
     });
     this.threadSessionManager = new ThreadSessionManager({
-      // Tap the outbound stream so the orchestrator lane can track child
-      // thread-state transitions (wait_for_thread) without polling.
+      // Tap the outbound stream so the consultation child-thread lane can track
+      // child thread-state transitions without polling.
       emit: (event) => {
         this.orchestratorThreadManager.observeSupervisorEvent(event);
         emit(event);
@@ -842,8 +838,8 @@ export class SupervisorRuntime {
 
   /**
    * Re-register persisted orchestrator child threads after a supervisor
-   * restart (main pushes them at every supervisor start) so the Crossagents
-   * orchestrator lane can keep addressing children created before the restart.
+   * restart (main pushes them at every supervisor start) so the consultation
+   * child-thread lane can keep addressing children created before the restart.
    */
   seedOrchestratorChildren(payload: SeedOrchestratorChildrenPayload): void {
     this.orchestratorThreadManager.rehydrateChildren(payload.children);

@@ -101,8 +101,10 @@ export default function SupportPage() {
             <h2 className="mb-3 text-xl font-semibold text-white">Camera and notifications</h2>
             <p>
               QR scanning needs camera permission; manual pairing remains available if permission is
-              denied. Push notifications are optional and need system permission plus APNs or FCM
-              connectivity. You can change notification settings in the app or operating system.
+              denied. Push notifications are optional and need system permission plus APNs, FCM, or
+              browser Push API connectivity. On iPhone and iPad, browser notifications require the
+              web app to be added to the Home Screen. You can change notification settings in the
+              app or operating system.
             </p>
           </section>
 

@@ -173,6 +173,7 @@ describe("ThreadComposerSection", () => {
       runtimeItemsByIdByThread: {},
       runtimeRequestsByThread: {},
       pendingSteerByThreadId: {},
+      pendingComposerFocusThreadId: null,
       threadDraftContents: {},
     });
     bridgeMock.isRemoteSession.mockReturnValue(false);
@@ -192,6 +193,7 @@ describe("ThreadComposerSection", () => {
   function composerElement(opts?: {
     thread?: Thread;
     agentStatus?: AgentStatus;
+    autoFocusComposer?: boolean;
     errorDockStates?: ThreadErrorDockState[];
     onSubmitInput?: (prompt: string, segments?: unknown) => Promise<void>;
     onOpenProjectRelativePath?: (path: string, lineNumber?: number) => void;
@@ -214,6 +216,9 @@ describe("ThreadComposerSection", () => {
         onGoalDockDismiss={() => undefined}
         onDismissError={() => undefined}
         {...(opts?.onSubmitInput ? { onSubmitInput: opts.onSubmitInput } : {})}
+        {...(opts?.autoFocusComposer !== undefined
+          ? { autoFocusComposer: opts.autoFocusComposer }
+          : {})}
         {...(opts?.onOpenProjectRelativePath
           ? { onOpenProjectRelativePath: opts.onOpenProjectRelativePath }
           : {})}
@@ -226,6 +231,7 @@ describe("ThreadComposerSection", () => {
   function renderComposer(opts?: {
     thread?: Thread;
     agentStatus?: AgentStatus;
+    autoFocusComposer?: boolean;
     errorDockStates?: ThreadErrorDockState[];
     onSubmitInput?: ReturnType<typeof vi.fn<(prompt: string, segments?: unknown) => Promise<void>>>;
     onOpenProjectRelativePath?: (path: string, lineNumber?: number) => void;
@@ -328,6 +334,78 @@ describe("ThreadComposerSection", () => {
       { kind: "text", content: "first thread draft" },
     ]);
     expect(useAppStore.getState().threadDraftContents[secondGuiThread.id]).toBeUndefined();
+  });
+
+  it("focuses the reused composer when the desktop switches threads", async () => {
+    const { rerender } = renderComposer();
+    const input = screen.getByRole("textbox");
+    const outsideButton = document.createElement("button");
+    document.body.appendChild(outsideButton);
+    outsideButton.focus();
+    expect(outsideButton).toHaveFocus();
+
+    act(() => {
+      useAppStore.getState().requestComposerFocus(secondGuiThread.id);
+    });
+    rerender(
+      composerElement({
+        thread: secondGuiThread,
+        onSubmitInput: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      }),
+    );
+
+    await waitFor(() => expect(input).toHaveFocus());
+    outsideButton.remove();
+  });
+
+  it("does not focus a reused composer without an explicit request", () => {
+    const { rerender } = renderComposer();
+    const outsideButton = document.createElement("button");
+    document.body.appendChild(outsideButton);
+    outsideButton.focus();
+
+    rerender(
+      composerElement({
+        thread: secondGuiThread,
+        onSubmitInput: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      }),
+    );
+
+    expect(outsideButton).toHaveFocus();
+    outsideButton.remove();
+  });
+
+  it("defers an explicit focus request while the terminal composer is collapsed", async () => {
+    useSharedSettings.setState({ collapseTerminalComposer: true });
+    renderComposer({ thread: terminalThread, agentStatus: claudeTerminalStatus });
+    const input = screen.getByRole("textbox");
+    const outsideButton = document.createElement("button");
+    document.body.appendChild(outsideButton);
+    outsideButton.focus();
+
+    act(() => {
+      useAppStore.getState().requestComposerFocus(terminalThread.id);
+    });
+    expect(input).not.toHaveFocus();
+    expect(useAppStore.getState().pendingComposerFocusThreadId).toBe(terminalThread.id);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show composer" }));
+
+    await waitFor(() => {
+      expect(input).toHaveFocus();
+      expect(useAppStore.getState().pendingComposerFocusThreadId).toBeNull();
+    });
+    outsideButton.remove();
+  });
+
+  it("lets desktop PWA input opt into autofocus without enabling it for touch", () => {
+    bridgeMock.isRemoteSession.mockReturnValue(true);
+    const { unmount } = renderComposer({ autoFocusComposer: false });
+    expect(screen.getByRole("textbox")).not.toHaveFocus();
+    unmount();
+
+    renderComposer({ autoFocusComposer: true });
+    expect(screen.getByRole("textbox")).toHaveFocus();
   });
 
   it("does not let an older thread's failed submit overwrite the reused composer", async () => {
@@ -808,7 +886,7 @@ describe("ThreadComposerSection", () => {
         [guiThread.id]: {
           id: "pending-1",
           prompt: "Actually inspect the diff first",
-          stagedAt: Date.now(),
+          stagedAt: Date.now() - 2_000,
         },
       },
     });

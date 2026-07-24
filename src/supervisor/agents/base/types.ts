@@ -122,6 +122,14 @@ export interface StructuredSessionHandle {
     segments?: PromptSegment[],
     options?: StartTurnOptions,
   ): Promise<void>;
+  /**
+   * Best-effort provider preparation immediately before the shared runtime
+   * interrupts an in-flight turn for steering. Providers can preserve work
+   * that should survive the turn boundary (for example, by backgrounding
+   * foreground tasks). The runtime still owns the interrupt, watchdog, staged
+   * prompt, and fresh `startTurn` accounting.
+   */
+  prepareSteerInterrupt?(): Promise<void>;
   interruptTurn?(): Promise<void>;
   /**
    * Close the provider's current canonical turn locally before a forced
@@ -168,6 +176,18 @@ export interface CreateStructuredSessionInput {
    */
   acpSessionUpdateTransform?: AcpSessionUpdateTransform;
   /**
+   * Enable canonical goal lifecycle events for providers whose ACP server
+   * implements the `/goal` command family. Kept opt-in so unsupported ACP
+   * providers do not paint an optimistic goal dock for an unknown command.
+   */
+  acpGoalCommands?: boolean;
+  /**
+   * Translate a vendor ACP extension notification into a standard
+   * `session/update` before canonical mapping. This is for providers that put
+   * lifecycle boundaries on an extension method instead of the ACP stream.
+   */
+  acpExtensionSessionUpdateTransform?: AcpExtensionSessionUpdateTransform;
+  /**
    * Handle vendor ACP extension notifications (e.g. Cursor's `cursor/task`)
    * that carry metadata absent from the standard `session/update` stream.
    */
@@ -182,6 +202,11 @@ export type AcpEmptyResponseErrorResolver = (input: {
 export type AcpSessionUpdateTransform = (
   notification: import("@agentclientprotocol/sdk").SessionNotification,
 ) => import("@agentclientprotocol/sdk").SessionNotification;
+
+export type AcpExtensionSessionUpdateTransform = (
+  method: string,
+  params: Record<string, unknown>,
+) => import("@agentclientprotocol/sdk").SessionNotification | undefined;
 
 export type AcpExtensionNotificationHandler = (
   method: string,
@@ -558,6 +583,11 @@ export interface AgentSkillRootSpec {
     readonly env: string;
     readonly path: string;
   };
+  /**
+   * Minimum provider version that can follow a linked skill directory at this
+   * projection root. Older or unknown versions receive a copied projection.
+   */
+  readonly linkProjectionFromVersion?: string;
 }
 
 export interface AgentSkillSupport {
@@ -565,7 +595,8 @@ export interface AgentSkillSupport {
   readonly roots: readonly AgentSkillRootSpec[];
   /** Provider roots that need a Poracode-owned copy of canonical skills. */
   readonly projectionRoots?: readonly AgentSkillRootSpec[];
-  readonly invocation: "slash" | "dollar" | "prompt";
+  /** How the provider invokes a named skill from its composer. */
+  readonly invocation: "slash" | "dollar" | "prompt" | "skill";
   /** Provider-native duplicate resolution, using root ids plus canonical `agents`. */
   readonly precedence?: {
     readonly scopeOrder?: readonly ("global" | "project")[];

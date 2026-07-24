@@ -31,6 +31,7 @@ import {
 import {
   deleteThreadAttachments,
   deleteThreadAttachmentsAsync,
+  readLocalImageFile,
   resolveProjectFsPath,
   saveClipboardImageFile,
   saveHandoffContextFile,
@@ -39,7 +40,7 @@ import {
 import { createProjectDirectory } from "../projectDirectory";
 import { copyCampaignConsultationAttachments } from "../campaignConsultationAttachments";
 import { ensureCampaignWorkspaceDir } from "../campaignWorkspaceDir";
-import { diffSyncedThreadIds } from "./threadSyncBroadcast";
+import { diffSyncedThreads } from "./threadSyncBroadcast";
 import { showOsNotification } from "../osNotifications";
 import { showAndFocusWindow } from "../window/showAndFocusWindow";
 import {
@@ -51,6 +52,7 @@ import {
 } from "../profile";
 import {
   applyClaudeProfileEnvironment,
+  mergeManagedSharedSettings,
   readSharedSettingsFile,
   writeSharedSettingsFile,
 } from "../sharedSettingsFile";
@@ -69,7 +71,6 @@ import {
   type WindowChromeResult,
 } from "@/shared/ipc";
 import { supportsNativeWindowMaterial, syncNativeThemeForMaterial } from "../window/windowMaterial";
-import type { AgentInstanceConfig } from "@/shared/contracts";
 import type { SharedSettings } from "@/shared/settings";
 import { headersToRecord, readBoundedResponseBody } from "@/shared/http";
 import type { PoracodePaths } from "@/shared/poracodePaths";
@@ -211,6 +212,7 @@ export function createLocalIpcHandlers(
       clipboard.writeImage(image);
       return true;
     },
+    readLocalImageFile: ({ url }) => readLocalImageFile(url),
     createProjectDirectory: (payload) => createProjectDirectory(payload),
     ensureCampaignWorkspaceDir: (payload) => {
       const baseDir = options.requirePoracodePaths().baseDir;
@@ -317,6 +319,11 @@ export function createLocalIpcHandlers(
     setGlobalShortcutsSuspended: (payload) =>
       options.setGlobalShortcutsSuspended?.(payload.suspended),
     getRemoteAccessPairing: () => getRemoteAccessPairingInfo(options.getRemoteAccessServer()),
+    refreshRemoteAccessPairing: () => {
+      const server = options.getRemoteAccessServer();
+      server?.issuePairingUrl("Settings QR");
+      return getRemoteAccessPairingInfo(server);
+    },
     setRemoteAccessEnabled: (payload) => options.setRemoteAccessEnabled(payload.enabled),
     sshDiscoverHosts: () => options.sshConnectionManager.discoverHosts(),
     sshConnect: (payload) => options.sshConnectionManager.connect(payload),
@@ -342,40 +349,11 @@ export function createLocalIpcHandlers(
     getSharedSettings: () => readSharedSettingsFile(options.requirePoracodePaths().settingsPath),
     setSharedSettings: (settings) => {
       const settingsPath = options.requirePoracodePaths().settingsPath;
-      // Preserve supervisor-managed fields so the renderer's persist cycle
-      // doesn't clobber writes made out-of-band by the supervisor.
-      const onDisk = readSharedSettingsFile(settingsPath);
-      const rendererManagedInstances = Object.fromEntries(
-        Object.entries(settings.agentInstances)
-          .filter(([, instance]) => instance.driver !== "acp-generic")
-          .map(([id, instance]): [string, AgentInstanceConfig] => {
-            // A Claude profile's `environment` is owned by the encrypting
-            // `setClaudeProfileEnvironment` path. Pin it to disk so the
-            // renderer's plaintext-capable persist cycle can never write a
-            // secret in the clear or clear a saved one. Other drivers keep
-            // their existing renderer-managed behavior.
-            if (instance.driver !== "claude") return [id, instance];
-            const onDiskEnv = onDisk.agentInstances[id]?.environment;
-            const next: AgentInstanceConfig = { ...instance };
-            if (onDiskEnv) next.environment = onDiskEnv;
-            else delete next.environment;
-            return [id, next];
-          }),
-      );
-      const supervisorManagedInstances = Object.fromEntries(
-        Object.entries(onDisk.agentInstances).filter(
-          ([, instance]) => instance.driver === "acp-generic",
-        ),
-      );
-      const merged: SharedSettings = {
-        ...settings,
-        acpRegistryInstalledAgents: onDisk.acpRegistryInstalledAgents,
-        agentInstances: {
-          ...rendererManagedInstances,
-          ...supervisorManagedInstances,
-        },
-        agentHookSupport: onDisk.agentHookSupport,
-      };
+      // Preserve supervisor-managed fields and encrypted Claude-profile
+      // environments so the renderer's persist cycle doesn't clobber writes
+      // made out-of-band by the supervisor. (Shared with the app-controls MCP
+      // `update_settings` tool via `mergeManagedSharedSettings`.)
+      const merged = mergeManagedSharedSettings(readSharedSettingsFile(settingsPath), settings);
       writeSharedSettingsFile(settingsPath, merged);
       options.updatePowerSaveBlocker();
       options.onSharedSettingsChanged?.(merged);
@@ -448,12 +426,13 @@ export function createLocalIpcHandlers(
       // Diff before writing, then publish the same event remote-issued thread
       // commands send; the remote's debounced refresh reads the post-write
       // state.
-      const changedThreadIds = diffSyncedThreadIds(dbGetThreads(), threads);
+      const { changedThreadIds, viewedThreadIds } = diffSyncedThreads(dbGetThreads(), threads);
       dbSyncAll(projects, threads, viewJson);
       if (changedThreadIds.length > 0) {
         options.getRemoteAccessServer()?.publishSupervisorEvent({
           type: "remote-threads-changed",
           threadIds: changedThreadIds,
+          ...(viewedThreadIds.length > 0 ? { viewedThreadIds } : {}),
         });
       }
     },

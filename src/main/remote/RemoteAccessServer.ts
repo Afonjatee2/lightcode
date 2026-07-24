@@ -3,8 +3,11 @@ import type { AddressInfo } from "node:net";
 import { WebSocket, WebSocketServer } from "ws";
 import {
   toWebSocketUrl,
+  type RemoteAccessScope,
   type RemoteGitSummaries,
   type RemoteAccessSessionSummary,
+  type RemoteAccessTokenResult,
+  type RemoteClientMetadata,
   type RemotePushRegistration,
   type RemoteSettings,
   type RemoteSettingsPatch,
@@ -164,9 +167,12 @@ export interface RemoteAccessServerOptions {
    * are injected here. Absent on hosts that don't support push (returns 503).
    */
   readonly pushRegistrations?: {
+    webPublicKey(): Promise<string>;
     upsert(registration: RemotePushRegistration): void;
     remove(deviceId: string): void;
   };
+  /** Notifies the desktop shell after the active pairing code rotates. */
+  readonly onPairingChanged?: () => void;
 }
 
 /**
@@ -223,6 +229,7 @@ export class RemoteAccessServer {
   private readonly context: RemoteServerContext;
   private seq = 0;
   private info: RemoteAccessServerInfo | null = null;
+  private activePairingCredential: string | null = null;
   private stopping = false;
 
   constructor(private readonly options: RemoteAccessServerOptions) {
@@ -264,6 +271,7 @@ export class RemoteAccessServer {
       get seq() {
         return server.seq;
       },
+      exchangePairingCredential: (input) => this.exchangePairingCredential(input),
       requireInfo: () => this.requireInfo(),
       requireSettingsGateway: () => this.requireSettingsGateway(),
       requireSchedulesGateway: () => this.requireSchedulesGateway(),
@@ -304,6 +312,7 @@ export class RemoteAccessServer {
     const pairingCredential = this.auth.issuePairingCredential({
       label: "Startup pairing",
     });
+    this.activePairingCredential = pairingCredential.credential;
 
     this.info = {
       httpBaseUrl,
@@ -365,6 +374,7 @@ export class RemoteAccessServer {
       this.server.close(() => done());
     });
     this.info = null;
+    this.activePairingCredential = null;
   }
 
   getInfo(): RemoteAccessServerInfo | null {
@@ -441,10 +451,35 @@ export class RemoteAccessServer {
 
   issuePairingUrl(label?: string): string {
     const info = this.requireInfo();
+    if (this.activePairingCredential) {
+      this.auth.revokePairingCredential(this.activePairingCredential);
+    }
     const issued = this.auth.issuePairingCredential({
       ...(label ? { label } : {}),
     });
-    return this.mintPairingUrl(info.httpBaseUrl, issued.credential);
+    this.activePairingCredential = issued.credential;
+    const pairingUrl = this.mintPairingUrl(info.httpBaseUrl, issued.credential);
+    this.info = { ...info, pairingUrl };
+    this.notifyPairingChanged();
+    return pairingUrl;
+  }
+
+  private exchangePairingCredential(input: {
+    readonly credential: string;
+    readonly scopes?: readonly RemoteAccessScope[];
+    readonly client?: RemoteClientMetadata;
+  }): RemoteAccessTokenResult {
+    const result = this.auth.exchangePairingCredential(input);
+    this.issuePairingUrl("Automatic pairing");
+    return result;
+  }
+
+  private notifyPairingChanged(): void {
+    try {
+      this.options.onPairingChanged?.();
+    } catch (error) {
+      console.warn("[poracode] failed to notify desktop after pairing code rotation:", error);
+    }
   }
 
   private mintPairingUrl(httpBaseUrl: string, credential: string): string {

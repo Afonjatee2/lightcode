@@ -106,7 +106,9 @@ export function SortableThreadItem(props: {
     type: "thread",
     accept: sortDisabled || isExperimentCandidate ? [] : ["thread", "worktree-group"],
     group: props.group,
-    disabled: sortDisabled || isExperimentCandidate,
+    // Automatic sort modes only disable reordering within the sidebar. Keep
+    // ordinary threads draggable so they can still be dropped onto a pane.
+    disabled: isExperimentCandidate,
     data: {
       type: "thread",
       threadId: thread.id,

@@ -60,6 +60,10 @@ interface ClaudeAdapterOptions {
   models?: ClaudeProfileModel[];
   /** Profile-specific effort allow-list (hides built-in tiers outside it). */
   efforts?: string[];
+  /** Profile-specific default effort. */
+  defaultEffort?: string;
+  /** Per-model effort choices for external-provider model ids. */
+  modelEfforts?: Record<string, string[]>;
 }
 
 function resolveTildePath(rawPath: string, location: ProjectLocation): string {
@@ -110,20 +114,23 @@ function resolveInstanceEnv(
  * Apply a profile's optional model additions / effort allow-list on top of the
  * built-in Claude capabilities. A no-op when neither override is set (so the
  * default adapter is unaffected). Custom models are *appended* to the built-in
- * list (the user can still pick the Claude models); they aren't in the built-in
- * per-model maps, so the picker falls back to the global effort/context lists.
+ * list (the user can still pick the Claude models). Profiles may also provide
+ * per-model effort choices for their external model ids.
  */
 function overrideProfileCapabilities(
   base: AgentCapability,
   models: ClaudeProfileModel[] | undefined,
   efforts: readonly string[] | undefined,
+  defaultEffort: string | undefined,
+  modelEfforts: Readonly<Record<string, readonly string[]>> | undefined,
 ): AgentCapability {
+  const keep = (list: readonly string[], allowed: ReadonlySet<string>) =>
+    list.filter((effort) => allowed.has(effort));
   let caps = base;
 
   if (efforts && efforts.length > 0) {
     const allowed = new Set(efforts);
-    const keep = (list: readonly string[]) => list.filter((effort) => allowed.has(effort));
-    const nextEfforts = keep(caps.efforts);
+    const nextEfforts = keep(caps.efforts, allowed);
     // If a hand-edited config lists only unknown tier names, the allow-list is
     // empty — keep the full built-in list rather than leaving the picker with no
     // efforts to choose from. (The UI only ever writes valid tiers.)
@@ -136,7 +143,7 @@ function overrideProfileCapabilities(
             ? caps.defaultEffort
             : nextEfforts[0],
         modelEfforts: Object.fromEntries(
-          Object.entries(caps.modelEfforts).map(([id, list]) => [id, keep(list)]),
+          Object.entries(caps.modelEfforts).map(([id, list]) => [id, keep(list, allowed)]),
         ),
       };
     }
@@ -156,6 +163,23 @@ function overrideProfileCapabilities(
     }
   }
 
+  if (defaultEffort && caps.efforts.includes(defaultEffort)) {
+    caps = { ...caps, defaultEffort };
+  }
+
+  if (modelEfforts) {
+    const allowed = new Set(caps.efforts);
+    caps = {
+      ...caps,
+      modelEfforts: {
+        ...caps.modelEfforts,
+        ...Object.fromEntries(
+          Object.entries(modelEfforts).map(([modelId, list]) => [modelId, keep(list, allowed)]),
+        ),
+      },
+    };
+  }
+
   return caps;
 }
 
@@ -170,6 +194,8 @@ export function createClaudeProfileAdapter(instance: AgentInstanceConfig): Agent
     ...(customEnv ? { customEnv } : {}),
     ...(cfg.models && cfg.models.length > 0 ? { models: cfg.models } : {}),
     ...(cfg.efforts && cfg.efforts.length > 0 ? { efforts: cfg.efforts } : {}),
+    ...(cfg.defaultEffort ? { defaultEffort: cfg.defaultEffort } : {}),
+    ...(cfg.modelEfforts ? { modelEfforts: cfg.modelEfforts } : {}),
   });
 }
 
@@ -182,6 +208,8 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
     claudeCapabilities,
     options.models,
     options.efforts,
+    options.defaultEffort,
+    options.modelEfforts,
   );
 
   function buildClaudeOneShotCommand(
@@ -246,6 +274,7 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
           projectPath: ".claude/skills",
           ...(options.configDir ? { globalBasePath: options.configDir } : {}),
           globalOverride: { env: "CLAUDE_CONFIG_DIR", path: "skills" },
+          linkProjectionFromVersion: "2.1.203",
         },
       ],
       invocation: "slash",
@@ -318,6 +347,8 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
           status.capabilities,
           options.models,
           options.efforts,
+          options.defaultEffort,
+          options.modelEfforts,
         ),
       };
     },

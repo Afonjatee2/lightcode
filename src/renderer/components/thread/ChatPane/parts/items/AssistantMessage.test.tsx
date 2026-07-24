@@ -136,14 +136,25 @@ describe("AssistantMessage", () => {
       expect(screen.getByLabelText("Copy message")).toBeTruthy();
     });
 
-    it("hides the copy action while the turn is still active", () => {
+    it("reserves the copy strip without exposing its action while the turn is active", () => {
       seed([answer]);
-      render(
+      const { container, rerender } = render(
         <AppProvider>
           <AssistantMessage threadId="thread-1" item={answer} isTurnActive={true} />
         </AppProvider>,
       );
       expect(screen.queryByLabelText("Copy message")).toBeNull();
+      const reservedStrip = container.querySelector(".poracode-message-action-strip");
+      expect(reservedStrip).not.toBeNull();
+
+      rerender(
+        <AppProvider>
+          <AssistantMessage threadId="thread-1" item={answer} isTurnActive={false} />
+        </AppProvider>,
+      );
+
+      expect(screen.getByLabelText("Copy message")).toBeTruthy();
+      expect(container.querySelector(".poracode-message-action-strip")).toBe(reservedStrip);
     });
   });
 });

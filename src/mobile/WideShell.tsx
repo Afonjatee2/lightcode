@@ -1,7 +1,7 @@
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@heroui/react";
 import { FolderKanban, Gauge, Globe2, Plus, Server, Settings2, Waypoints } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type {
   CSSProperties,
   KeyboardEvent as ReactKeyboardEvent,
@@ -9,12 +9,22 @@ import type {
   ReactNode,
 } from "react";
 import { Outlet, useNavigate } from "@tanstack/react-router";
+import { DeferredFileEditorPanel } from "@/renderer/deferredFeatures";
+import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { ConnectionBanner } from "./components";
 import { Brand, ConnectionControl } from "./NarrowShell";
-import { preselectWorktreeDraft, threadIdFromPath } from "./navHelpers";
+import { openWorktreeDraft, threadIdFromPath } from "./navHelpers";
 import { MobileSetupEmptyState } from "./setupEmptyState";
 import type { RemoteDesktopSession } from "./useRemoteDesktop";
 import { ThreadsView } from "./views/ThreadsView";
+import { useDesktopPanelStore } from "./desktopPanelStore";
+import { DESKTOP_RIGHT_PANEL_QUERY, useMediaQuery } from "./useMediaQuery";
+
+const DesktopWorkspacePanel = lazy(() =>
+  import("./views/DesktopWorkspacePanel").then((module) => ({
+    default: module.DesktopWorkspacePanel,
+  })),
+);
 
 const SIDEBAR_WIDTH_KEY = "poracode-mobile.sidebar-width";
 const SIDEBAR_MIN_WIDTH = 240;
@@ -84,12 +94,20 @@ export function WideShell(props: {
   const { t } = useLingui();
   const selectedThreadId = threadIdFromPath(pathname);
   const hasActiveDesktop = remote.activeDesktop !== null;
+  const showDesktopTools = useMediaQuery(DESKTOP_RIGHT_PANEL_QUERY);
+  const fileEditorOpen = useFileEditorStore((state) => state.overlayMode === "modal");
   const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
   const sidebarWidthRef = useRef(sidebarWidth);
   const shellRef = useRef<HTMLDivElement>(null);
   const teardownResizeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => () => teardownResizeRef.current?.(), []);
+
+  useEffect(() => {
+    if (showDesktopTools && selectedThreadId) {
+      useDesktopPanelStore.getState().setThreadId(selectedThreadId);
+    }
+  }, [selectedThreadId, showDesktopTools]);
 
   function applySidebarWidth(next: number): number {
     const width = clampSidebarWidth(next);
@@ -211,10 +229,13 @@ export function WideShell(props: {
             }}
             onNew={() => void navigate({ to: "/new" })}
             onNewThreadInWorktree={(input) => {
-              preselectWorktreeDraft(input);
-              void navigate({ to: "/new" });
+              void openWorktreeDraft(input, () => navigate({ to: "/new" }));
             }}
-            onOpenTerminal={(input) =>
+            onOpenTerminal={(input) => {
+              if (showDesktopTools && input.sourceThreadId) {
+                useDesktopPanelStore.getState().show("terminal", input.sourceThreadId);
+                return;
+              }
               void navigate({
                 to: "/terminal/$projectId",
                 params: { projectId: input.projectId },
@@ -222,8 +243,8 @@ export function WideShell(props: {
                   ...(input.sourceThreadId ? { fromThread: input.sourceThreadId } : {}),
                   ...(input.worktreePath ? { worktree: input.worktreePath } : {}),
                 },
-              })
-            }
+              });
+            }}
             onRunProjectAction={(input) =>
               void navigate({
                 to: "/terminal/$projectId",
@@ -249,13 +270,15 @@ export function WideShell(props: {
         </div>
         <footer className="m-sidebar__foot">
           <nav className="m-sidebar__nav">
-            <SidebarDestination
-              active={pathname === "/usage"}
-              disabled={!hasActiveDesktop}
-              icon={<Gauge className="size-4" />}
-              label={<Trans>Usage</Trans>}
-              onPress={() => void navigate({ to: "/usage" })}
-            />
+            {!showDesktopTools ? (
+              <SidebarDestination
+                active={pathname === "/usage"}
+                disabled={!hasActiveDesktop}
+                icon={<Gauge className="size-4" />}
+                label={<Trans>Usage</Trans>}
+                onPress={() => void navigate({ to: "/usage" })}
+              />
+            ) : null}
             <SidebarDestination
               active={pathname === "/projects"}
               disabled={!hasActiveDesktop}
@@ -270,13 +293,15 @@ export function WideShell(props: {
               label={<Trans>Browser</Trans>}
               onPress={() => void navigate({ to: "/browser" })}
             />
-            <SidebarDestination
-              active={pathname === "/ports"}
-              disabled={!hasActiveDesktop}
-              icon={<Waypoints className="size-4" />}
-              label={<Trans>Ports</Trans>}
-              onPress={() => void navigate({ to: "/ports" })}
-            />
+            {!showDesktopTools ? (
+              <SidebarDestination
+                active={pathname === "/ports"}
+                disabled={!hasActiveDesktop}
+                icon={<Waypoints className="size-4" />}
+                label={<Trans>Ports</Trans>}
+                onPress={() => void navigate({ to: "/ports" })}
+              />
+            ) : null}
             <SidebarDestination
               active={pathname.startsWith("/settings")}
               icon={<Settings2 className="size-4" />}
@@ -316,17 +341,29 @@ export function WideShell(props: {
           aria-valuenow={sidebarWidth}
         />
       </aside>
-      <main className="m-detail">
-        {hasActiveDesktop ? (
-          <ConnectionBanner
-            state={remote.connection}
-            message={remote.message}
-            onReconnect={remote.reconnect}
-            onPair={() => void navigate({ to: "/desktops" })}
-          />
+      <div className="m-wide-content">
+        <main className="m-detail">
+          {hasActiveDesktop ? (
+            <ConnectionBanner
+              state={remote.connection}
+              message={remote.message}
+              onReconnect={remote.reconnect}
+              onPair={() => void navigate({ to: "/desktops" })}
+            />
+          ) : null}
+          <Outlet />
+          {showDesktopTools && fileEditorOpen ? (
+            <Suspense fallback={null}>
+              <DeferredFileEditorPanel />
+            </Suspense>
+          ) : null}
+        </main>
+        {showDesktopTools ? (
+          <Suspense fallback={null}>
+            <DesktopWorkspacePanel remote={remote} currentThreadId={selectedThreadId} />
+          </Suspense>
         ) : null}
-        <Outlet />
-      </main>
+      </div>
     </div>
   );
 }

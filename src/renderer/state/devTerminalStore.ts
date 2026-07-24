@@ -311,3 +311,17 @@ export const useDevTerminalStore = create<DevTerminalState & DevTerminalActions>
     });
   },
 }));
+
+export function resetDevTerminalStore(): void {
+  clearStreaming([...streamingTimers.keys()]);
+  useDevTerminalStore.setState({
+    isOpen: false,
+    activeProjectId: null,
+    activeWorktreePath: null,
+    tabs: [],
+    activeTabId: null,
+    focusRequestId: 0,
+    tabActivity: {},
+    streamingTabs: {},
+  });
+}

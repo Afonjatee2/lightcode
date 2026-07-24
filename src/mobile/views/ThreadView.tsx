@@ -13,7 +13,7 @@ import { resolveProjectLocation } from "@/shared/worktree";
 import { friendlyError } from "@/shared/messages";
 import { readBridge } from "@/renderer/bridge";
 import type { XTermSurfaceHandle } from "@/renderer/components/terminal/XTermSurface";
-import { SubAgentOverlay } from "@/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay";
+import { SubAgentOpenController } from "@/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay";
 import { GuiThreadContent } from "@/renderer/components/thread/ThreadContent";
 import { ThreadComposerSection } from "@/renderer/components/thread/ThreadComposerSection";
 import {
@@ -41,6 +41,8 @@ import { DESKTOP_POINTER_QUERY, useMediaQuery } from "../useMediaQuery";
 import type { ThreadAction } from "../useRemoteDesktop";
 import type { WorkspaceTab } from "./WorkspaceView";
 
+const PWA_INITIAL_SCROLL_REVEAL_DELAY_MS = 50;
+
 export interface ThreadViewProps {
   readonly thread: Thread | null;
   /** Terminal scrollback text from the latest remote thread snapshot. */
@@ -53,6 +55,7 @@ export interface ThreadViewProps {
   readonly loading?: boolean;
   readonly onThreadAction: (action: ThreadAction) => void;
   readonly onSubmitInput: (prompt: string, segments?: PromptSegment[]) => Promise<void>;
+  readonly onOpenSubAgent?: ((parentItemId: string) => void) | undefined;
   /** Open the unified workspace panel (Changes/Files) for this thread. */
   readonly onOpenWorkspace?: (tab: WorkspaceTab) => void;
   /** Open a project/worktree file from a shared chat file chip. */
@@ -61,6 +64,8 @@ export interface ThreadViewProps {
   readonly onOpenWorkspaceFolder?: ((path: string) => void) | undefined;
   /** Open a terminal scoped to this thread's project/worktree. */
   readonly onOpenTerminal?: () => void;
+  /** Open project notes and to-dos for this thread. */
+  readonly onOpenNotes?: () => void;
   /** Opens the new-thread composer pre-targeted at this thread's worktree. */
   readonly onNewThreadInWorktree?:
     | ((input: {
@@ -105,6 +110,7 @@ export function ThreadView(props: ThreadViewProps) {
   const [terminalReloadKey, setTerminalReloadKey] = useState(0);
   const [terminalSize, setTerminalSize] = useState<TerminalSize | null>(null);
   const [composerInputFocused, setComposerInputFocused] = useState(false);
+  const [guiScrollSettledThreadId, setGuiScrollSettledThreadId] = useState<string | null>(null);
   // The thread composer dock is controlled so a successful send collapses it
   // (drops the keyboard + scrim), while a dismissed keyboard leaves it expanded
   // like the home composer. Uncontrolled would collapse on either.
@@ -140,11 +146,20 @@ export function ThreadView(props: ThreadViewProps) {
   latestThreadIdRef.current = thread?.id;
   useEffect(() => () => window.clearTimeout(reloadTimerRef.current), []);
 
-  // A fresh thread starts collapsed; ThreadView is reused across thread switches,
-  // so reset the controlled expansion when the active thread changes.
+  // ThreadView is reused across thread switches. Touch layouts start each
+  // thread compact, while desktop PWA layouts open the focused composer at its
+  // full size. Resetting every thread to compact here used to race the shared
+  // composer's desktop autofocus and collapse the dock immediately afterward.
   useEffect(() => {
-    setComposerExpanded(false);
-  }, [thread?.id]);
+    setComposerExpanded(submitOnEnter);
+    setGuiScrollSettledThreadId(null);
+    if (thread?.id && submitOnEnter) {
+      // The shared composer stays mounted while the wide PWA switches thread
+      // IDs, so its mount-only autofocus does not run again. Route the switch
+      // through the existing focus request consumed by ThreadComposerSection.
+      useAppStore.getState().requestComposerFocus(thread.id);
+    }
+  }, [thread?.id, submitOnEnter]);
 
   if (!thread) {
     return (
@@ -242,6 +257,9 @@ export function ThreadView(props: ThreadViewProps) {
       ? { onRevealProjectFolderInTree: props.onOpenWorkspaceFolder }
       : {}),
     canShowProjectEntryInExplorer: false,
+    ...(props.onOpenSubAgent
+      ? { onOpenSubAgent: (parentItemId: string) => props.onOpenSubAgent?.(parentItemId) }
+      : {}),
   };
   const showComposerDock = thread.status !== "launching" || !isTerminal;
   const terminalPageKeyboardOffset = isTerminal && composerInputFocused ? 0 : keyboardOffset;
@@ -251,6 +269,7 @@ export function ThreadView(props: ThreadViewProps) {
       keyboardKey={thread.id}
       scrimLabel={t`Close composer`}
       expanded={composerExpanded}
+      nonBlockingOutsidePress={submitOnEnter}
       onExpandedChange={setComposerExpanded}
       onComposerFocusChange={setComposerInputFocused}
       onBubbleHeightChange={(height) => {
@@ -261,6 +280,7 @@ export function ThreadView(props: ThreadViewProps) {
     >
       <ThreadComposerSection
         {...commonProps}
+        autoFocusComposer={submitOnEnter}
         composerPlaceholder={t`Follow up...`}
         submitOnEnter={submitOnEnter}
         hideInfoDocks
@@ -295,6 +315,7 @@ export function ThreadView(props: ThreadViewProps) {
             onAction={props.onThreadAction}
             onNewThreadInWorktree={props.onNewThreadInWorktree}
             onDeleteWorktreeGroup={props.onDeleteWorktreeGroup}
+            onOpenNotes={props.onOpenNotes}
             onOpenTerminal={props.onOpenTerminal}
           />
           <ThreadUsageIndicator thread={thread} />
@@ -311,7 +332,11 @@ export function ThreadView(props: ThreadViewProps) {
         </div>
       ) : null}
       {/* Same shell classes as the desktop ThreadView pane. */}
-      <div className="m-thread-content relative mx-auto flex min-h-0 w-full max-w-[1040px] flex-1 flex-col px-3 pb-2">
+      <div
+        className={`m-thread-content relative mx-auto flex min-h-0 w-full max-w-[1040px] flex-1 flex-col px-3 pb-2 ${
+          !isTerminal && guiScrollSettledThreadId !== thread.id ? "invisible" : ""
+        }`}
+      >
         <div className="mx-auto flex min-h-0 w-full max-w-[920px] flex-1 flex-col pt-2">
           {isTerminal ? (
             <>
@@ -336,14 +361,26 @@ export function ThreadView(props: ThreadViewProps) {
                   <TerminalAccessory terminalId={thread.id} onReload={reloadTerminal} />
                 </div>
               )}
-              <SubAgentOverlay threadId={thread.id} projectLocation={projectLocation} />
+              {props.onOpenSubAgent ? (
+                <SubAgentOpenController
+                  threadId={thread.id}
+                  projectLocation={projectLocation}
+                  onOpen={(parentItemId) => props.onOpenSubAgent?.(parentItemId)}
+                />
+              ) : null}
             </>
-          ) : (
+          ) : props.loading ? null : (
+            // PWA history arrives after the routed thread shell mounts. Wait
+            // for that snapshot before mounting the shared virtualized chat so
+            // its one-time initial tail settle measures the real transcript.
+            // Desktop already has history at mount and never takes this path.
             <GuiThreadContent
               {...commonProps}
               dockState={dockState}
               runtimeDebugOpen={false}
               hideComposer
+              initialScrollRevealDelayMs={PWA_INITIAL_SCROLL_REVEAL_DELAY_MS}
+              onInitialScrollSettled={() => setGuiScrollSettledThreadId(thread.id)}
             />
           )}
         </div>

@@ -41,6 +41,7 @@ export function useProjectTree(props: {
   const reloadPaths = useEffectEvent(async (paths: string[]) => {
     const uniquePaths = [...new Set(paths.flatMap((path) => [getParentPath(path), path]))];
     const treeStore = useProjectTreeStore.getState();
+    const generation = treeStore.generation;
     for (const path of uniquePaths) treeStore.setLoading(path, true);
 
     const results = await Promise.all(
@@ -65,6 +66,7 @@ export function useProjectTree(props: {
       return [];
     });
 
+    if (useProjectTreeStore.getState().generation !== generation) return;
     if (results.length > 0) {
       useProjectTreeStore
         .getState()

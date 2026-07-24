@@ -251,11 +251,13 @@ export const remoteProjectsChangedEventSchema = z.object({
 export type RemoteProjectsChangedEvent = z.infer<typeof remoteProjectsChangedEventSchema>;
 
 /** Broadcast after durable thread metadata changes so remote clients refresh
- * the shell snapshot. The payload intentionally carries ids only; clients
- * already have a snapshot endpoint for current thread/project/runtime state. */
+ * the shell snapshot. `viewedThreadIds` is the explicit-read signal: unlike a
+ * normal persisted `idle` status, it authorizes clients to clear a locally
+ * derived `finished` badge. */
 export const remoteThreadsChangedEventSchema = z.object({
   type: z.literal("remote-threads-changed"),
   threadIds: z.array(z.string().min(1)),
+  viewedThreadIds: z.array(z.string().min(1)).optional(),
 });
 export type RemoteThreadsChangedEvent = z.infer<typeof remoteThreadsChangedEventSchema>;
 
@@ -348,42 +350,104 @@ export type RemotePortEnterResult = z.infer<typeof remotePortEnterResultSchema>;
  *
  * Platform tokens: iOS carries an APNs `deviceToken` (alerts) plus optional
  * `pushToStartToken` / `activityTokens` (Live Activities). Android carries its
- * FCM registration token in the same `deviceToken` field and has no
- * push-to-start / per-activity tokens (a `superRefine` rejects them so an
- * Android registration can't smuggle iOS-only fields).
+ * FCM registration token in the same `deviceToken` field. An installed web app
+ * carries the browser's Push API subscription plus the app base path used for
+ * notification-click routing. Platform-specific fields are rejected when they
+ * appear on the wrong registration type.
  *
  * Upsert semantics: any token field **present** in a registration replaces the
  * stored value for that field; **absent** fields are preserved. This lets the
  * app re-register a single rotated token without clobbering the others.
  */
+export const remoteWebPushSubscriptionSchema = z.object({
+  endpoint: z
+    .string()
+    .url()
+    .refine((value) => value.startsWith("https://"), "endpoint must use https"),
+  expirationTime: z.number().int().nonnegative().nullable(),
+  keys: z.object({
+    p256dh: z.string().min(1),
+    auth: z.string().min(1),
+  }),
+});
+export type RemoteWebPushSubscription = z.infer<typeof remoteWebPushSubscriptionSchema>;
+
 export const remotePushRegistrationSchema = z
   .object({
     /** Stable per-device identity (survives token rotation); the upsert key. */
     deviceId: z.string().min(8),
-    platform: z.enum(["ios", "android"]),
+    platform: z.enum(["ios", "android", "web"]),
     /** APNs device token (iOS alerts) or FCM registration token (Android). */
     deviceToken: z.string().min(1).optional(),
     /** iOS 17.2+ push-to-start token for the desktop-session Live Activity. iOS only. */
     pushToStartToken: z.string().min(1).optional(),
     /** Per-activity update tokens, keyed by ActivityKit activity id. iOS only. */
     activityTokens: z.record(z.string().min(1), z.string().min(1)).optional(),
+    /** Standards-based Push API subscription. Installed web apps only. */
+    webPushSubscription: remoteWebPushSubscriptionSchema.optional(),
+    /** Browser-history base path (`/` or `/app`) for notification click routing. */
+    webAppBasePath: z
+      .string()
+      .regex(/^\/(?!\/)(?:[^?#]*)$/)
+      .optional(),
     appVersion: z.string().min(1).optional(),
   })
   .superRefine((registration, ctx) => {
-    if (registration.platform !== "android") return;
-    if (registration.pushToStartToken !== undefined) {
+    if (registration.platform === "android") {
+      if (registration.pushToStartToken !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["pushToStartToken"],
+          message: "pushToStartToken is iOS-only",
+        });
+      }
+      if (registration.activityTokens !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["activityTokens"],
+          message: "activityTokens is iOS-only",
+        });
+      }
+    }
+    if (registration.platform !== "web") {
+      if (registration.webPushSubscription !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["webPushSubscription"],
+          message: "webPushSubscription is web-only",
+        });
+      }
+      if (registration.webAppBasePath !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["webAppBasePath"],
+          message: "webAppBasePath is web-only",
+        });
+      }
+      return;
+    }
+    if (!registration.webPushSubscription) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["pushToStartToken"],
-        message: "pushToStartToken is iOS-only",
+        path: ["webPushSubscription"],
+        message: "webPushSubscription is required on web",
       });
     }
-    if (registration.activityTokens !== undefined) {
+    if (!registration.webAppBasePath) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["activityTokens"],
-        message: "activityTokens is iOS-only",
+        path: ["webAppBasePath"],
+        message: "webAppBasePath is required on web",
       });
+    }
+    for (const field of ["deviceToken", "pushToStartToken", "activityTokens"] as const) {
+      if (registration[field] !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [field],
+          message: `${field} is native-only`,
+        });
+      }
     }
   });
 export type RemotePushRegistration = z.infer<typeof remotePushRegistrationSchema>;
@@ -395,6 +459,11 @@ export const remotePushUnregisterSchema = z.object({
 export const remotePushRegistrationResultSchema = z.object({
   ok: z.literal(true),
 });
+
+export const remoteWebPushConfigResultSchema = z.object({
+  publicKey: z.string().min(1),
+});
+export type RemoteWebPushConfigResult = z.infer<typeof remoteWebPushConfigResultSchema>;
 
 /**
  * A single row in the Live Activity content-state, mirroring the Swift
@@ -452,11 +521,13 @@ export const remoteThreadSnapshotSchema = z.object({
 });
 export type RemoteThreadSnapshot = z.infer<typeof remoteThreadSnapshotSchema>;
 
+export const remoteTimelineEntryCountSchema = z.number().int().min(1).max(100);
+
 export const remoteRuntimeItemsPageRequestSchema = z.object({
   threadId: z.string().min(1),
   beforePosition: z.number().int().nonnegative().optional(),
   limit: z.number().int().min(1).max(500),
-  targetTimelineEntryCount: z.number().int().min(1).max(100).optional(),
+  targetTimelineEntryCount: remoteTimelineEntryCountSchema.optional(),
 });
 export type RemoteRuntimeItemsPageRequest = z.infer<typeof remoteRuntimeItemsPageRequestSchema>;
 
