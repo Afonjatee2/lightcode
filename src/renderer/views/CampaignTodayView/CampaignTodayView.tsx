@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import { Button, Spinner } from "@heroui/react";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { msg } from "@lingui/core/macro";
@@ -19,11 +19,16 @@ import {
   greetingAllClear,
   resolveDayPeriod,
 } from "@/renderer/campaign/cockpit/cockpitGreeting";
+import { generateMorningBrief } from "@/renderer/campaign/morningBrief/briefGenerator";
+import { useMorningBriefStore } from "@/renderer/campaign/morningBrief/morningBriefStore";
+import { processMorningBriefNotifications } from "@/renderer/campaign/morningBrief/morningBriefSync";
 import { useCampaignTodayOperations } from "@/renderer/hooks/useCampaignTodayOperations";
 import { useProfileDisplayName } from "@/renderer/hooks/useProfileDisplayName";
 import { useAppStore } from "@/renderer/state/appStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { RelativeTime } from "@/renderer/components/common/RelativeTime";
+import { MorningBriefCard } from "./parts/MorningBriefCard";
 
 const ASK_SUGGESTIONS = [
   msg`Which campaigns are off pace this week?`,
@@ -282,6 +287,27 @@ export function CampaignTodayView() {
   );
   const showSetupState = !projectId;
 
+  const morningBriefEnabled = useSharedSettings((s) => s.morningBriefEnabled);
+  const latestBrief = useMorningBriefStore((s) => s.latestBrief);
+  const setLatestBrief = useMorningBriefStore((s) => s.setLatestBrief);
+  const dismissedAt = useMorningBriefStore((s) => s.dismissedAt);
+  const dismissBrief = useMorningBriefStore((s) => s.dismissBrief);
+
+  const generatedAt = operationsToday.status === "ready" ? operationsToday.data.generatedAt : null;
+
+  useEffect(() => {
+    if (operationsToday.status !== "ready") return;
+    const currentBrief = useMorningBriefStore.getState().latestBrief;
+    if (currentBrief && currentBrief.generatedAt === operationsToday.data.generatedAt) {
+      return;
+    }
+    const brief = generateMorningBrief(operationsToday.data);
+    setLatestBrief(brief);
+    if (morningBriefEnabled) {
+      processMorningBriefNotifications(brief);
+    }
+  }, [operationsToday, morningBriefEnabled, setLatestBrief, generatedAt]);
+
   function openCampaignWorkspace(campaignGroupId: string, options?: { openApprovals?: boolean }) {
     const project = findCampaignProjectByGroupId(projects, campaignGroupId);
     if (!project) return;
@@ -365,6 +391,16 @@ export function CampaignTodayView() {
             </p>
           ) : null}
         </header>
+
+        {morningBriefEnabled &&
+        latestBrief &&
+        (!dismissedAt || Date.parse(dismissedAt) < Date.parse(latestBrief.generatedAt)) ? (
+          <MorningBriefCard
+            brief={latestBrief}
+            onDismiss={dismissBrief}
+            onOpenCampaign={openCampaignWorkspace}
+          />
+        ) : null}
 
         <section className="flex flex-col gap-2">
           <div className="cockpit-askbar flex items-center gap-3 px-4 py-3.5">

@@ -34,6 +34,11 @@ msgstr "（ブランチなし）"
 msgid "(no message)"
 msgstr "(メッセージはありません)"
 
+#. placeholder {0}: brief.counts.waitingForApproval
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "{0, plural, one {# awaiting approval} other {# awaiting approval}}"
+msgstr "{0} 件が承認待ち"
+
 #. placeholder {0}: candidates.length
 #. placeholder {0}: props.candidates.length
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
@@ -96,6 +101,11 @@ msgstr "{0, plural, one {#プロバイダーの準備ができています} othe
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "{0, plural, one {# skill} other {# skills}}"
 msgstr "{0, plural, one {# 個のスキル} other {# 個のスキル}}"
+
+#. placeholder {0}: brief.counts.needsAttention
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "{0, plural, one {# thing needs attention} other {# things need attention}}"
+msgstr "{0} 件の要対応事項"
 
 #. placeholder {0}: props.count
 #. placeholder {0}: toolList.tools.length
@@ -1882,6 +1892,12 @@ msgstr "キャンペーンコンテキスト"
 msgid "Campaign event"
 msgstr "キャンペーンイベント"
 
+#. placeholder {0}: item.clientName
+#. placeholder {1}: item.campaignName
+#: src/renderer/campaign/morningBrief/morningBriefSync.ts
+msgid "Campaign Exception: {0} · {1}"
+msgstr "キャンペーン例外: {0} · {1}"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Campaign group ID"
 msgstr "キャンペーングループID"
@@ -1889,6 +1905,15 @@ msgstr "キャンペーングループID"
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Campaign Group ID"
 msgstr "キャンペーングループID"
+
+#: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
+msgid "Campaign morning brief"
+msgstr "キャンペーンモーニングブリーフ"
+
+#: src/renderer/campaign/morningBrief/morningBriefSync.ts
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "Campaign Morning Brief"
+msgstr "キャンペーンモーニングブリーフ"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Campaign name"
@@ -3484,6 +3509,7 @@ msgid "Credits"
 msgstr "クレジット"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
 msgid "Critical"
 msgstr "重大"
 
@@ -4096,6 +4122,10 @@ msgstr "コーディング エージェントを発見中…"
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Dismiss"
 msgstr "閉じる"
+
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "Dismiss brief"
+msgstr "ブリーフを閉じる"
 
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Dismiss error"
@@ -5196,6 +5226,10 @@ msgstr "一般"
 msgid "Generate commit message"
 msgstr "コミットメッセージを生成する"
 
+#: src/renderer/campaign/morningBrief/morningBriefSync.ts
+msgid "Generate daily campaign morning brief and exception notifications."
+msgstr "日次のキャンペーンモーニングブリーフと例外通知を生成します。"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CreatePrModal.tsx
 msgid "Generate PR summary"
 msgstr "PRサマリーを生成する"
@@ -5206,6 +5240,7 @@ msgstr "AIで生成"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
 msgid "Generated"
 msgstr "生成"
 
@@ -5397,6 +5432,10 @@ msgstr "未送信の下書きがあります"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Headers"
 msgstr "ヘッダー"
+
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "Health:"
+msgstr "ヘルス:"
 
 #: src/renderer/campaign/cockpit/cockpitGreeting.ts
 msgid "Hello"
@@ -6133,6 +6172,10 @@ msgstr "ローカル"
 msgid "Local changes need to be stashed before pulling from {branch}"
 msgstr "ローカルの変更は{branch}からプルする前に隠しておく必要があります"
 
+#: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
+msgid "Local time for daily brief generation."
+msgstr "毎日のブリーフ生成の現地時間。"
+
 #. placeholder {0}: forward.targetPort
 #: src/mobile/views/PortsView.tsx
 msgid "localhost:{0} on desktop"
@@ -6732,6 +6775,10 @@ msgstr "その他のスケジュールオプション"
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "More sync options"
 msgstr "その他の同期オプション"
+
+#: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
+msgid "Morning brief time"
+msgstr "モーニングブリーフの時間"
 
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Most active hour"
@@ -9486,6 +9533,7 @@ msgid "Revert to this checkpoint"
 msgstr "このチェックポイントに戻る"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Review"
 msgstr "確認"
@@ -9791,6 +9839,10 @@ msgstr "Windows と WSL をスキャンして、インストールされてい�
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "Scanning your system for installed CLIs. This usually takes a couple of seconds."
 msgstr "システムをスキャンして、インストールされている CLI を探します。通常、これには数秒かかります。"
+
+#: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
+msgid "Schedule a daily morning brief and receive restrained notifications for genuine campaign exceptions."
+msgstr "毎日のモーニングブリーフをスケジュールし、重要なキャンペーン例外のみの通知を受け取ります。"
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Schedule name"
@@ -12590,6 +12642,7 @@ msgid "Warming up WSL shell environment…"
 msgstr "WSL シェル環境をウォームアップしています…"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
 msgid "Warning"
 msgstr "警告"
 

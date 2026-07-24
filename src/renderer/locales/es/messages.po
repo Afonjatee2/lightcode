@@ -34,6 +34,11 @@ msgstr "(sin rama)"
 msgid "(no message)"
 msgstr "(sin mensaje)"
 
+#. placeholder {0}: brief.counts.waitingForApproval
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "{0, plural, one {# awaiting approval} other {# awaiting approval}}"
+msgstr "{0, plural, one {# pendiente de aprobación} other {# pendientes de aprobación}}"
+
 #. placeholder {0}: candidates.length
 #. placeholder {0}: props.candidates.length
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
@@ -96,6 +101,11 @@ msgstr "{0, plural, one {# proveedor listo} other {# proveedores listos}}"
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "{0, plural, one {# skill} other {# skills}}"
 msgstr "{0, plural, one {# skill} other {# skills}}"
+
+#. placeholder {0}: brief.counts.needsAttention
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "{0, plural, one {# thing needs attention} other {# things need attention}}"
+msgstr "{0, plural, one {# asunto requiere atención} other {# asuntos requieren atención}}"
 
 #. placeholder {0}: props.count
 #. placeholder {0}: toolList.tools.length
@@ -1883,6 +1893,12 @@ msgstr "Contexto de campaña"
 msgid "Campaign event"
 msgstr "Evento de campaña"
 
+#. placeholder {0}: item.clientName
+#. placeholder {1}: item.campaignName
+#: src/renderer/campaign/morningBrief/morningBriefSync.ts
+msgid "Campaign Exception: {0} · {1}"
+msgstr "Excepción de campaña: {0} · {1}"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Campaign group ID"
 msgstr "ID del grupo de campaña"
@@ -1890,6 +1906,15 @@ msgstr "ID del grupo de campaña"
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Campaign Group ID"
 msgstr "ID del grupo de campaña"
+
+#: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
+msgid "Campaign morning brief"
+msgstr "Informe matutino de campaña"
+
+#: src/renderer/campaign/morningBrief/morningBriefSync.ts
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "Campaign Morning Brief"
+msgstr "Informe matutino de campaña"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Campaign name"
@@ -3485,6 +3510,7 @@ msgid "Credits"
 msgstr "Créditos"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
 msgid "Critical"
 msgstr "Crítico"
 
@@ -4097,6 +4123,10 @@ msgstr "Descubriendo agentes de codificación…"
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Dismiss"
 msgstr "Descartar"
+
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "Dismiss brief"
+msgstr "Descartar informe"
 
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Dismiss error"
@@ -5197,6 +5227,10 @@ msgstr "General"
 msgid "Generate commit message"
 msgstr "Generar mensaje de commit"
 
+#: src/renderer/campaign/morningBrief/morningBriefSync.ts
+msgid "Generate daily campaign morning brief and exception notifications."
+msgstr "Generar informe matutino diario de la campaña y notificaciones de excepciones."
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CreatePrModal.tsx
 msgid "Generate PR summary"
 msgstr "Generar resumen de PR"
@@ -5207,6 +5241,7 @@ msgstr "Generar con AI"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
 msgid "Generated"
 msgstr "Generado"
 
@@ -5398,6 +5433,10 @@ msgstr "Tiene un borrador sin enviar"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Headers"
 msgstr "Encabezados"
+
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "Health:"
+msgstr "Estado:"
 
 #: src/renderer/campaign/cockpit/cockpitGreeting.ts
 msgid "Hello"
@@ -6134,6 +6173,10 @@ msgstr "Local"
 msgid "Local changes need to be stashed before pulling from {branch}"
 msgstr "Es necesario guardar los cambios locales en stash antes de hacer pull desde {branch}"
 
+#: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
+msgid "Local time for daily brief generation."
+msgstr "Hora local para la generación del informe diario."
+
 #. placeholder {0}: forward.targetPort
 #: src/mobile/views/PortsView.tsx
 msgid "localhost:{0} on desktop"
@@ -6734,6 +6777,10 @@ msgstr "Más opciones de programación"
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "More sync options"
 msgstr "Más opciones de sincronización"
+
+#: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
+msgid "Morning brief time"
+msgstr "Hora del informe matutino"
 
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Most active hour"
@@ -9488,6 +9535,7 @@ msgid "Revert to this checkpoint"
 msgstr "Revertir a este punto de control"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Review"
 msgstr "Revisar"
@@ -9793,6 +9841,10 @@ msgstr "Escaneando Windows y WSL en busca de CLIs instaladas. Esto suele tardar 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "Scanning your system for installed CLIs. This usually takes a couple of seconds."
 msgstr "Escaneando tu sistema en busca de CLIs instaladas. Esto suele tardar un par de segundos."
+
+#: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
+msgid "Schedule a daily morning brief and receive restrained notifications for genuine campaign exceptions."
+msgstr "Programe un informe matutino diario y reciba notificaciones moderadas sobre excepciones reales de la campaña."
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Schedule name"
@@ -12592,6 +12644,7 @@ msgid "Warming up WSL shell environment…"
 msgstr "Preparando el entorno de shell de WSL…"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
 msgid "Warning"
 msgstr "Advertencia"
 

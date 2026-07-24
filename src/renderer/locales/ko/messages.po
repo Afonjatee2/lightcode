@@ -34,6 +34,11 @@ msgstr "(브랜치 없음)"
 msgid "(no message)"
 msgstr "(메시지 없음)"
 
+#. placeholder {0}: brief.counts.waitingForApproval
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "{0, plural, one {# awaiting approval} other {# awaiting approval}}"
+msgstr "{0}개 승인 대기 중"
+
 #. placeholder {0}: candidates.length
 #. placeholder {0}: props.candidates.length
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
@@ -96,6 +101,11 @@ msgstr "{0, plural, one {# 공급자 준비됨} other {# 공급자 준비됨}}"
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "{0, plural, one {# skill} other {# skills}}"
 msgstr "{0, plural, one {스킬 #개} other {스킬 #개}}"
+
+#. placeholder {0}: brief.counts.needsAttention
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "{0, plural, one {# thing needs attention} other {# things need attention}}"
+msgstr "{0}개 주의 필요"
 
 #. placeholder {0}: props.count
 #. placeholder {0}: toolList.tools.length
@@ -1883,6 +1893,12 @@ msgstr "캠페인 컨텍스트"
 msgid "Campaign event"
 msgstr "캠페인 이벤트"
 
+#. placeholder {0}: item.clientName
+#. placeholder {1}: item.campaignName
+#: src/renderer/campaign/morningBrief/morningBriefSync.ts
+msgid "Campaign Exception: {0} · {1}"
+msgstr "캠페인 예외: {0} · {1}"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Campaign group ID"
 msgstr "캠페인 그룹 ID"
@@ -1890,6 +1906,15 @@ msgstr "캠페인 그룹 ID"
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Campaign Group ID"
 msgstr "캠페인 그룹 ID"
+
+#: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
+msgid "Campaign morning brief"
+msgstr "캠페인 모닝 브리핑"
+
+#: src/renderer/campaign/morningBrief/morningBriefSync.ts
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "Campaign Morning Brief"
+msgstr "캠페인 모닝 브리핑"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Campaign name"
@@ -3485,6 +3510,7 @@ msgid "Credits"
 msgstr "크레딧"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
 msgid "Critical"
 msgstr "심각"
 
@@ -4097,6 +4123,10 @@ msgstr "코딩 에이전트 검색 중…"
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Dismiss"
 msgstr "닫기"
+
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "Dismiss brief"
+msgstr "브리핑 닫기"
 
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Dismiss error"
@@ -5197,6 +5227,10 @@ msgstr "일반"
 msgid "Generate commit message"
 msgstr "커밋 메시지 생성"
 
+#: src/renderer/campaign/morningBrief/morningBriefSync.ts
+msgid "Generate daily campaign morning brief and exception notifications."
+msgstr "일일 캠페인 모닝 브리핑 및 예외 알림을 생성합니다."
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CreatePrModal.tsx
 msgid "Generate PR summary"
 msgstr "PR 요약 생성"
@@ -5207,6 +5241,7 @@ msgstr "AI로 생성"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
 msgid "Generated"
 msgstr "생성됨"
 
@@ -5398,6 +5433,10 @@ msgstr "보내지 않은 초안이 있습니다"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Headers"
 msgstr "헤더"
+
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "Health:"
+msgstr "상태:"
 
 #: src/renderer/campaign/cockpit/cockpitGreeting.ts
 msgid "Hello"
@@ -6134,6 +6173,10 @@ msgstr "로컬"
 msgid "Local changes need to be stashed before pulling from {branch}"
 msgstr "{branch}에서 가져오기 전에 로컬 변경 사항을 숨겨야 합니다."
 
+#: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
+msgid "Local time for daily brief generation."
+msgstr "일일 브리핑 생성 현지 시간."
+
 #. placeholder {0}: forward.targetPort
 #: src/mobile/views/PortsView.tsx
 msgid "localhost:{0} on desktop"
@@ -6734,6 +6777,10 @@ msgstr "추가 일정 옵션"
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "More sync options"
 msgstr "더 많은 동기화 옵션"
+
+#: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
+msgid "Morning brief time"
+msgstr "모닝 브리핑 시간"
 
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Most active hour"
@@ -9488,6 +9535,7 @@ msgid "Revert to this checkpoint"
 msgstr "이 체크포인트로 되돌리기"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Review"
 msgstr "검토"
@@ -9793,6 +9841,10 @@ msgstr "설치된 CLI를 찾기 위해 Windows 및 WSL을 검색합니다. 이 �
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "Scanning your system for installed CLIs. This usually takes a couple of seconds."
 msgstr "설치된 CLI를 찾기 위해 시스템을 검색합니다. 이 작업은 일반적으로 몇 초 정도 걸립니다."
+
+#: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
+msgid "Schedule a daily morning brief and receive restrained notifications for genuine campaign exceptions."
+msgstr "일일 모닝 브리핑을 예약하고 중요한 캠페인 예외에 대한 절제된 알림을 받으세요."
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Schedule name"
@@ -12592,6 +12644,7 @@ msgid "Warming up WSL shell environment…"
 msgstr "WSL 셸 환경 준비 중…"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
 msgid "Warning"
 msgstr "경고"
 

@@ -46,9 +46,11 @@ export function showOsNotification(
     const win = getMainWindow();
     if (!win || win.isDestroyed()) return;
     showAndFocusWindow(win);
-    win.webContents.send(IPC_EVENT_CHANNELS.threadOpenRequested, {
-      threadId: payload.threadId,
-    });
+    if (payload.threadId) {
+      win.webContents.send(IPC_EVENT_CHANNELS.threadOpenRequested, {
+        threadId: payload.threadId,
+      });
+    }
   });
 
   try {

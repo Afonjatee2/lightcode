@@ -7,6 +7,7 @@ import { isRemoteSession } from "@/renderer/bridge";
 import { requestBrowserNotificationPermission } from "@/renderer/browserNotificationPermission";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { Select, ToggleSwitch } from "@/renderer/components/common";
+import { syncMorningBriefSchedule } from "@/renderer/campaign/morningBrief/morningBriefSync";
 import { SettingRow, SettingsPage } from "./SettingsForm";
 import { useLocalizedOptions } from "./settingsOptions";
 
@@ -104,6 +105,12 @@ export function NotificationSettings() {
   const setNotificationStatuses = useSharedSettings((s) => s.setNotificationStatuses);
   const notifyL2Cli = useSharedSettings((s) => s.notifyL2Cli);
   const setNotifyL2Cli = useSharedSettings((s) => s.setNotifyL2Cli);
+
+  const morningBriefEnabled = useSharedSettings((s) => s.morningBriefEnabled);
+  const setMorningBriefEnabled = useSharedSettings((s) => s.setMorningBriefEnabled);
+  const morningBriefTime = useSharedSettings((s) => s.morningBriefTime);
+  const setMorningBriefTime = useSharedSettings((s) => s.setMorningBriefTime);
+
   // Remote sessions notify on this device; the L2 CLI nuance is desktop-only
   // and the browser permission row is PWA-only.
   const remote = isRemoteSession();
@@ -145,6 +152,53 @@ export function NotificationSettings() {
       <div
         className={`space-y-4 transition-opacity ${notificationsEnabled ? "" : "pointer-events-none opacity-40"}`}
       >
+        <SettingRow
+          anchorId="notifications.morningBriefEnabled"
+          title={t`Campaign morning brief`}
+          description={
+            <Trans>
+              Schedule a daily morning brief and receive restrained notifications for genuine
+              campaign exceptions.
+            </Trans>
+          }
+        >
+          <ToggleSwitch
+            aria-label={t`Campaign morning brief`}
+            isSelected={morningBriefEnabled}
+            onChange={(selected) => {
+              startTransition(() => {
+                setMorningBriefEnabled(selected);
+                void syncMorningBriefSchedule(selected, morningBriefTime);
+              });
+            }}
+          />
+        </SettingRow>
+
+        {morningBriefEnabled ? (
+          <SettingRow
+            anchorId="notifications.morningBriefTime"
+            title={t`Morning brief time`}
+            description={<Trans>Local time for daily brief generation.</Trans>}
+          >
+            <input
+              type="time"
+              aria-label={t`Morning brief time`}
+              className="rounded-md border border-[var(--hairline)] bg-surface px-2.5 py-1 text-sm text-foreground outline-none"
+              value={morningBriefTime}
+              onChange={(e) => {
+                const newTime = e.target.value;
+                if (!newTime) return;
+                startTransition(() => {
+                  setMorningBriefTime(newTime);
+                  if (morningBriefEnabled) {
+                    void syncMorningBriefSchedule(true, newTime);
+                  }
+                });
+              }}
+            />
+          </SettingRow>
+        ) : null}
+
         <SettingRow
           anchorId="notifications.playNotificationSound"
           title={t`Play notification sound`}

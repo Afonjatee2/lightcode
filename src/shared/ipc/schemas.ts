@@ -257,8 +257,8 @@ export const showNotificationPayloadSchema = z.object({
   title: z.string(),
   /** Notification body (already localized by the renderer). */
   body: z.string(),
-  /** Thread to open when the notification is clicked. */
-  threadId: z.string().min(1),
+  /** Thread to open when the notification is clicked. Optional. */
+  threadId: z.string().min(1).optional(),
 });
 export type ShowNotificationPayload = z.infer<typeof showNotificationPayloadSchema>;
 

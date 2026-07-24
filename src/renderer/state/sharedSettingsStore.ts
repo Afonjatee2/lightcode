@@ -149,6 +149,10 @@ interface SharedSettingsState extends SharedSettings {
     fallbackMode: ThreadPresentationMode,
   ) => boolean;
   setCrossagentRoutingGuide: (value: string) => void;
+  setMorningBriefEnabled: (enabled: boolean) => void;
+  setMorningBriefTime: (time: string) => void;
+  setMorningBriefScheduleId: (id: string | null) => void;
+  addMorningBriefNotifiedKeys: (keys: string[]) => void;
   pushRecentModel: (
     agentKind: string,
     modelId: string,
@@ -701,6 +705,29 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ crossagentRoutingGuide });
     persistSettings(selectSharedSettings(get()));
   },
+  setMorningBriefEnabled: (morningBriefEnabled) => {
+    if (get().morningBriefEnabled === morningBriefEnabled) return;
+    set({ morningBriefEnabled });
+    persistSettings(selectSharedSettings(get()));
+  },
+  setMorningBriefTime: (morningBriefTime) => {
+    if (get().morningBriefTime === morningBriefTime) return;
+    set({ morningBriefTime });
+    persistSettings(selectSharedSettings(get()));
+  },
+  setMorningBriefScheduleId: (morningBriefScheduleId) => {
+    if (get().morningBriefScheduleId === morningBriefScheduleId) return;
+    set({ morningBriefScheduleId });
+    persistSettings(selectSharedSettings(get()));
+  },
+  addMorningBriefNotifiedKeys: (keys) => {
+    if (keys.length === 0) return;
+    const current = get().morningBriefNotifiedKeys;
+    const nextSet = new Set([...current, ...keys]);
+    if (nextSet.size === current.length) return;
+    set({ morningBriefNotifiedKeys: Array.from(nextSet) });
+    persistSettings(selectSharedSettings(get()));
+  },
   pushRecentModel: (agentKind, modelId, presentationMode) => {
     const current = get().recentModels;
     const samePresentation = current.filter((m) => m.presentationMode === presentationMode);
@@ -823,6 +850,10 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     browser: state.browser,
     audio: state.audio,
     usage: state.usage,
+    morningBriefEnabled: state.morningBriefEnabled,
+    morningBriefTime: state.morningBriefTime,
+    morningBriefScheduleId: state.morningBriefScheduleId,
+    morningBriefNotifiedKeys: state.morningBriefNotifiedKeys,
     crossagentRoutingGuide: state.crossagentRoutingGuide,
   };
 }
