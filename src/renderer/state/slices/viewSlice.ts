@@ -33,6 +33,8 @@ export interface ViewSlice {
   view: AppView;
   focusedPaneId: string | null;
   pendingComposerFocusThreadId: string | null;
+  /** Prefill text for a campaign workspace composer after navigating from Today home. */
+  pendingCampaignComposerPrefill: { projectId: string; text: string } | null;
   chatScrollToBottomTokens: Record<string, number>;
   /**
    * Optimistic, urgent active-thread id used only for instant sidebar-row
@@ -45,11 +47,13 @@ export interface ViewSlice {
   setFocusedPane: (paneId: string) => void;
   requestComposerFocus: (threadId: string) => void;
   clearComposerFocusRequest: (threadId: string) => void;
+  setPendingCampaignComposerPrefill: (prefill: { projectId: string; text: string } | null) => void;
   requestChatScrollToBottom: (threadId: string) => void;
   setPendingActiveThread: (threadId: string | null) => void;
   openDraft: (projectId: string) => void;
   openDraftSideBySide: (projectId: string) => void;
   openHome: () => void;
+  openCampaignToday: () => void;
   openPullRequests: () => void;
   openSchedules: () => void;
   openExperiment: (experimentId: string, projectId: string) => void;
@@ -92,6 +96,7 @@ export const createViewSlice: SliceCreator<ViewSlice> = (set) => ({
   view: { kind: "home" },
   focusedPaneId: null,
   pendingComposerFocusThreadId: null,
+  pendingCampaignComposerPrefill: null,
   chatScrollToBottomTokens: {},
   pendingActiveThreadId: null,
   groupLayouts: {},
@@ -101,6 +106,7 @@ export const createViewSlice: SliceCreator<ViewSlice> = (set) => ({
     set((state) =>
       state.pendingComposerFocusThreadId === threadId ? { pendingComposerFocusThreadId: null } : {},
     ),
+  setPendingCampaignComposerPrefill: (prefill) => set({ pendingCampaignComposerPrefill: prefill }),
   requestChatScrollToBottom: (threadId) =>
     set((state) => ({
       chatScrollToBottomTokens: {
@@ -160,6 +166,7 @@ export const createViewSlice: SliceCreator<ViewSlice> = (set) => ({
       };
     }),
   openHome: () => set({ view: { kind: "home" } }),
+  openCampaignToday: () => set({ view: { kind: "campaignToday" } }),
   openPullRequests: () => set({ view: { kind: "pullRequests" } }),
   openSchedules: () => set({ view: { kind: "schedules" } }),
   openExperiment: (experimentId, projectId) =>

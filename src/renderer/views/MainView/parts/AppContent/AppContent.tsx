@@ -49,6 +49,7 @@ import { ThreadDraftView } from "@/renderer/components/thread/ThreadDraftView";
 import type { DraftStartInput } from "@/renderer/components/thread/ThreadDraftComposerArea";
 import { generateTitleAsync } from "@/renderer/utils/titleGen";
 import { HomeView } from "@/renderer/views/HomeView";
+import { CampaignTodayView } from "@/renderer/views/CampaignTodayView/CampaignTodayView";
 import { ExperimentView } from "@/renderer/views/ExperimentView/ExperimentView";
 import { PullRequestsView } from "@/renderer/views/PullRequestsView/PullRequestsView";
 import { SchedulesView } from "@/renderer/views/SchedulesView/SchedulesView";
@@ -281,6 +282,14 @@ export function AppContent() {
 
   if (view.kind === "experiment") {
     return <ExperimentView experimentId={view.experimentId} />;
+  }
+
+  if (view.kind === "campaignToday") {
+    return (
+      <div className="h-full overflow-y-auto [scrollbar-gutter:stable]">
+        <CampaignTodayView />
+      </div>
+    );
   }
 
   if (view.kind === "schedules") {

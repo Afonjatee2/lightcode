@@ -165,6 +165,16 @@ msgstr "{0} kimlik bilgileri kaydedildi."
 msgid "{0} devices"
 msgstr "{0} cihaz"
 
+#. placeholder {0}: summary.failed
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} failed"
+msgstr "{0} başarısız"
+
+#. placeholder {0}: summary.healthy
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} healthy"
+msgstr "{0} sağlıklı"
+
 #. placeholder {0}: props.agentLabel
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "{0} hooks installed for {envName}."
@@ -254,6 +264,11 @@ msgstr "{0} çalıştırma"
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
 msgid "{0} runs"
 msgstr "{0} çalıştırma"
+
+#. placeholder {0}: summary.stale
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} stale"
+msgstr "{0} güncel değil"
 
 #. placeholder {0}: evidenceFreshness.staleSourceCount
 #: src/renderer/components/consultations/ContextWarnings.tsx
@@ -1036,6 +1051,10 @@ msgstr "Tümü başarısız"
 msgid "All files"
 msgstr "Tüm dosyalar"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "All other live campaigns"
+msgstr "Diğer tüm aktif kampanyalar"
+
 #: src/mobile/views/ThreadsView.tsx
 msgid "All projects"
 msgstr "Tüm projeler"
@@ -1222,12 +1241,24 @@ msgstr "Aşamalandırılmamış tüm değişiklikleri geri almak istediğinizden
 msgid "Arguments"
 msgstr "Bağımsız değişkenler"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask"
+msgstr "Sor"
+
 #. placeholder {0}: agentStatus?.label ?? agentFallbackLabel
 #. placeholder {0}: project.name
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/views/QuickComposerOverlay/QuickComposerOverlay.tsx
 msgid "Ask {0} anything about this workspace"
 msgstr "{0} öğesine bu çalışma alanıyla ilgili her şeyi sorun"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask anything about your campaigns"
+msgstr "Kampanyalarınız hakkında her şeyi sorun"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask anything about your campaigns…"
+msgstr "Kampanyalarınız hakkında her şeyi sorun…"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Ask each time"
@@ -1695,6 +1726,8 @@ msgid "Campaign workspace \"{0}\" created."
 msgstr "\"{0}\" kampanya çalışma alanı oluşturuldu."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarCampaignsSection.tsx
+#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 msgid "Campaigns"
 msgstr "Kampanyalar"
 
@@ -2766,6 +2799,7 @@ msgstr "Kontrol Merkezi kullanılamıyor. Yine de manuel olarak bir kampanya ça
 msgid "Control Centre MCP Profile"
 msgstr "Control Centre MCP Profili"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
@@ -3033,6 +3067,10 @@ msgstr "Beceri güncellenemedi."
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 msgid "Create"
 msgstr "Oluştur"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Create a campaign project to see your operations overview."
+msgstr "Operasyon özetinizi görmek için bir kampanya projesi oluşturun."
 
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
@@ -4665,6 +4703,10 @@ msgstr "PR özeti oluştur"
 msgid "Generate with AI"
 msgstr "Yapay zeka ile oluşturun"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Generated"
+msgstr "Oluşturuldu"
+
 #: src/renderer/components/thread/ChatPane/parts/items/imageViewSource.ts
 msgid "Generated image"
 msgstr "Oluşturulan görsel"
@@ -5449,6 +5491,10 @@ msgstr "Marketplace yükleniyor…"
 msgid "Loading notes…"
 msgstr "Notlar yükleniyor…"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Loading operations overview…"
+msgstr "Operasyon özeti yükleniyor…"
+
 #: src/renderer/components/pdf/PdfViewer.tsx
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 #~ msgid "Loading PDF…"
@@ -6173,6 +6219,10 @@ msgstr "Yerel destek"
 msgid "Needs approval"
 msgstr "Onay gerekiyor"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Needs attention"
+msgstr "Dikkat gerekiyor"
+
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Needs Attention"
@@ -6211,6 +6261,7 @@ msgstr "Yeni işlem adı"
 msgid "New branch name..."
 msgstr "Yeni şube adı..."
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "New Campaign Project"
 msgstr "Yeni Kampanya Projesi"
@@ -6643,6 +6694,10 @@ msgstr "Açık uyarı yok."
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No other agents installed"
 msgstr "Başka aracı yüklü değil"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "No other live campaigns."
+msgstr "Başka aktif kampanya yok."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "No paired devices yet."
@@ -8031,6 +8086,10 @@ msgstr "Son yüklemeler"
 #: src/renderer/views/HomeView.tsx
 msgid "Recent threads"
 msgstr "Son konular"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Recently resolved"
+msgstr "Son çözülenler"
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Recommendations:"
@@ -9553,6 +9612,10 @@ msgstr "Kaynak şube {branch}, çalışma ağacı oluşturulmadan önce taşınd
 msgid "Source Health"
 msgstr "Kaynak Durumu"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Source health:"
+msgstr "Kaynak durumu:"
+
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Sources"
 msgstr "Kaynaklar"
@@ -10573,9 +10636,17 @@ msgstr "Başlık, commit ve çakışma modelleri"
 msgid "To-dos"
 msgstr "Yapılacaklar"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Today"
+msgstr "Bugün"
+
 #: src/renderer/commands/registry.ts
 msgid "Toggle browser panel"
 msgstr "Tarayıcı panelini aç/kapat"
+
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarCampaignsSection.tsx
+msgid "Toggle campaigns section"
+msgstr "Kampanyalar bölümünü aç/kapat"
 
 #: src/renderer/commands/composerCommands.ts
 #: src/renderer/components/providers/codex/index.tsx
@@ -11410,6 +11481,10 @@ msgstr "{methodName} kimlik doğrulaması bekleniyor. Tamamlandığında algıla
 #: src/renderer/components/thread/ThreadPendingSteerStrip.tsx
 msgid "waiting for agent to stop"
 msgstr "aracının durması bekleniyor"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Waiting for approval"
+msgstr "Onay bekliyor"
 
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "Waiting for workflow to spawn agents…"

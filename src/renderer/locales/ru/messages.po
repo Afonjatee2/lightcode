@@ -165,6 +165,16 @@ msgstr "Учётные данные {0} сохранены."
 msgid "{0} devices"
 msgstr "Устройств: {0}"
 
+#. placeholder {0}: summary.failed
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} failed"
+msgstr "{0} с ошибкой"
+
+#. placeholder {0}: summary.healthy
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} healthy"
+msgstr "{0} исправны"
+
 #. placeholder {0}: props.agentLabel
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "{0} hooks installed for {envName}."
@@ -254,6 +264,11 @@ msgstr "{0} запуск"
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
 msgid "{0} runs"
 msgstr "{0} запусков"
+
+#. placeholder {0}: summary.stale
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} stale"
+msgstr "{0} устарели"
 
 #. placeholder {0}: evidenceFreshness.staleSourceCount
 #: src/renderer/components/consultations/ContextWarnings.tsx
@@ -1036,6 +1051,10 @@ msgstr "Все не удались"
 msgid "All files"
 msgstr "Все файлы"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "All other live campaigns"
+msgstr "Все остальные активные кампании"
+
 #: src/mobile/views/ThreadsView.tsx
 msgid "All projects"
 msgstr "Все проекты"
@@ -1222,12 +1241,24 @@ msgstr "Вы уверены, что хотите откатить все неп�
 msgid "Arguments"
 msgstr "Аргументы"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask"
+msgstr "Спросить"
+
 #. placeholder {0}: agentStatus?.label ?? agentFallbackLabel
 #. placeholder {0}: project.name
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/views/QuickComposerOverlay/QuickComposerOverlay.tsx
 msgid "Ask {0} anything about this workspace"
 msgstr "Спросите {0} о чём угодно в этом рабочем пространстве"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask anything about your campaigns"
+msgstr "Спросите что угодно о ваших кампаниях"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask anything about your campaigns…"
+msgstr "Спросите что угодно о ваших кампаниях…"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Ask each time"
@@ -1695,6 +1726,8 @@ msgid "Campaign workspace \"{0}\" created."
 msgstr "Рабочая область кампании «{0}» создана."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarCampaignsSection.tsx
+#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 msgid "Campaigns"
 msgstr "Кампании"
 
@@ -2766,6 +2799,7 @@ msgstr "Центр управления недоступен. Вы всё ещё
 msgid "Control Centre MCP Profile"
 msgstr "Профиль MCP Control Centre"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
@@ -3033,6 +3067,10 @@ msgstr "Не удалось обновить навык."
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 msgid "Create"
 msgstr "Создать"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Create a campaign project to see your operations overview."
+msgstr "Создайте проект кампании, чтобы увидеть обзор операций."
 
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
@@ -4665,6 +4703,10 @@ msgstr "Сгенерировать сводку PR"
 msgid "Generate with AI"
 msgstr "Сгенерировать с помощью AI"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Generated"
+msgstr "Сформировано"
+
 #: src/renderer/components/thread/ChatPane/parts/items/imageViewSource.ts
 msgid "Generated image"
 msgstr "Сгенерированное изображение"
@@ -5449,6 +5491,10 @@ msgstr "Загрузка маркетплейса…"
 msgid "Loading notes…"
 msgstr "Загрузка заметок…"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Loading operations overview…"
+msgstr "Загрузка обзора операций…"
+
 #: src/renderer/components/pdf/PdfViewer.tsx
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 #~ msgid "Loading PDF…"
@@ -6173,6 +6219,10 @@ msgstr "Нативная поддержка"
 msgid "Needs approval"
 msgstr "Требует подтверждения"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Needs attention"
+msgstr "Требует внимания"
+
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Needs Attention"
@@ -6211,6 +6261,7 @@ msgstr "Новое имя действия"
 msgid "New branch name..."
 msgstr "Имя новой ветки..."
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "New Campaign Project"
 msgstr "Новый проект кампании"
@@ -6643,6 +6694,10 @@ msgstr "Нет открытых оповещений."
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No other agents installed"
 msgstr "Других установленных агентов нет"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "No other live campaigns."
+msgstr "Других активных кампаний нет."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "No paired devices yet."
@@ -8031,6 +8086,10 @@ msgstr "Недавние установки"
 #: src/renderer/views/HomeView.tsx
 msgid "Recent threads"
 msgstr "Недавние треды"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Recently resolved"
+msgstr "Недавно решённые"
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Recommendations:"
@@ -9553,6 +9612,10 @@ msgstr "Исходная ветка {branch} переместилась до с�
 msgid "Source Health"
 msgstr "Состояние источников"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Source health:"
+msgstr "Состояние источников:"
+
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Sources"
 msgstr "Источники"
@@ -10573,9 +10636,17 @@ msgstr "Модели для заголовков, коммитов и конфл
 msgid "To-dos"
 msgstr "Задачи"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Today"
+msgstr "Сегодня"
+
 #: src/renderer/commands/registry.ts
 msgid "Toggle browser panel"
 msgstr "Переключить панель браузера"
+
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarCampaignsSection.tsx
+msgid "Toggle campaigns section"
+msgstr "Переключить раздел кампаний"
 
 #: src/renderer/commands/composerCommands.ts
 #: src/renderer/components/providers/codex/index.tsx
@@ -11410,6 +11481,10 @@ msgstr "Ожидание аутентификации {methodName}. Обнару
 #: src/renderer/components/thread/ThreadPendingSteerStrip.tsx
 msgid "waiting for agent to stop"
 msgstr "ожидание остановки агента"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Waiting for approval"
+msgstr "Ожидает утверждения"
 
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "Waiting for workflow to spawn agents…"

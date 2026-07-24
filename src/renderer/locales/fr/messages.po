@@ -165,6 +165,16 @@ msgstr "Informations d'identification {0} enregistrées."
 msgid "{0} devices"
 msgstr "{0} appareils"
 
+#. placeholder {0}: summary.failed
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} failed"
+msgstr "{0} en échec"
+
+#. placeholder {0}: summary.healthy
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} healthy"
+msgstr "{0} saines"
+
 #. placeholder {0}: props.agentLabel
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "{0} hooks installed for {envName}."
@@ -254,6 +264,11 @@ msgstr "{0} exécution"
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
 msgid "{0} runs"
 msgstr "{0} exécutions"
+
+#. placeholder {0}: summary.stale
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} stale"
+msgstr "{0} obsolètes"
 
 #. placeholder {0}: evidenceFreshness.staleSourceCount
 #: src/renderer/components/consultations/ContextWarnings.tsx
@@ -1036,6 +1051,10 @@ msgstr "Tous ont échoué"
 msgid "All files"
 msgstr "Tous les fichiers"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "All other live campaigns"
+msgstr "Toutes les autres campagnes actives"
+
 #: src/mobile/views/ThreadsView.tsx
 msgid "All projects"
 msgstr "Tous les projets"
@@ -1222,12 +1241,24 @@ msgstr "Êtes-vous sûr de vouloir annuler toutes les modifications non indexée
 msgid "Arguments"
 msgstr "Arguments"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask"
+msgstr "Demander"
+
 #. placeholder {0}: agentStatus?.label ?? agentFallbackLabel
 #. placeholder {0}: project.name
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/views/QuickComposerOverlay/QuickComposerOverlay.tsx
 msgid "Ask {0} anything about this workspace"
 msgstr "Posez n'importe quelle question à {0} à propos de cet espace de travail"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask anything about your campaigns"
+msgstr "Posez n'importe quelle question sur vos campagnes"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask anything about your campaigns…"
+msgstr "Posez n'importe quelle question sur vos campagnes…"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Ask each time"
@@ -1695,6 +1726,8 @@ msgid "Campaign workspace \"{0}\" created."
 msgstr "Espace de travail de campagne \"{0}\" créé."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarCampaignsSection.tsx
+#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 msgid "Campaigns"
 msgstr "Campagnes"
 
@@ -2766,6 +2799,7 @@ msgstr "Le Centre de contrôle n'est pas disponible. Vous pouvez toujours créer
 msgid "Control Centre MCP Profile"
 msgstr "Profil MCP Control Centre"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
@@ -3033,6 +3067,10 @@ msgstr "Impossible de mettre à jour la compétence."
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 msgid "Create"
 msgstr "Créer"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Create a campaign project to see your operations overview."
+msgstr "Créez un projet de campagne pour voir votre aperçu opérationnel."
 
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
@@ -4665,6 +4703,10 @@ msgstr "Générer un résumé de la PR"
 msgid "Generate with AI"
 msgstr "Générer avec l'IA"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Generated"
+msgstr "Généré"
+
 #: src/renderer/components/thread/ChatPane/parts/items/imageViewSource.ts
 msgid "Generated image"
 msgstr "Image générée"
@@ -5449,6 +5491,10 @@ msgstr "Chargement de la place de marché…"
 msgid "Loading notes…"
 msgstr "Chargement des notes…"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Loading operations overview…"
+msgstr "Chargement de l'aperçu opérationnel…"
+
 #: src/renderer/components/pdf/PdfViewer.tsx
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 #~ msgid "Loading PDF…"
@@ -6172,6 +6218,10 @@ msgstr "Prise en charge native"
 msgid "Needs approval"
 msgstr "A besoin d'approbation"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Needs attention"
+msgstr "Nécessite une attention"
+
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Needs Attention"
@@ -6210,6 +6260,7 @@ msgstr "Nouveau nom d'action"
 msgid "New branch name..."
 msgstr "Nouveau nom de branche..."
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "New Campaign Project"
 msgstr "Nouveau projet de campagne"
@@ -6642,6 +6693,10 @@ msgstr "Aucune alerte ouverte."
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No other agents installed"
 msgstr "Aucun autre agent installé"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "No other live campaigns."
+msgstr "Aucune autre campagne active."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "No paired devices yet."
@@ -8030,6 +8085,10 @@ msgstr "Installations récentes"
 #: src/renderer/views/HomeView.tsx
 msgid "Recent threads"
 msgstr "Fils de discussion récents"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Recently resolved"
+msgstr "Résolus récemment"
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Recommendations:"
@@ -9552,6 +9611,10 @@ msgstr "La branche source {branch} a été déplacée avant la création de l'ar
 msgid "Source Health"
 msgstr "État des sources"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Source health:"
+msgstr "État des sources :"
+
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Sources"
 msgstr "Sources"
@@ -10572,9 +10635,17 @@ msgstr "Modèles de titre, commit et conflit"
 msgid "To-dos"
 msgstr "À faire"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Today"
+msgstr "Aujourd'hui"
+
 #: src/renderer/commands/registry.ts
 msgid "Toggle browser panel"
 msgstr "Basculer le panneau du navigateur"
+
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarCampaignsSection.tsx
+msgid "Toggle campaigns section"
+msgstr "Afficher/masquer la section Campagnes"
 
 #: src/renderer/commands/composerCommands.ts
 #: src/renderer/components/providers/codex/index.tsx
@@ -11409,6 +11480,10 @@ msgstr "En attente de l'authentification {methodName}. Les agents détectés ser
 #: src/renderer/components/thread/ThreadPendingSteerStrip.tsx
 msgid "waiting for agent to stop"
 msgstr "en attente de l'arrêt de l'agent"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Waiting for approval"
+msgstr "En attente d'approbation"
 
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "Waiting for workflow to spawn agents…"

@@ -165,6 +165,16 @@ msgstr "{0}資格情報が保存されました。"
 msgid "{0} devices"
 msgstr "{0}台のデバイス"
 
+#. placeholder {0}: summary.failed
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} failed"
+msgstr "{0} 件失敗"
+
+#. placeholder {0}: summary.healthy
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} healthy"
+msgstr "{0} 件正常"
+
 #. placeholder {0}: props.agentLabel
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "{0} hooks installed for {envName}."
@@ -254,6 +264,11 @@ msgstr "{0}回の実行"
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
 msgid "{0} runs"
 msgstr "{0}回の実行"
+
+#. placeholder {0}: summary.stale
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} stale"
+msgstr "{0} 件古い"
 
 #. placeholder {0}: evidenceFreshness.staleSourceCount
 #: src/renderer/components/consultations/ContextWarnings.tsx
@@ -1035,6 +1050,10 @@ msgstr "すべて失敗"
 msgid "All files"
 msgstr "すべてのファイル"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "All other live campaigns"
+msgstr "その他の稼働中キャンペーン"
+
 #: src/mobile/views/ThreadsView.tsx
 msgid "All projects"
 msgstr "すべてのプロジェクト"
@@ -1221,12 +1240,24 @@ msgstr "ステージングされていない変更をすべて元に戻しても
 msgid "Arguments"
 msgstr "引数"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask"
+msgstr "質問"
+
 #. placeholder {0}: agentStatus?.label ?? agentFallbackLabel
 #. placeholder {0}: project.name
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/views/QuickComposerOverlay/QuickComposerOverlay.tsx
 msgid "Ask {0} anything about this workspace"
 msgstr "このワークスペースについて{0}に何でも質問してください"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask anything about your campaigns"
+msgstr "キャンペーンについて何でも質問"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask anything about your campaigns…"
+msgstr "キャンペーンについて何でも質問…"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Ask each time"
@@ -1694,6 +1725,8 @@ msgid "Campaign workspace \"{0}\" created."
 msgstr "キャンペーンワークスペース「{0}」を作成しました。"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarCampaignsSection.tsx
+#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 msgid "Campaigns"
 msgstr "キャンペーン"
 
@@ -2765,6 +2798,7 @@ msgstr "コントロールセンターは利用できません。手動でキャ
 msgid "Control Centre MCP Profile"
 msgstr "Control Centre MCPプロファイル"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
@@ -3032,6 +3066,10 @@ msgstr "スキルを更新できませんでした。"
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 msgid "Create"
 msgstr "作成"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Create a campaign project to see your operations overview."
+msgstr "運用概要を表示するにはキャンペーンプロジェクトを作成してください。"
 
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
@@ -4664,6 +4702,10 @@ msgstr "PRサマリーを生成する"
 msgid "Generate with AI"
 msgstr "AIで生成"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Generated"
+msgstr "生成"
+
 #: src/renderer/components/thread/ChatPane/parts/items/imageViewSource.ts
 msgid "Generated image"
 msgstr "生成された画像"
@@ -5448,6 +5490,10 @@ msgstr "マーケットプレイスを読み込み中…"
 msgid "Loading notes…"
 msgstr "メモを読み込んでいます…"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Loading operations overview…"
+msgstr "運用概要を読み込み中…"
+
 #: src/renderer/components/pdf/PdfViewer.tsx
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 #~ msgid "Loading PDF…"
@@ -6171,6 +6217,10 @@ msgstr "ネイティブサポート"
 msgid "Needs approval"
 msgstr "承認が必要です"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Needs attention"
+msgstr "要対応"
+
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Needs Attention"
@@ -6209,6 +6259,7 @@ msgstr "新しいアクション名"
 msgid "New branch name..."
 msgstr "新しいブランチ名..."
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "New Campaign Project"
 msgstr "新規キャンペーンプロジェクト"
@@ -6641,6 +6692,10 @@ msgstr "未解決のアラートはありません。"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No other agents installed"
 msgstr "他のエージェントはインストールされていません"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "No other live campaigns."
+msgstr "他に稼働中のキャンペーンはありません。"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "No paired devices yet."
@@ -8029,6 +8084,10 @@ msgstr "最近のインストール"
 #: src/renderer/views/HomeView.tsx
 msgid "Recent threads"
 msgstr "最近のスレッド"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Recently resolved"
+msgstr "最近解決"
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Recommendations:"
@@ -9551,6 +9610,10 @@ msgstr "ワークツリーの作成前にソースブランチ {branch} が移�
 msgid "Source Health"
 msgstr "ソースヘルス"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Source health:"
+msgstr "ソースの状態:"
+
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Sources"
 msgstr "ソース"
@@ -10571,9 +10634,17 @@ msgstr "タイトル、コミット、競合用モデル"
 msgid "To-dos"
 msgstr "やるべきこと"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Today"
+msgstr "今日"
+
 #: src/renderer/commands/registry.ts
 msgid "Toggle browser panel"
 msgstr "ブラウザパネルの切り替え"
+
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarCampaignsSection.tsx
+msgid "Toggle campaigns section"
+msgstr "キャンペーンセクションの表示切替"
 
 #: src/renderer/commands/composerCommands.ts
 #: src/renderer/components/providers/codex/index.tsx
@@ -11408,6 +11479,10 @@ msgstr "{methodName}認証を待機しています。検出されたエージェ
 #: src/renderer/components/thread/ThreadPendingSteerStrip.tsx
 msgid "waiting for agent to stop"
 msgstr "エージェントが停止するのを待っています"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Waiting for approval"
+msgstr "承認待ち"
 
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "Waiting for workflow to spawn agents…"

@@ -1,4 +1,4 @@
-import { useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
+import { useRef, useState, useEffect, type ClipboardEvent, type KeyboardEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, toast } from "@heroui/react";
 import { Send } from "lucide-react";
@@ -21,6 +21,7 @@ import {
   handleComposerAttachmentDrop,
 } from "./campaignComposerDrop";
 import { routeCampaignComposerMessage } from "./campaignThreadComposerRouting";
+import { useAppStore } from "@/renderer/state/appStore";
 
 const submittingThreads = new Set<string>();
 
@@ -38,6 +39,16 @@ export function CampaignThreadComposer(props: CampaignThreadComposerProps) {
   const [isAttachmentDropActive, setIsAttachmentDropActive] = useState(false);
   const attachments = useAttachments();
   const attachmentDragDepthRef = useRef(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const pendingPrefill = useAppStore((s) => s.pendingCampaignComposerPrefill);
+  const setPendingCampaignComposerPrefill = useAppStore((s) => s.setPendingCampaignComposerPrefill);
+
+  useEffect(() => {
+    if (!pendingPrefill || pendingPrefill.projectId !== props.projectId) return;
+    setInput(pendingPrefill.text);
+    setPendingCampaignComposerPrefill(null);
+    textareaRef.current?.focus();
+  }, [pendingPrefill, props.projectId, setPendingCampaignComposerPrefill]);
 
   const hasContent = input.trim().length > 0 || attachments.attachments.length > 0;
   const canSubmit = Boolean(props.parentThreadId) && hasContent && !isSubmitting;
@@ -172,6 +183,7 @@ export function CampaignThreadComposer(props: CampaignThreadComposerProps) {
       <div className="flex items-end gap-2 p-3">
         <ComposerAddMenu mcpServers={[]} showFileOption onPickFiles={handlePickFiles} />
         <textarea
+          ref={textareaRef}
           aria-label={t`Message composer`}
           placeholder={t`@codex check budget pacing, or type a message…`}
           rows={2}
