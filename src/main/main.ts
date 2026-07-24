@@ -541,6 +541,8 @@ function injectBrowserToMain(): void {
 
 const workingThreads = new Set<string>();
 const sleepInhibitor = createSleepInhibitor();
+/** Ceiling on MCP ingress startup before the supervisor launches regardless. */
+const MCP_INGRESS_STARTUP_TIMEOUT_MS = 10_000;
 
 function requirePoracodePaths(): PoracodePaths {
   if (!poracodePaths) {
@@ -1062,11 +1064,21 @@ if (!hasSingleInstanceLock) {
         );
       }
 
-      await Promise.all([
-        mcpInfoReady,
-        chromeMcpReady,
-        computerUseMcpInfoReady,
-        appControlsMcpReady,
+      // The ingress servers only supply env vars for agents the supervisor
+      // launches later, so they must never gate the supervisor itself: a launch
+      // environment without `node` on PATH (Finder/Dock, where PATH is just
+      // /usr/bin:/bin:/usr/sbin:/sbin) can leave one of these pending forever,
+      // and the whole app then sits on the renderer's loading screen.
+      await Promise.race([
+        Promise.all([mcpInfoReady, chromeMcpReady, computerUseMcpInfoReady, appControlsMcpReady]),
+        new Promise<void>((resolve) => {
+          setTimeout(() => {
+            console.warn(
+              "[poracode] MCP ingress startup exceeded 10s — starting the supervisor without it.",
+            );
+            resolve();
+          }, MCP_INGRESS_STARTUP_TIMEOUT_MS).unref?.();
+        }),
       ]);
       supervisorClient.start(paths.baseDir);
       scheduleService.start();
