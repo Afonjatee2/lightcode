@@ -1,6 +1,9 @@
 import { startTransition, useEffect, useState } from "react";
 import { isThreadTurnActive } from "@/shared/contracts";
+import { getProjectPurpose } from "@/shared/contracts/project";
 import { readBridge } from "@/renderer/bridge";
+import { shouldLandOnCampaignToday } from "@/renderer/campaign/resolveCampaignLanding";
+import { isWelcomeSeen } from "@/renderer/state/welcomeGateStore";
 import { captureRendererException } from "@/renderer/diagnostics/sentry";
 import { useAppStore } from "@/renderer/state/appStore";
 import {
@@ -85,6 +88,22 @@ export function useAppHydration(options: { runtimeOwner?: boolean } = {}) {
       !useExperimentStore.getState().experiments[restoredView.experimentId]
     ) {
       appState.openHome();
+    }
+
+    // Campaign operators land on the campaign Today home rather than the neutral
+    // default surface — but only once the first-run welcome is dismissed and
+    // only when we'd otherwise sit on the plain `home` view (never clobbering a
+    // restored working session). See resolveCampaignLanding for the full rules.
+    if (
+      shouldLandOnCampaignToday({
+        welcomeSeen: isWelcomeSeen(),
+        hasCampaignProject: appState.projects.some(
+          (project) => getProjectPurpose(project) === "campaign",
+        ),
+        restoredViewKind: useAppStore.getState().view.kind,
+      })
+    ) {
+      useAppStore.getState().openCampaignToday();
     }
     console.log(
       `[renderer] +${Date.now() - loadT0}ms: store hydrated, view=${JSON.stringify(restoredView)}, ${useAppStore.getState().projects.length} projects, ${useAppStore.getState().threads.length} threads`,

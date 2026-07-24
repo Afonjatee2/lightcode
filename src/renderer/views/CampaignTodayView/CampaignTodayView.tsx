@@ -503,9 +503,12 @@ export function CampaignTodayView() {
                     ))}
                   </div>
                 ) : (
-                  <p className="px-3 py-2 text-sm text-muted">
-                    <Trans>No other live campaigns.</Trans>
-                  </p>
+                  <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-[var(--hairline)] px-6 py-8 text-center">
+                    <Sparkles className="size-5 text-muted" aria-hidden />
+                    <p className="text-sm text-muted">
+                      <Trans>No other live campaigns.</Trans>
+                    </p>
+                  </div>
                 )}
               </section>
 

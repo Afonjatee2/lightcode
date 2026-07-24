@@ -51,7 +51,11 @@ export function ConsultationDock({ threadId, onOpenThread }: ConsultationDockPro
         <Sparkles size={12} />
         <Trans>Consultations</Trans>
       </div>
-      <div className="flex max-h-72 flex-col gap-3 overflow-y-auto">
+      {/* No nested scroll: the campaign thread pane is already scrollable, so a
+          bounded `max-h` + `overflow-y-auto` here created a scroll-within-scroll
+          that clipped a second consultation's CONTROL CENTRE block at the inner
+          edge. Let the cards flow in the thread's own scroll region instead. */}
+      <div className="flex flex-col gap-3">
         {topLevel.map((record) =>
           record.consultationMode === "panel" ? (
             <PanelCardContainer

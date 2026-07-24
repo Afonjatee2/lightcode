@@ -3859,6 +3859,17 @@ html[data-poracode-drag-active="true"] [data-poracode-chat-scroller="true"] {
   overflow: hidden;
 }
 
+/* Over-attainment (>100%) KPI fill. The bar itself is capped at 100% width;
+   this subtle diagonal hatch over the tone colour distinguishes "beat target"
+   from an exactly-on-target solid fill, alongside the ↑ marker + numeric %. */
+.cockpit-kpi-bar--over {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in oklab, white 26%, transparent) 0 2px,
+    transparent 2px 6px
+  );
+}
+
 .cockpit-topic-tab {
   display: inline-flex;
   align-items: center;
