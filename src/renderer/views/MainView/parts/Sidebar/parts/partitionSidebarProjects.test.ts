@@ -50,4 +50,24 @@ describe("partitionSidebarProjects", () => {
     expect(result.codeProjectIds).toEqual(["code-1"]);
     expect(result.campaignProjectIds).toEqual([]);
   });
+
+  it("returns a referentially stable result for the same projects array", () => {
+    const code = project({ id: "code-1", name: "App" });
+    const projects = [code];
+    const first = partitionSidebarProjects(projects);
+    const second = partitionSidebarProjects(projects);
+    // useShallow compares the two array references inside the selector result;
+    // fresh arrays per call loop the shell into "maximum update depth exceeded".
+    expect(second).toBe(first);
+    expect(second.codeProjectIds).toBe(first.codeProjectIds);
+    expect(second.campaignProjectIds).toBe(first.campaignProjectIds);
+  });
+
+  it("recomputes when handed a different projects array", () => {
+    const code = project({ id: "code-1", name: "App" });
+    const first = partitionSidebarProjects([code]);
+    const second = partitionSidebarProjects([code]);
+    expect(second).not.toBe(first);
+    expect(second.codeProjectIds).toEqual(first.codeProjectIds);
+  });
 });
