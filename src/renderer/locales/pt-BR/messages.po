@@ -18,8 +18,8 @@ msgid "-y @modelcontextprotocol/server-memory"
 msgstr "-y @modelcontextprotocol/server-memory"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "(coming in Phase 4)"
-msgstr "(em breve na Fase 4)"
+#~ msgid "(coming in Phase 4)"
+#~ msgstr "(em breve na Fase 4)"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "(Draft)"
@@ -542,6 +542,10 @@ msgstr "{usedLabel} tokens"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/ModelVisibilityDropdown.tsx
 msgid "{visibleCount} of {totalCount} visible"
 msgstr "{visibleCount} de {totalCount} visíveis"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+msgid "@codex check budget pacing, or type a message…"
+msgstr "@codex verificar ritmo do orçamento ou digite uma mensagem…"
 
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "@codex check the budget pacing"
@@ -2658,6 +2662,10 @@ msgstr "Consulta concluída"
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Consultation failed"
 msgstr "Consulta falhou"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
+msgstr "Os resultados das consultas aparecem aqui. Use @codex, @verify, @panel e outras menções no compositor abaixo."
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Consultation was cancelled"
@@ -5887,7 +5895,7 @@ msgstr "A mesclagem está bloqueada"
 msgid "Message actions"
 msgstr "Ações da mensagem"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "Message composer"
 msgstr "Compositor de mensagens"
 
@@ -9122,7 +9130,7 @@ msgstr "Enviar texto genérico em vez dos títulos das conversas pelo serviço p
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/thread/ThreadComposerSection.tsx
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "Send message"
 msgstr "Enviar mensagem"
 
@@ -10490,8 +10498,8 @@ msgid "Thread is already unloaded."
 msgstr "O tópico já está descarregado."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "Thread messages will appear here"
-msgstr "As mensagens do tópico aparecerão aqui"
+#~ msgid "Thread messages will appear here"
+#~ msgstr "As mensagens do tópico aparecerão aqui"
 
 #: src/renderer/components/thread/PresentationModeTabs.tsx
 msgid "Thread mode"
@@ -10687,8 +10695,8 @@ msgid "Type a command"
 msgstr "Digite um comando"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "Type a message…"
-msgstr "Digite uma mensagem…"
+#~ msgid "Type a message…"
+#~ msgstr "Digite uma mensagem…"
 
 #: src/mobile/views/BrowserView.tsx
 msgid "Type into the page"
