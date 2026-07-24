@@ -738,6 +738,8 @@ export function initDatabase(dbPath: string) {
       .run(String(SCHEMA_VERSION));
   }
 
+  repairExpectedColumns(sqlite);
+
   // Bound the durable usage log: drop events older than the retention window so
   // a long-lived install can't accumulate unboundedly (aggregation reads scan
   // this table). Runs once per startup; cheap on a bounded table.
@@ -753,6 +755,51 @@ export function initDatabase(dbPath: string) {
 
   console.log("[db] initialized");
   return _db;
+}
+
+/**
+ * Columns the current code reads unconditionally, paired with the DDL that adds
+ * them. The numbered ladder above only runs for databases below each version,
+ * so a database stamped by a divergent build — same version number, different
+ * columns — skips migrations it still needs and every query touching the
+ * missing column throws. This pass is version-independent and idempotent, so
+ * such a database heals itself on the next launch instead of failing opaquely.
+ */
+const EXPECTED_COLUMNS: readonly { table: string; column: string; ddl: string }[] = [
+  {
+    table: "projects",
+    column: "campaign_group_id",
+    ddl: "ALTER TABLE projects ADD COLUMN campaign_group_id TEXT",
+  },
+  { table: "projects", column: "purpose", ddl: "ALTER TABLE projects ADD COLUMN purpose TEXT" },
+  {
+    table: "projects",
+    column: "campaign_extension",
+    ddl: "ALTER TABLE projects ADD COLUMN campaign_extension TEXT",
+  },
+  {
+    table: "consultations",
+    column: "panel_completion_rule",
+    ddl: "ALTER TABLE consultations ADD COLUMN panel_completion_rule TEXT",
+  },
+];
+
+export function repairExpectedColumns(sqlite: InstanceType<typeof Database>): string[] {
+  const repaired: string[] = [];
+  for (const { table, column, ddl } of EXPECTED_COLUMNS) {
+    const tableExists = sqlite
+      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+      .get(table);
+    if (!tableExists) continue;
+    const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (cols.some((c) => c.name === column)) continue;
+    sqlite.exec(ddl);
+    repaired.push(`${table}.${column}`);
+  }
+  if (repaired.length > 0) {
+    console.warn(`[db] repaired missing columns: ${repaired.join(", ")}`);
+  }
+  return repaired;
 }
 
 function foldContextSuffix(sqlite: InstanceType<typeof Database>, table: string, column: string) {
