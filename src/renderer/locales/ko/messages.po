@@ -431,6 +431,10 @@ msgstr "{days}일 전"
 msgid "{envOrAgentLabel} needs authentication."
 msgstr "{envOrAgentLabel}에는 인증이 필요합니다."
 
+#: src/renderer/campaign/morningBrief/briefGenerator.ts
+msgid "{failed} failed"
+msgstr "실패 {failed}개"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #~ msgid "{failedCount} data sources have failed to sync"
 #~ msgstr "{failedCount}개의 데이터 소스 동기화에 실패했습니다"
@@ -450,6 +454,10 @@ msgstr "{head} 또는 {tail}"
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "{heading} mode"
 msgstr "{heading} 모드"
+
+#: src/renderer/campaign/morningBrief/briefGenerator.ts
+msgid "{healthy} healthy"
+msgstr "정상 {healthy}개"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "{hook} hook failed"
@@ -581,6 +589,10 @@ msgstr "{seconds}초 전"
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "{serverName} from {providerLabel}: {disabledLabel}"
 msgstr "{providerLabel}의 {serverName}: {disabledLabel}"
+
+#: src/renderer/campaign/morningBrief/briefGenerator.ts
+msgid "{stale} stale"
+msgstr "오래됨 {stale}개"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #~ msgid "{staleCount} data sources have stale data"

@@ -431,6 +431,10 @@ msgstr "{days}д тому"
 msgid "{envOrAgentLabel} needs authentication."
 msgstr "{envOrAgentLabel} потребує автентифікації."
 
+#: src/renderer/campaign/morningBrief/briefGenerator.ts
+msgid "{failed} failed"
+msgstr "{failed} з помилкою"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #~ msgid "{failedCount} data sources have failed to sync"
 #~ msgstr "Не вдалося синхронізувати джерел даних: {failedCount}"
@@ -450,6 +454,10 @@ msgstr "{head} або {tail}"
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "{heading} mode"
 msgstr "Режим {heading}"
+
+#: src/renderer/campaign/morningBrief/briefGenerator.ts
+msgid "{healthy} healthy"
+msgstr "{healthy} справних"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "{hook} hook failed"
@@ -581,6 +589,10 @@ msgstr "{seconds}с тому"
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "{serverName} from {providerLabel}: {disabledLabel}"
 msgstr "{serverName} з {providerLabel}: {disabledLabel}"
+
+#: src/renderer/campaign/morningBrief/briefGenerator.ts
+msgid "{stale} stale"
+msgstr "{stale} застарілих"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #~ msgid "{staleCount} data sources have stale data"

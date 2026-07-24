@@ -431,6 +431,10 @@ msgstr "il y a {days} j"
 msgid "{envOrAgentLabel} needs authentication."
 msgstr "{envOrAgentLabel} nécessite une authentification."
 
+#: src/renderer/campaign/morningBrief/briefGenerator.ts
+msgid "{failed} failed"
+msgstr "{failed} en échec"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #~ msgid "{failedCount} data sources have failed to sync"
 #~ msgstr "{failedCount} sources de données n'ont pas pu se synchroniser"
@@ -450,6 +454,10 @@ msgstr "{head}, ou {tail}"
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "{heading} mode"
 msgstr "Mode {heading}"
+
+#: src/renderer/campaign/morningBrief/briefGenerator.ts
+msgid "{healthy} healthy"
+msgstr "{healthy} saines"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "{hook} hook failed"
@@ -581,6 +589,10 @@ msgstr "il y a {seconds} s"
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "{serverName} from {providerLabel}: {disabledLabel}"
 msgstr "{serverName} de {providerLabel} : {disabledLabel}"
+
+#: src/renderer/campaign/morningBrief/briefGenerator.ts
+msgid "{stale} stale"
+msgstr "{stale} obsolètes"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #~ msgid "{staleCount} data sources have stale data"

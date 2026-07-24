@@ -1,3 +1,5 @@
+import { msg } from "@lingui/core/macro";
+import { i18n } from "@/renderer/i18n/i18n";
 import type { OperationsTodayViewModel } from "@/renderer/adapters/campaignViewModels";
 
 export type ExceptionType =
@@ -80,12 +82,12 @@ export function formatHealthNote(summary: {
   const { healthy, stale, failed } = summary;
   if (healthy + stale + failed === 0) return "—";
   if (stale === 0 && failed === 0) {
-    return `${healthy} healthy`;
+    return i18n._(msg`${healthy} healthy`);
   }
   const parts: string[] = [];
-  if (healthy > 0) parts.push(`${healthy} healthy`);
-  if (stale > 0) parts.push(`${stale} stale`);
-  if (failed > 0) parts.push(`${failed} failed`);
+  if (healthy > 0) parts.push(i18n._(msg`${healthy} healthy`));
+  if (stale > 0) parts.push(i18n._(msg`${stale} stale`));
+  if (failed > 0) parts.push(i18n._(msg`${failed} failed`));
   return parts.join(", ");
 }
 
@@ -106,9 +108,12 @@ export function generateMorningBrief(
   const needsAttentionItems: MorningBriefItem[] = payload.needsAttention.map((item) => {
     const reason = item.attentionReason ?? item.campaignName;
     const classification = classifyNeedsAttentionException(item.topPriority, reason);
+    // Stable identity only: reason text and counts move as the backend
+    // rewords or re-counts, and anything volatile in the key makes the same
+    // underlying exception notify again every time it shifts.
     const id = classification.isException
-      ? `${item.campaignGroupId}:${classification.exceptionType}:${item.topPriority ?? "P"}:${reason}`
-      : `${item.campaignGroupId}:needs_attention:${reason}`;
+      ? `${item.campaignGroupId}:${classification.exceptionType}`
+      : `${item.campaignGroupId}:needs_attention`;
     return {
       id,
       campaignGroupId: item.campaignGroupId,
@@ -127,8 +132,8 @@ export function generateMorningBrief(
       item.attentionReason ?? `${item.pendingProposalCount} proposals awaiting approval`;
     const classification = classifyWaitingForApprovalException(item.pendingProposalCount);
     const id = classification.isException
-      ? `${item.campaignGroupId}:proposal:${item.pendingProposalCount}:${reason}`
-      : `${item.campaignGroupId}:waiting_approval:${reason}`;
+      ? `${item.campaignGroupId}:proposal`
+      : `${item.campaignGroupId}:waiting_approval`;
     return {
       id,
       campaignGroupId: item.campaignGroupId,

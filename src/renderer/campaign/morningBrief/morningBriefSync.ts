@@ -92,6 +92,11 @@ export function processMorningBriefNotifications(brief: MorningBrief): void {
   }
 
   if (newlyNotifiedKeys.length > 0) {
-    settings.addMorningBriefNotifiedKeys(newlyNotifiedKeys);
+    // Retain only keys still present in this brief (plus the ones just sent):
+    // once an exception clears it should be able to notify again if it returns,
+    // and the persisted list must not grow forever in the settings file.
+    const stillLive = new Set(brief.exceptions.map((item) => item.id));
+    const retained = settings.morningBriefNotifiedKeys.filter((key) => stillLive.has(key));
+    settings.setMorningBriefNotifiedKeys([...new Set([...retained, ...newlyNotifiedKeys])]);
   }
 }
