@@ -2120,6 +2120,7 @@ msgstr "Close search"
 msgid "Close Split"
 msgstr "Close Split"
 
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
 msgid "Close subagent"
 msgstr "Close subagent"
@@ -5199,6 +5200,7 @@ msgid "Loading threads"
 msgstr "Loading threads"
 
 #: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/HostFolderPicker.tsx
 #: src/renderer/app.tsx
@@ -6402,7 +6404,7 @@ msgstr "No supported agents are installed on this remote machine. Install and si
 msgid "No supported agents detected"
 msgstr "No supported agents detected"
 
-#: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "No thread selected"
 msgstr "No thread selected"
@@ -7103,7 +7105,7 @@ msgstr "permission"
 msgid "Pi"
 msgstr "Pi"
 
-#: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "Pick a thread from the list to follow the agent from here."
 msgstr "Pick a thread from the list to follow the agent from here."
@@ -9405,6 +9407,8 @@ msgstr "Stored on this device; the desktop keeps its own values."
 #~ msgid "Stored on this phone; the desktop keeps its own values."
 #~ msgstr "Stored on this phone; the desktop keeps its own values."
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
 msgid "Subagent"
 msgstr "Subagent"

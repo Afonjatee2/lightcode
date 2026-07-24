@@ -40,7 +40,7 @@ describe("mobile home depth styles", () => {
       /\.m-shell\[data-chrome="home"\]\s*\{[^}]*--m-home-header-clearance:\s*calc\(env\(safe-area-inset-top\) \+ var\(--m-tap-min\)\)/s,
     );
     expect(css).toMatch(
-      /\.m-shell\[data-chrome="home"\] > \.m-topbar\s*\{[^}]*position:\s*absolute;[^}]*background:\s*color-mix\(in oklab, var\(--background\) 78%, transparent\);[^}]*backdrop-filter:\s*saturate\(140%\) blur\(16px\)/s,
+      /\.m-shell\[data-chrome="home"\] > \.m-topbar\s*\{[^}]*position:\s*absolute;[^}]*min-height:\s*var\(--m-home-header-clearance\);[^}]*background:\s*color-mix\(in oklab, var\(--background\) 78%, transparent\);[^}]*backdrop-filter:\s*saturate\(140%\) blur\(16px\)/s,
     );
     expect(css).toMatch(
       /\.m-shell\[data-chrome="home"\] > \.m-main > \.m-threads > \.m-thread-list\s*\{[^}]*padding-top:\s*calc\(var\(--m-home-header-clearance\) \+ 0\.125rem\);[^}]*scroll-padding-top:\s*var\(--m-home-header-clearance\)/s,
@@ -58,6 +58,18 @@ describe("mobile home depth styles", () => {
     );
     expect(css).not.toMatch(
       /html\[data-mobile-platform="ios"\]\[data-mobile-browser-chrome="true"\][^{]*\.m-shell\[data-chrome="home"\][^{]*\.m-thread-list\s*\{[^}]*overflow-y:\s*visible;/s,
+    );
+  });
+
+  it("keeps the floating search below the status bar and expands it across the header", () => {
+    expect(css).toMatch(
+      /\.m-shell\[data-chrome="home"\] > \.m-topbar\s*\{[^}]*min-height:\s*var\(--m-home-header-clearance\)/s,
+    );
+    expect(css).toMatch(
+      /\.m-topbar-search:has\(\.m-search-float\)\s*\{[^}]*right:\s*0\.625rem;[^}]*width:\s*calc\(100% - 1\.25rem\);[^}]*max-width:\s*none;/s,
+    );
+    expect(css).toMatch(
+      /\.m-topbar-search > \.m-threads__picker\s*\{[^}]*min-width:\s*0;[^}]*flex:\s*1;/s,
     );
   });
 });

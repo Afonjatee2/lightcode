@@ -16,6 +16,10 @@ import { ProjectFilesPanel } from "@/renderer/views/FileEditorOverlay/parts/Proj
 import { NotesPanel } from "@/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/NotesPanel";
 import { UsagePanel } from "@/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/UsagePanel";
 import { UsagePanelHeaderActions } from "@/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsagePanelHeaderActions";
+import {
+  SubAgentContent,
+  SubAgentHeaderText,
+} from "@/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
 import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
@@ -75,6 +79,7 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean }) {
   const gitReviewContext = usePanelStore((s) => s.gitReviewContext);
   const gitReviewAsPanel = usePanelStore((s) => s.gitReviewAsPanel);
   const filesPanelContext = usePanelStore((s) => s.filesPanelContext);
+  const subAgentPanelContext = usePanelStore((s) => s.subAgentPanelContext);
   const rightPanelTab = usePanelStore((s) => s.rightPanelTab);
   const setRightPanelTab = usePanelStore((s) => s.setRightPanelTab);
   const browserPanelOpen = usePanelStore((s) => s.browserPanelOpen);
@@ -95,9 +100,26 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean }) {
   const terminalOpen = useDevTerminalStore((s) => s.isOpen);
   const terminalProjectId = useDevTerminalStore((s) => s.activeProjectId);
   const terminalWorktreePath = useDevTerminalStore((s) => s.activeWorktreePath);
+  const currentThreadId = useAppStore((state) => {
+    if (state.view.kind !== "thread") return null;
+    return state.focusedPaneId && state.view.panes.includes(state.focusedPaneId)
+      ? state.focusedPaneId
+      : state.view.panes[0];
+  });
 
   const gitPanelOpen = !!gitReviewContext && gitReviewAsPanel;
   const filesPanelOpen = filesPanelContext !== null;
+  const subAgentItemExists = useAppStore((state) =>
+    subAgentPanelContext
+      ? state.runtimeItemsByIdByThread[subAgentPanelContext.threadId]?.[
+          subAgentPanelContext.parentItemId
+        ] !== undefined
+      : false,
+  );
+  const subAgentInCurrentThread =
+    subAgentPanelContext !== null &&
+    subAgentPanelContext.threadId === currentThreadId &&
+    subAgentItemExists;
 
   const lastGitPanelContextRef = useRef(gitReviewContext);
   if (gitReviewContext && gitReviewAsPanel) {
@@ -114,16 +136,33 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean }) {
     : lastFilesPanelContextRef.current;
   const resolvedFilesPanelContext = resolveFilesRootContext(rawFilesPanelContext, projects);
 
-  const activeTab: RightPanelTab = props.includeTerminal
+  const requestedTab: RightPanelTab = props.includeTerminal
     ? rightPanelTab === "ports"
       ? "git"
       : rightPanelTab
     : rightPanelTab === "files" ||
         rightPanelTab === "browser" ||
         rightPanelTab === "usage" ||
-        rightPanelTab === "notes"
+        rightPanelTab === "notes" ||
+        rightPanelTab === "subagent"
       ? rightPanelTab
       : "git";
+  const activeTab: RightPanelTab =
+    requestedTab !== "subagent" || subAgentInCurrentThread
+      ? requestedTab
+      : filesPanelOpen
+        ? "files"
+        : gitPanelOpen
+          ? "git"
+          : browserPanelOpen
+            ? "browser"
+            : usagePanelOpen
+              ? "usage"
+              : notesPanelOpen
+                ? "notes"
+                : props.includeTerminal && terminalOpen
+                  ? "terminal"
+                  : "git";
 
   const gitScope = scopeFromGitContext(gitPanelContext);
   const filesScope = scopeFromFilesContext(resolvedFilesPanelContext);
@@ -161,6 +200,8 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean }) {
         return t`Usage`;
       case "notes":
         return notesProjectId ? projectNameForScope({ projectId: notesProjectId }) : t`Notes`;
+      case "subagent":
+        return undefined;
       case "files":
         return resolvedFilesPanelContext?.rootLabel ?? projectNameForScope(activeProjectScope());
       default:
@@ -199,17 +240,26 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean }) {
     closeAllPanels();
   }
 
+  function handleCloseSubAgent() {
+    usePanelStore.getState().setSubAgentPanelContext(null);
+    handleClose();
+  }
+
   const renderTerminalContent = props.includeTerminal && terminalOpen;
   const renderGitContent = gitPanelOpen;
   const renderFilesContent = filesPanelOpen;
   const renderBrowserContent = browserPanelOpen;
   const renderUsageContent = usagePanelOpen;
   const renderNotesContent = notesPanelOpen && notesProjectId !== undefined;
+  const renderSubAgentContent = subAgentInCurrentThread;
 
   return (
     <UnifiedRightPanel
       activeTab={activeTab}
-      onTabChange={setRightPanelTab}
+      onTabChange={(tab) => {
+        if (tab === "subagent" && !renderSubAgentContent) return;
+        setRightPanelTab(tab);
+      }}
       {...(renderTerminalContent ? { terminalContent: <DevTerminalPanel hideHeader /> } : {})}
       gitContent={
         renderGitContent ? (
@@ -240,6 +290,19 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean }) {
           <NotesPanel key={notesProjectId} projectId={notesProjectId} />
         ) : undefined
       }
+      subagentContent={
+        renderSubAgentContent ? (
+          <SubAgentContent
+            key={`${subAgentPanelContext.threadId}:${subAgentPanelContext.parentItemId}`}
+            threadId={subAgentPanelContext.threadId}
+            parentItemId={subAgentPanelContext.parentItemId}
+            hideHeader
+            {...(subAgentPanelContext.projectLocation
+              ? { projectLocation: subAgentPanelContext.projectLocation }
+              : {})}
+          />
+        ) : undefined
+      }
       usageHeaderActions={
         <UsagePanelHeaderActions dragControlClass="poracode-overlay-header__controls" />
       }
@@ -247,6 +310,28 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean }) {
       showFilesTab={!isHomeScope}
       showGitTab={!isHomeScope}
       showNotesTab={notesProjectId !== undefined}
+      showSubagentTab={renderSubAgentContent}
+      {...(renderSubAgentContent
+        ? {
+            subagentModel: (
+              <SubAgentHeaderText
+                threadId={subAgentPanelContext.threadId}
+                parentItemId={subAgentPanelContext.parentItemId}
+                compact
+                part="description"
+              />
+            ),
+            subagentTitle: (
+              <SubAgentHeaderText
+                threadId={subAgentPanelContext.threadId}
+                parentItemId={subAgentPanelContext.parentItemId}
+                compact
+                part="title"
+              />
+            ),
+            onCloseSubagent: handleCloseSubAgent,
+          }
+        : {})}
       projectName={projectName}
       onExpandGitToOverlay={() => setGitOverlayOpen(true)}
       onExpandFilesToOverlay={() => setFileEditorOverlayMode("fullscreen")}

@@ -1,11 +1,12 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ToolCallPayload } from "@/shared/contracts";
+import type { ProjectLocation, ToolCallPayload } from "@/shared/contracts";
 import { AppProvider } from "@/renderer/components/ui/provider";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import { useAppStore } from "@/renderer/state/appStore";
+import type { ChatTimelineEntry } from "../../chatPaneSelectors";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
-import { SubAgentOverlay } from "./SubAgentOverlay";
+import { SubAgentContent, SubAgentHeaderText, SubAgentOpenController } from "./SubAgentOverlay";
 import { ActiveSubAgentTile } from "./ActiveSubAgentTile";
 
 const mockBridge = {
@@ -15,12 +16,64 @@ const mockBridge = {
     vi.fn<(payload: { threadId: string; parentItemId: string }) => Promise<void>>(),
 };
 
+type MockLegendProps = {
+  data: readonly ChatTimelineEntry[];
+  keyExtractor: (item: ChatTimelineEntry, index: number) => string;
+  renderItem: (input: { item: ChatTimelineEntry; index: number }) => React.ReactNode;
+  ListHeaderComponent?: React.ReactNode;
+  ListEmptyComponent?: React.ReactNode;
+  ListFooterComponent?: React.ReactNode;
+  className?: string;
+  contentContainerClassName?: string;
+  contentContainerStyle?: React.CSSProperties;
+  onLoad?: () => void;
+};
+
+vi.mock("@legendapp/list/react", async () => {
+  const React = await import("react");
+  return {
+    LegendList: React.forwardRef(function MockLegendList(
+      props: MockLegendProps,
+      forwardedRef: React.ForwardedRef<unknown>,
+    ) {
+      const scrollRef = React.useRef<HTMLDivElement>(null);
+      const onLoadRef = React.useRef(props.onLoad);
+      React.useImperativeHandle(forwardedRef, () => ({
+        getScrollableNode: () => scrollRef.current,
+        getState: () => ({
+          sizes: new Map(),
+          listen: () => () => undefined,
+        }),
+        scrollToEnd: () => Promise.resolve(),
+      }));
+      React.useLayoutEffect(() => onLoadRef.current?.(), []);
+      return (
+        <div ref={scrollRef} className={props.className} data-poracode-chat-scroller="true">
+          <div
+            className={`legend-list-content-container ${props.contentContainerClassName ?? ""}`}
+            style={props.contentContainerStyle}
+          >
+            {props.ListHeaderComponent}
+            {props.data.length === 0 ? props.ListEmptyComponent : null}
+            {props.data.map((item, index) => (
+              <React.Fragment key={props.keyExtractor(item, index)}>
+                {props.renderItem({ item, index })}
+              </React.Fragment>
+            ))}
+            {props.ListFooterComponent}
+          </div>
+        </div>
+      );
+    }),
+  };
+});
+
 vi.mock("@/renderer/bridge", () => ({
   isRemoteSession: () => false,
   readBridge: () => mockBridge,
 }));
 
-describe("SubAgentOverlay", () => {
+describe("SubAgentContent", () => {
   beforeEach(() => {
     mockBridge.subagentSubscribe.mockReset().mockResolvedValue({ history: [] });
     mockBridge.subagentUnsubscribe.mockReset().mockResolvedValue(undefined);
@@ -48,18 +101,24 @@ describe("SubAgentOverlay", () => {
       openSubAgentByThread: { [threadId]: parentItem.id },
     });
 
-    render(<SubAgentOverlay threadId={threadId} />);
+    render(
+      <SubAgentContent
+        threadId={threadId}
+        parentItemId={parentItem.id}
+        onClose={() => undefined}
+      />,
+    );
 
-    const dialog = await screen.findByRole("dialog", {
+    const dialog = await screen.findByRole("region", {
       name: "Agent (rubber-duck): Critiquing opencode fix",
     });
-    expect(dialog).toHaveClass("bg-[var(--content-background)]");
+    expect(dialog).toHaveClass("poracode-subagent-surface", "bg-[var(--content-background)]");
     expect(within(dialog).getByText("Working…")).toBeInTheDocument();
 
     const heading = within(dialog).getByRole("heading", {
       name: "Agent (rubber-duck): Critiquing opencode fix",
     });
-    const header = heading.parentElement;
+    const header = heading.parentElement?.parentElement;
     if (!(header instanceof HTMLDivElement)) {
       throw new Error("missing subagent overlay header");
     }
@@ -74,6 +133,52 @@ describe("SubAgentOverlay", () => {
     expect(icons).toHaveLength(2);
     expect(icons[0]).toHaveClass("size-3.5");
     expect(icons[1]).toHaveClass("size-3.5");
+  });
+
+  it("splits a Crossagent name and model selection into a two-line route header", () => {
+    const threadId = "thread-1";
+    const parentItem: RuntimeChatItem = {
+      id: "parent-1",
+      type: "tool_call",
+      state: "started",
+      payload: {
+        name: "dev-spa-rework — Codex · 5.6 Sol · High · Fast",
+        status: "running",
+        isCrossagent: true,
+      } satisfies ToolCallPayload,
+      streams: {},
+    };
+    useAppStore.setState({
+      runtimeItemIdsByThread: { [threadId]: [parentItem.id] },
+      runtimeItemsByIdByThread: { [threadId]: { [parentItem.id]: parentItem } },
+      runtimeStructuralVersionByThread: { [threadId]: 1 },
+    });
+
+    render(<SubAgentHeaderText threadId={threadId} parentItemId={parentItem.id} />);
+
+    expect(screen.getByText("Crossagent: dev-spa-rework")).toHaveClass("text-sm");
+    expect(screen.getByText("Codex · 5.6 Sol · High · Fast")).toHaveClass(
+      "text-[0.6875rem]",
+      "text-foreground-muted",
+    );
+  });
+
+  it("can omit its internal header when the routed shell owns the title", async () => {
+    const threadId = "thread-1";
+    const parentItem = makeSubAgentItem("parent-1");
+    useAppStore.setState({
+      runtimeItemIdsByThread: { [threadId]: [parentItem.id] },
+      runtimeItemsByIdByThread: { [threadId]: { [parentItem.id]: parentItem } },
+      runtimeStructuralVersionByThread: { [threadId]: 1 },
+    });
+
+    render(<SubAgentContent threadId={threadId} parentItemId={parentItem.id} hideHeader />);
+
+    const region = await screen.findByRole("region", {
+      name: "Agent (rubber-duck): Critiquing opencode fix",
+    });
+    expect(within(region).queryByRole("heading")).not.toBeInTheDocument();
+    expect(within(region).getByText("Working…")).toBeInTheDocument();
   });
 
   it("keeps the composer loader without a leading dot or duplicate agent description", () => {
@@ -201,11 +306,11 @@ describe("SubAgentOverlay", () => {
 
     render(
       <AppProvider>
-        <SubAgentOverlay threadId={threadId} />
+        <SubAgentContent threadId={threadId} parentItemId={parentItem.id} />
       </AppProvider>,
     );
 
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await screen.findByRole("region");
     expect(within(dialog).getByText("Inspect the renderer.")).toBeInTheDocument();
     expect(within(dialog).getByText("2 commands")).toBeInTheDocument();
     expect(
@@ -247,15 +352,38 @@ describe("SubAgentOverlay", () => {
 
     render(
       <AppProvider>
-        <SubAgentOverlay threadId={threadId} />
+        <SubAgentContent threadId={threadId} parentItemId={parentItem.id} />
       </AppProvider>,
     );
 
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await screen.findByRole("region");
     expect(within(dialog).getByText("2 commands").closest("button")).toHaveAttribute(
       "aria-expanded",
       "false",
     );
+  });
+
+  it("hands an open target to its host and consumes the transient store signal", async () => {
+    const threadId = "thread-1";
+    const parentItem = makeSubAgentItem("parent-1");
+    const onOpen = vi.fn<(parentItemId: string, projectLocation?: ProjectLocation) => void>();
+    useAppStore.setState({
+      openSubAgentByThread: { [threadId]: parentItem.id },
+    });
+
+    render(
+      <SubAgentOpenController
+        threadId={threadId}
+        projectLocation={{ kind: "posix", path: "/repo" }}
+        onOpen={onOpen}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onOpen).toHaveBeenCalledWith(parentItem.id, { kind: "posix", path: "/repo" });
+    });
+    expect(useAppStore.getState().openSubAgentByThread[threadId]).toBeNull();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
 

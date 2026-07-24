@@ -2120,6 +2120,7 @@ msgstr "Закрити пошук"
 msgid "Close Split"
 msgstr "Закрити розділення"
 
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
 msgid "Close subagent"
 msgstr "Закрити субагент"
@@ -5199,6 +5200,7 @@ msgid "Loading threads"
 msgstr "Завантаження потоків"
 
 #: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/HostFolderPicker.tsx
 #: src/renderer/app.tsx
@@ -6402,7 +6404,7 @@ msgstr "На цьому віддаленому комп’ютері не вст
 msgid "No supported agents detected"
 msgstr "Підтримуваних агентів не виявлено"
 
-#: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "No thread selected"
 msgstr "Потік не вибрано"
@@ -7103,7 +7105,7 @@ msgstr "дозвіл"
 msgid "Pi"
 msgstr "Pi"
 
-#: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "Pick a thread from the list to follow the agent from here."
 msgstr "Виберіть потік зі списку, щоб стежити за агентом звідси."
@@ -9405,6 +9407,8 @@ msgstr "Зберігається на цьому пристрої; на комп
 #~ msgid "Stored on this phone; the desktop keeps its own values."
 #~ msgstr "Збережено на цьому телефоні; десктоп зберігає власні значення."
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
 msgid "Subagent"
 msgstr "Субагент"

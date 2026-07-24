@@ -2120,6 +2120,7 @@ msgstr "Fermer la recherche"
 msgid "Close Split"
 msgstr "Fermer la division"
 
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
 msgid "Close subagent"
 msgstr "Fermer le sous-agent"
@@ -5199,6 +5200,7 @@ msgid "Loading threads"
 msgstr "Chargement des fils"
 
 #: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/HostFolderPicker.tsx
 #: src/renderer/app.tsx
@@ -6401,7 +6403,7 @@ msgstr "Aucun agent compatible n’est installé sur cette machine distante. Ins
 msgid "No supported agents detected"
 msgstr "Aucun agent pris en charge détecté"
 
-#: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "No thread selected"
 msgstr "Aucun fil sélectionné"
@@ -7102,7 +7104,7 @@ msgstr "autorisation"
 msgid "Pi"
 msgstr "Pi"
 
-#: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "Pick a thread from the list to follow the agent from here."
 msgstr "Choisissez un fil dans la liste pour suivre l'agent depuis ici."
@@ -9404,6 +9406,8 @@ msgstr "Enregistré sur cet appareil ; l’ordinateur conserve ses propres valeu
 #~ msgid "Stored on this phone; the desktop keeps its own values."
 #~ msgstr "Stocké sur ce téléphone ; l'ordinateur conserve ses propres valeurs."
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
 msgid "Subagent"
 msgstr "Sous-agent"

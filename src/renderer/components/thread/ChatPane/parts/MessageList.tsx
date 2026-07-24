@@ -69,6 +69,7 @@ interface MessageListProps {
   threadConfig?: ThreadConfig;
   entries: readonly ChatTimelineEntry[];
   isTurnActive?: boolean;
+  markTailAsLive?: boolean;
   setScrollContainer?: (element: HTMLDivElement | null) => void;
   scrollContentRef?: RefObject<HTMLDivElement | null>;
   onContentHeightChange?: () => void;
@@ -78,6 +79,7 @@ interface MessageListProps {
   scrollClassName?: string;
   scrollStyle?: CSSProperties;
   contentClassName?: string;
+  header?: ReactNode;
   footer?: ReactNode;
   emptyContent?: ReactNode;
   onWheelCapture?: WheelEventHandler<HTMLDivElement>;
@@ -125,6 +127,7 @@ export function MessageList({
   threadConfig,
   entries,
   isTurnActive = false,
+  markTailAsLive = true,
   setScrollContainer,
   scrollContentRef,
   onContentHeightChange,
@@ -134,6 +137,7 @@ export function MessageList({
   scrollClassName,
   scrollStyle,
   contentClassName,
+  header,
   footer,
   emptyContent,
   onWheelCapture,
@@ -294,13 +298,21 @@ export function MessageList({
   const remeasureRowElement = useCallback(
     (itemKey: string, element: HTMLDivElement | null, liveStreamGrowth = false) => {
       if (!element) return;
+      const height = element.offsetHeight;
+      // A streamed store delta and the live-row ResizeObserver can report the
+      // same painted size in either order. Let the first path update LegendList
+      // and make the second a no-op instead of starting a redundant anchor /
+      // scroll reconciliation cycle.
+      if (liveStreamGrowth && listRef.current?.getState().sizes.get(itemKey) === height) {
+        return;
+      }
       if (liveStreamGrowth) {
         onLiveVirtualizerLayoutChange?.();
       } else {
         onVirtualizerLayoutChange?.();
       }
       listRef.current?.setItemSize(itemKey, {
-        height: element.offsetHeight,
+        height,
         width: element.offsetWidth,
       });
     },
@@ -399,7 +411,7 @@ export function MessageList({
         dataKey={threadId}
         drawDistance={CHAT_TRANSCRIPT_DRAW_DISTANCE_PX}
         estimatedItemSize={DEFAULT_ROW_ESTIMATE_PX}
-        extraData={`${lastLiveIndex}:${isTurnActive}:${suppressInlineTurnAnchorId ?? ""}:${canRevertCheckpoints}`}
+        extraData={`${lastLiveIndex}:${isTurnActive}:${markTailAsLive}:${suppressInlineTurnAnchorId ?? ""}:${canRevertCheckpoints}`}
         getFixedItemSize={(entry) =>
           getFixedTimelineEntrySize(entry, threadId, scrollElementRef.current?.clientWidth)
         }
@@ -427,7 +439,7 @@ export function MessageList({
             threadId={threadId}
             entry={entry}
             index={index}
-            isLastEntry={index === lastLiveIndex}
+            isLastEntry={markTailAsLive && index === lastLiveIndex}
             isTurnActive={isTurnActive}
             remeasureElement={remeasureRowElement}
             {...(onVirtualizerLayoutChange ? { onVirtualizerLayoutChange } : {})}
@@ -436,6 +448,7 @@ export function MessageList({
             onRequestRevert={requestRevert}
           />
         )}
+        {...(header ? { ListHeaderComponent: <>{header}</> } : {})}
         {...(!hasItems && emptyContent ? { ListEmptyComponent: <>{emptyContent}</> } : {})}
         {...(footer ? { ListFooterComponent: <div className="pb-2">{footer}</div> } : {})}
         {...(scrollClassName ? { className: scrollClassName } : {})}
@@ -537,6 +550,30 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
       },
     );
   }, [entry, isLastEntry, scheduleLiveMeasure, threadId]);
+  useLayoutEffect(() => {
+    const element = rowElementRef.current;
+    if (!isLastEntry || !element) return;
+
+    let previousHeight = element.offsetHeight;
+    let previousWidth = element.offsetWidth;
+    const observer = new ResizeObserver(() => {
+      const nextHeight = element.offsetHeight;
+      const nextWidth = element.offsetWidth;
+      if (nextHeight === previousHeight && nextWidth === previousWidth) return;
+      previousHeight = nextHeight;
+      previousWidth = nextWidth;
+      // The smoothed Markdown renderer can grow between provider deltas. Its
+      // actual DOM resize is the earliest reliable signal and ResizeObserver
+      // runs after layout but before paint, so measure LegendList here instead
+      // of letting the tail paint below the reserved composer/safe-area band
+      // until the next stream event or animation frame catches up. Observe the
+      // single tail row through turn completion as well: the final unsmoothed
+      // text commit can land in the same update that marks the turn inactive.
+      remeasureElement(entry.id, element, true);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [entry.id, isLastEntry, remeasureElement]);
   useLayoutEffect(
     () => () => {
       if (liveMeasureRafRef.current !== null) {

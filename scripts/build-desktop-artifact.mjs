@@ -42,7 +42,6 @@ const { supportEmail } = requireFromHere("../branding/contact.json");
 const RUNTIME_DEPS = [
   "@agentclientprotocol/sdk",
   "@anthropic-ai/claude-agent-sdk",
-  "@earendil-works/pi-coding-agent",
   "@modelcontextprotocol/sdk",
   "@opencode-ai/sdk",
   "@sentry/electron",
@@ -197,10 +196,18 @@ function validateRuntimeDeps() {
   const emittedExternals = scanRuntimeExternals(repoRoot);
   const staged = new Set(RUNTIME_DEPS);
   const missing = emittedExternals.filter((name) => !staged.has(name));
-  if (missing.length > 0) {
+  const emitted = new Set(emittedExternals);
+  const stale = RUNTIME_DEPS.filter((name) => !emitted.has(name));
+  if (missing.length > 0 || stale.length > 0) {
+    const details = [
+      missing.length > 0 ? `missing from RUNTIME_DEPS: ${missing.join(", ")}` : "",
+      stale.length > 0 ? `not present in bundled output: ${stale.join(", ")}` : "",
+    ]
+      .filter(Boolean)
+      .join("; ");
     throw new Error(
-      `Bundled output requires unstaged runtime dependencies: ${missing.join(", ")}. ` +
-        "Update RUNTIME_DEPS before packaging.",
+      `Runtime dependency staging is out of sync (${details}). ` +
+        "Regenerate RUNTIME_DEPS with scripts/scan-runtime-externals.mjs before packaging.",
     );
   }
   console.log(`[stage] validated ${emittedExternals.length} emitted runtime dependencies`);
@@ -305,6 +312,7 @@ async function main() {
   const arch = args.arch;
   const target = args.target; // optional, e.g. dmg/zip/nsis/AppImage/deb
   const skipBuild = Boolean(args["skip-build"]);
+  const checkRuntimeDeps = Boolean(args["check-runtime-deps"]);
   const publish = args.publish ?? "never";
   const outputDir = resolve(repoRoot, args["output-dir"] ?? "release");
   const keepStage = Boolean(args["keep-stage"]);
@@ -323,6 +331,9 @@ async function main() {
   // Fail before the expensive clean install/rebuild if tsdown emitted a new
   // external that the curated staging package would otherwise omit.
   validateRuntimeDeps();
+  if (checkRuntimeDeps) {
+    return;
+  }
 
   // 2. Create the stage in tmp (outside the pnpm workspace).
   const stageRoot = mkdtempSync(join(tmpdir(), "poracode-stage-"));

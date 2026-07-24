@@ -95,6 +95,8 @@ export function screenStateTransition(type: "push" | "pop", update: () => void):
 
 /** Extract the selected thread from its detail or project-tool pathname. */
 export function threadIdFromPath(pathname: string): string | null {
+  const subAgentMatch = /^\/subagent\/([^/]+)\/[^/]+$/.exec(pathname);
+  if (subAgentMatch?.[1]) return decodeURIComponent(subAgentMatch[1]);
   const match = /^\/(?:thread|workspace|notes)\/(.+)$/.exec(pathname);
   return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
@@ -124,6 +126,7 @@ export function isFullscreenScreenPath(path: string): boolean {
 }
 
 export function screenDepth(path: string): number {
+  if (path.startsWith("/subagent/")) return 2;
   if (path.startsWith("/thread/")) return 1;
   if (isFullscreenScreenPath(path)) return 2;
   // A desktop-syncing section is pushed from the Desktop Settings list (depth
@@ -198,13 +201,14 @@ export function buildGitTarget(remote: RemoteSession, threadId: string): GitTarg
   if (worktreePath) {
     return {
       project,
+      threadId,
       statusKey: worktreePath,
       worktreePath,
       worktreeBranch: summary?.branch,
       locationOverride: buildWorktreeLocation(project.location, worktreePath),
     };
   }
-  return { project };
+  return { project, threadId };
 }
 
 /** Resolve the project/worktree root the file tree should browse for a thread. */

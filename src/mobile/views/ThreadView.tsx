@@ -13,7 +13,7 @@ import { resolveProjectLocation } from "@/shared/worktree";
 import { friendlyError } from "@/shared/messages";
 import { readBridge } from "@/renderer/bridge";
 import type { XTermSurfaceHandle } from "@/renderer/components/terminal/XTermSurface";
-import { SubAgentOverlay } from "@/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay";
+import { SubAgentOpenController } from "@/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay";
 import { GuiThreadContent } from "@/renderer/components/thread/ThreadContent";
 import { ThreadComposerSection } from "@/renderer/components/thread/ThreadComposerSection";
 import {
@@ -55,6 +55,7 @@ export interface ThreadViewProps {
   readonly loading?: boolean;
   readonly onThreadAction: (action: ThreadAction) => void;
   readonly onSubmitInput: (prompt: string, segments?: PromptSegment[]) => Promise<void>;
+  readonly onOpenSubAgent?: ((parentItemId: string) => void) | undefined;
   /** Open the unified workspace panel (Changes/Files) for this thread. */
   readonly onOpenWorkspace?: (tab: WorkspaceTab) => void;
   /** Open a project/worktree file from a shared chat file chip. */
@@ -256,6 +257,9 @@ export function ThreadView(props: ThreadViewProps) {
       ? { onRevealProjectFolderInTree: props.onOpenWorkspaceFolder }
       : {}),
     canShowProjectEntryInExplorer: false,
+    ...(props.onOpenSubAgent
+      ? { onOpenSubAgent: (parentItemId: string) => props.onOpenSubAgent?.(parentItemId) }
+      : {}),
   };
   const showComposerDock = thread.status !== "launching" || !isTerminal;
   const terminalPageKeyboardOffset = isTerminal && composerInputFocused ? 0 : keyboardOffset;
@@ -357,7 +361,13 @@ export function ThreadView(props: ThreadViewProps) {
                   <TerminalAccessory terminalId={thread.id} onReload={reloadTerminal} />
                 </div>
               )}
-              <SubAgentOverlay threadId={thread.id} projectLocation={projectLocation} />
+              {props.onOpenSubAgent ? (
+                <SubAgentOpenController
+                  threadId={thread.id}
+                  projectLocation={projectLocation}
+                  onOpen={(parentItemId) => props.onOpenSubAgent?.(parentItemId)}
+                />
+              ) : null}
             </>
           ) : props.loading ? null : (
             // PWA history arrives after the routed thread shell mounts. Wait

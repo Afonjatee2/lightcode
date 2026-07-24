@@ -5,6 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   LIGHTWEIGHT_THREAD_LIST_POP_ANIMATION,
   LIGHTWEIGHT_THREAD_LIST_POP_CLASS,
+  LIGHTWEIGHT_SUBAGENT_PUSH_ANIMATION,
+  LIGHTWEIGHT_SUBAGENT_PUSH_CLASS,
+  LIGHTWEIGHT_SUBAGENT_POP_ANIMATION,
+  LIGHTWEIGHT_SUBAGENT_POP_CLASS,
 } from "./lightweightThreadListPop";
 import { useLightweightThreadListPop } from "./useLightweightThreadListPop";
 
@@ -80,5 +84,35 @@ describe("useLightweightThreadListPop", () => {
     const view = render(<Harness pathname="/thread/long" />);
     view.rerender(<Harness pathname="/threads" />);
     expect(view.getByTestId("shell")).not.toHaveClass(LIGHTWEIGHT_THREAD_LIST_POP_CLASS);
+  });
+
+  it("animates only the lightweight subagent layer on a thread-to-subagent commit", () => {
+    const view = render(<Harness pathname="/thread/thread-1" />);
+    const shell = view.getByTestId("shell");
+
+    view.rerender(<Harness pathname="/subagent/thread-1/parent-1" />);
+    expect(shell).toHaveClass(LIGHTWEIGHT_SUBAGENT_PUSH_CLASS);
+
+    const animationEnd = new Event("animationend", { bubbles: true });
+    Object.defineProperty(animationEnd, "animationName", {
+      value: LIGHTWEIGHT_SUBAGENT_PUSH_ANIMATION,
+    });
+    fireEvent(shell, animationEnd);
+    expect(shell).not.toHaveClass(LIGHTWEIGHT_SUBAGENT_PUSH_CLASS);
+  });
+
+  it("animates only the mounted parent shell on a subagent-to-thread commit", () => {
+    const view = render(<Harness pathname="/subagent/thread-1/parent-1" />);
+    const shell = view.getByTestId("shell");
+
+    view.rerender(<Harness pathname="/thread/thread-1" />);
+    expect(shell).toHaveClass(LIGHTWEIGHT_SUBAGENT_POP_CLASS);
+
+    const animationEnd = new Event("animationend", { bubbles: true });
+    Object.defineProperty(animationEnd, "animationName", {
+      value: LIGHTWEIGHT_SUBAGENT_POP_ANIMATION,
+    });
+    fireEvent(shell, animationEnd);
+    expect(shell).not.toHaveClass(LIGHTWEIGHT_SUBAGENT_POP_CLASS);
   });
 });

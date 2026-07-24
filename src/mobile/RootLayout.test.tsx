@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { StrictMode, type ReactNode } from "react";
+import { StrictMode, useEffect, type ReactNode } from "react";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -16,9 +16,12 @@ const routerMock = vi.hoisted(() => ({
   navigate: vi.fn<(options: unknown) => void>(),
   pathname: "/threads",
   pendingPathname: null as string | null,
+  historyBack: vi.fn<() => void>(),
+  canGoBack: true,
 }));
 
 const mediaMock = vi.hoisted(() => ({ isWide: false, rightPanel: false }));
+const threadDetailMock = vi.hoisted(() => ({ mounts: 0 }));
 
 const remoteMock = vi.hoisted(() => ({
   session: {
@@ -70,6 +73,12 @@ const remoteMock = vi.hoisted(() => ({
 vi.mock("@tanstack/react-router", () => ({
   Outlet: () => <div data-testid="outlet" />,
   useNavigate: () => routerMock.navigate,
+  useRouter: () => ({
+    history: {
+      back: routerMock.historyBack,
+      canGoBack: () => routerMock.canGoBack,
+    },
+  }),
   useRouterState: ({
     select,
   }: {
@@ -174,6 +183,15 @@ vi.mock("./useRemoteDesktop", () => ({
   useRemoteDesktop: () => remoteMock.session,
 }));
 
+vi.mock("./ThreadDetail", () => ({
+  ThreadDetail: (props: { thread: { id: string } | null }) => {
+    useEffect(() => {
+      threadDetailMock.mounts += 1;
+    }, []);
+    return <div data-testid="persistent-thread-detail" data-thread-id={props.thread?.id} />;
+  },
+}));
+
 vi.mock("./views/ThreadsView", () => ({
   ThreadsView: (props: { emptyStateOverride?: ReactNode }) => (
     <div data-testid="threads-view">{props.emptyStateOverride}</div>
@@ -187,8 +205,11 @@ describe("mobile RootLayout", () => {
     routerMock.navigate.mockReset();
     routerMock.pathname = "/threads";
     routerMock.pendingPathname = null;
+    routerMock.historyBack.mockReset();
+    routerMock.canGoBack = true;
     mediaMock.isWide = false;
     mediaMock.rightPanel = false;
+    threadDetailMock.mounts = 0;
     remoteMock.session.connection = "online";
     remoteMock.session.desktops = [{ id: "desktop-1", label: "Poracode on Mac" }];
     remoteMock.session.activeDesktop = { id: "desktop-1", label: "Poracode on Mac" };
@@ -199,7 +220,13 @@ describe("mobile RootLayout", () => {
       gitOverlayOpen: false,
       prReviewContext: null,
     });
-    useDesktopPanelStore.setState({ open: false, activeTab: "files", threadId: null });
+    useDesktopPanelStore.setState({
+      open: false,
+      activeTab: "files",
+      threadId: null,
+      subAgentThreadId: null,
+      subAgentParentItemId: null,
+    });
     useFileEditorStore.getState().clearSession();
   });
 
@@ -225,6 +252,40 @@ describe("mobile RootLayout", () => {
     expect(routerMock.navigate).toHaveBeenCalledWith({ to: "/desktops" });
     fireEvent.click(screen.getByText("Settings"));
     expect(routerMock.navigate).toHaveBeenCalledWith({ to: "/settings" });
+  });
+
+  it("uses real browser history when leaving a routed subagent page", () => {
+    routerMock.pathname = "/subagent/thread-1/parent-1";
+
+    const { container } = render(<RootLayout />);
+
+    expect(container.querySelector(".m-shell")).toHaveAttribute("data-chrome", "subagent");
+    expect(screen.getByText("Subagent")).toBeInTheDocument();
+    fireEvent.click(container.querySelector(".m-back")!);
+    expect(routerMock.historyBack).toHaveBeenCalledTimes(1);
+    expect(routerMock.navigate).not.toHaveBeenCalled();
+  });
+
+  it("keeps the parent thread mounted while the routed subagent page covers it", () => {
+    routerMock.pathname = "/thread/thread-1";
+    const view = render(<RootLayout />);
+
+    expect(screen.getByTestId("persistent-thread-detail")).toHaveAttribute(
+      "data-thread-id",
+      "thread-1",
+    );
+    expect(threadDetailMock.mounts).toBe(1);
+
+    routerMock.pathname = "/subagent/thread-1/parent-1";
+    view.rerender(<RootLayout />);
+    expect(screen.getByTestId("persistent-thread-detail").parentElement).toHaveAttribute(
+      "data-covered",
+      "true",
+    );
+
+    routerMock.pathname = "/thread/thread-1";
+    view.rerender(<RootLayout />);
+    expect(threadDetailMock.mounts).toBe(1);
   });
 
   it("keeps the disconnected icon hidden until a desktop is active", () => {

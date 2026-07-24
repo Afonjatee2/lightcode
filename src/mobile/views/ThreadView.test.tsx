@@ -231,9 +231,10 @@ describe("mobile ThreadView", () => {
     expect(useAppStore.getState().pendingComposerFocusThreadId).toBe(nextThread.id);
   });
 
-  it("mounts the subagent overlay for terminal threads", async () => {
+  it("hands terminal subagents to the routed host instead of mounting an overlay", async () => {
     const thread = makeTerminalThread();
     const parentItem = makeSubAgentItem("agent-1");
+    const onOpenSubAgent = vi.fn<(parentItemId: string) => void>();
 
     useAppStore.setState({
       runtimeItemIdsByThread: { [thread.id]: [parentItem.id] },
@@ -252,18 +253,16 @@ describe("mobile ThreadView", () => {
         terminalScrollback=""
         onThreadAction={() => undefined}
         onSubmitInput={() => Promise.resolve()}
+        onOpenSubAgent={onOpenSubAgent}
       />,
     );
 
-    expect(
-      await screen.findByRole("dialog", {
-        name: "Agent (rubber-duck): Checking mobile parity",
-      }),
-    ).toBeInTheDocument();
-    expect(bridgeMock.subagentSubscribe).toHaveBeenCalledWith({
-      threadId: thread.id,
-      parentItemId: parentItem.id,
+    await waitFor(() => {
+      expect(onOpenSubAgent).toHaveBeenCalledWith(parentItem.id);
     });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(bridgeMock.subagentSubscribe).not.toHaveBeenCalled();
+    expect(useAppStore.getState().openSubAgentByThread[thread.id]).toBeNull();
   });
 
   it("reports failed terminal thread reloads", async () => {

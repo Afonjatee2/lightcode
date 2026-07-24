@@ -4,69 +4,72 @@ import { Bot, X } from "lucide-react";
 import type { ProjectLocation, ToolCallPayload } from "@/shared/contracts";
 import { PixelLoader } from "@/renderer/components/common/PixelLoader";
 import { readBridge } from "@/renderer/bridge";
-import { OverlayShell } from "@/renderer/components/layout/OverlayShell";
 import { useAppStore } from "@/renderer/state/appStore";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { getRuntimeItemPayload } from "@/renderer/state/slices/runtimeEventSlice";
+import { guiChatFontCssVars } from "../../chatFontVars";
 import {
   getChildTimelineEntriesStoreSelector,
   getRuntimeItemStoreSelector,
   type ChatTimelineEntry,
 } from "../../chatPaneSelectors";
-import { ChatItemRow } from "./ChatItemRow";
+import { MessageList } from "../MessageList";
+import { buildSubAgentProgressParts } from "./subAgentProgressMeta";
 import { deriveToolDisplay, isCrossagentTool, isWorkflowTool } from "./toolDisplay";
-import { useStickToBottom } from "./useStickToBottom";
 import { WorkflowOverlayBody } from "./WorkflowOverlayBody";
 import { parseWorkflowInfo, type WorkflowInfo } from "./workflowDisplay";
 
-interface SubAgentOverlayProps {
+interface SubAgentOpenControllerProps {
   threadId: string;
   projectLocation?: ProjectLocation;
+  onOpen: (parentItemId: string, projectLocation: ProjectLocation | undefined) => void;
 }
 
-export function SubAgentOverlay({ threadId, projectLocation }: SubAgentOverlayProps) {
+/**
+ * Consumes the provider-agnostic "open subagent" signal and hands the target to
+ * the active host. Desktop opens a temporary right-panel tab; mobile routes to
+ * a history-backed page. Keeping presentation out of the tool rows means child
+ * and active-agent entry points stay identical across hosts.
+ */
+export function SubAgentOpenController({
+  threadId,
+  projectLocation,
+  onOpen,
+}: SubAgentOpenControllerProps) {
   const openParentItemId = useAppStore((s) => s.openSubAgentByThread[threadId] ?? null);
   const closeSubAgent = useAppStore((s) => s.closeSubAgent);
+  const handledParentItemIdRef = useRef<string | null>(null);
 
-  // Keep the body rendered through the fade-out by remembering the last
-  // non-null parent id; cleared once the OverlayShell finishes its exit.
-  const lastParentRef = useRef<string | null>(null);
-  if (openParentItemId) lastParentRef.current = openParentItemId;
-  const renderingParentItemId = lastParentRef.current;
+  useEffect(() => {
+    if (!openParentItemId) {
+      handledParentItemIdRef.current = null;
+      return;
+    }
+    if (handledParentItemIdRef.current === openParentItemId) return;
+    handledParentItemIdRef.current = openParentItemId;
+    onOpen(openParentItemId, projectLocation);
+    closeSubAgent(threadId);
+  }, [closeSubAgent, onOpen, openParentItemId, projectLocation, threadId]);
 
-  if (!renderingParentItemId) return null;
-
-  return (
-    <OverlayShell
-      mode="absolute"
-      open={openParentItemId !== null}
-      onExited={() => {
-        lastParentRef.current = null;
-        closeSubAgent(threadId);
-      }}
-    >
-      <SubAgentOverlayBody
-        threadId={threadId}
-        parentItemId={renderingParentItemId}
-        onClose={() => closeSubAgent(threadId)}
-        projectLocation={projectLocation}
-      />
-    </OverlayShell>
-  );
+  return null;
 }
 
-interface SubAgentOverlayBodyProps {
+interface SubAgentContentProps {
   threadId: string;
   parentItemId: string;
-  onClose: () => void;
-  projectLocation: ProjectLocation | undefined;
+  onClose?: () => void;
+  projectLocation?: ProjectLocation;
+  hideHeader?: boolean;
 }
 
-function SubAgentOverlayBody({
+/** Shared live subagent content rendered by routed mobile pages and right panels. */
+export function SubAgentContent({
   threadId,
   parentItemId,
   onClose,
   projectLocation,
-}: SubAgentOverlayBodyProps) {
+  hideHeader = false,
+}: SubAgentContentProps) {
   const { t } = useLingui();
   const item = useAppStore(getRuntimeItemStoreSelector(threadId, parentItemId));
   const childEntries = useAppStore(getChildTimelineEntriesStoreSelector(threadId, parentItemId));
@@ -100,7 +103,7 @@ function SubAgentOverlayBody({
 
   if (!item) {
     return (
-      <Shell title={t`Subagent`} onClose={onClose}>
+      <Shell title={t`Subagent`} hideHeader={hideHeader} {...(onClose ? { onClose } : {})}>
         <p className="px-3 py-4 text-sm text-foreground-muted">
           <Trans>Subagent not found.</Trans>
         </p>
@@ -112,7 +115,12 @@ function SubAgentOverlayBody({
   const isCrossagent = isCrossagentTool(payload);
   const display = payload ? deriveToolDisplay(payload) : null;
   const Icon = display?.Icon ?? Bot;
-  const title = display?.title ?? (isCrossagent ? t`Crossagent` : t`Subagent`);
+  const header = resolveSubAgentHeader(
+    display?.title ?? (isCrossagent ? t`Crossagent` : t`Subagent`),
+    payload,
+    isCrossagent,
+    t`Crossagent`,
+  );
   const isRunning = item.state !== "completed" || payload?.status === "running";
   const workflow = payload && isWorkflowTool(payload) ? parseWorkflowInfo(payload) : null;
   const workflowProgress: WorkflowOverlayProgress | null = workflow
@@ -129,11 +137,13 @@ function SubAgentOverlayBody({
   const renderWorkflow = !!(workflow && workflow.manifestPath);
   return (
     <Shell
-      title={title}
+      title={header.title}
+      {...(header.description ? { description: header.description } : {})}
       icon={<Icon className="size-3.5 shrink-0 text-[color:var(--muted)]" />}
-      onClose={onClose}
+      {...(onClose ? { onClose } : {})}
       closeLabel={isCrossagent ? t`Close Crossagent` : t`Close subagent`}
       hideTitleBorder={renderWorkflow}
+      hideHeader={hideHeader}
     >
       {renderWorkflow ? (
         <WorkflowOverlayBody
@@ -155,6 +165,83 @@ function SubAgentOverlayBody({
   );
 }
 
+export function SubAgentHeaderText({
+  threadId,
+  parentItemId,
+  compact = false,
+  part = "all",
+}: {
+  threadId: string;
+  parentItemId: string;
+  compact?: boolean;
+  part?: "all" | "title" | "description";
+}) {
+  const { t } = useLingui();
+  const item = useAppStore(getRuntimeItemStoreSelector(threadId, parentItemId));
+  const payload = item ? getRuntimeItemPayload<ToolCallPayload>(item, "tool_call") : undefined;
+  const isCrossagent = isCrossagentTool(payload);
+  const display = payload ? deriveToolDisplay(payload) : null;
+  const header = resolveSubAgentHeader(
+    display?.title ?? (isCrossagent ? t`Crossagent` : t`Subagent`),
+    payload,
+    isCrossagent,
+    t`Crossagent`,
+  );
+  const title = (
+    <span
+      className={`block truncate font-medium leading-tight text-foreground ${
+        compact ? "text-[0.6875rem]" : "text-sm"
+      }`}
+    >
+      {header.title}
+    </span>
+  );
+  const description = header.description ? (
+    <span
+      className={`block truncate leading-tight text-foreground-muted ${
+        compact ? "text-[0.5625rem]" : "text-[0.6875rem]"
+      }`}
+    >
+      {header.description}
+    </span>
+  ) : null;
+
+  if (part === "title") return title;
+  if (part === "description") return description;
+
+  return (
+    <span className="poracode-subagent-header-text flex min-w-0 flex-1 flex-col justify-center">
+      {title}
+      {description}
+    </span>
+  );
+}
+
+function resolveSubAgentHeader(
+  fullTitle: string,
+  payload: ToolCallPayload | undefined,
+  isCrossagent: boolean,
+  crossagentLabel: string,
+): { title: string; description?: string } {
+  const separator = " — ";
+  const separatorIndex = fullTitle.indexOf(separator);
+  if (separatorIndex > 0) {
+    const title = fullTitle.slice(0, separatorIndex).trim();
+    const description = fullTitle.slice(separatorIndex + separator.length).trim();
+    if (title && description) return { title, description };
+  }
+
+  if (isCrossagent && payload?.name.includes(" · ")) {
+    return { title: crossagentLabel, description: payload.name };
+  }
+
+  const description = buildSubAgentProgressParts({ progress: payload?.progress })
+    .filter((part) => part.kind === "model" || part.kind === "effort")
+    .map((part) => part.label)
+    .join(" · ");
+  return description ? { title: fullTitle, description } : { title: fullTitle };
+}
+
 interface WorkflowOverlayProgress {
   description?: string;
   lastToolName?: string;
@@ -164,15 +251,18 @@ interface WorkflowOverlayProgress {
 
 function Shell({
   title,
+  description,
   icon,
   onClose,
   closeLabel,
   children,
   hideTitleBorder = false,
+  hideHeader = false,
 }: {
   title: string;
+  description?: string;
   icon?: ReactNode;
-  onClose: () => void;
+  onClose?: () => void;
   closeLabel?: string;
   children: ReactNode;
   /**
@@ -181,37 +271,47 @@ function Shell({
    * dividers stacking next to each other.
    */
   hideTitleBorder?: boolean;
+  hideHeader?: boolean;
 }) {
   const { t } = useLingui();
   const titleId = useId();
+  const guiChatFontSize = useSharedSettings((state) => state.guiChatFontSize);
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      className="flex h-full min-h-0 flex-col bg-[var(--content-background)]"
+      role="region"
+      {...(hideHeader ? { "aria-label": title } : { "aria-labelledby": titleId })}
+      className="poracode-subagent-surface flex h-full min-h-0 flex-col bg-[var(--content-background)] text-[length:var(--lc-chat-font-size)]"
+      style={guiChatFontCssVars(guiChatFontSize)}
     >
-      <div
-        className={`flex shrink-0 items-center gap-2 px-2 py-1 ${
-          hideTitleBorder ? "" : "border-b border-[color:var(--border)]"
-        }`}
-      >
-        {icon ?? <Bot className="size-3.5 shrink-0 text-[color:var(--muted)]" />}
-        <h2
-          id={titleId}
-          className="min-w-0 flex-1 truncate text-sm font-medium leading-tight text-foreground"
+      {hideHeader ? null : (
+        <div
+          className={`flex shrink-0 items-center gap-2 px-2 py-1 ${
+            hideTitleBorder ? "" : "border-b border-[color:var(--border)]"
+          }`}
         >
-          {title}
-        </h2>
-        <button
-          type="button"
-          aria-label={closeLabel ?? t`Close subagent`}
-          className="shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
-          onClick={onClose}
-        >
-          <X className="size-3.5" />
-        </button>
-      </div>
+          {icon ?? <Bot className="size-3.5 shrink-0 text-[color:var(--muted)]" />}
+          <span className="flex min-w-0 flex-1 flex-col justify-center">
+            <h2 id={titleId} className="truncate text-sm font-medium leading-tight text-foreground">
+              {title}
+            </h2>
+            {description ? (
+              <span className="truncate text-[0.6875rem] leading-tight text-foreground-muted">
+                {description}
+              </span>
+            ) : null}
+          </span>
+          {onClose ? (
+            <button
+              type="button"
+              aria-label={closeLabel ?? t`Close subagent`}
+              className="shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
+              onClick={onClose}
+            >
+              <X className="size-3.5" />
+            </button>
+          ) : null}
+        </div>
+      )}
       {children}
     </div>
   );
@@ -230,37 +330,28 @@ function ChildList({
   workflow: WorkflowInfo | null;
   workflowProgress: WorkflowOverlayProgress | null;
 }) {
-  // Pin to bottom on first paint so opening the overlay lands on the latest
-  // child step rather than the start of the trail.
-  const { scrollRef, contentRef } = useStickToBottom({ enabled: stickToBottom });
-
   return (
-    <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
-      <div ref={contentRef} className="flex flex-col gap-1.5 px-3 py-3">
-        {workflow ? (
-          <WorkflowOverlayHeader workflow={workflow} progress={workflowProgress} />
-        ) : null}
-        {entries.length === 0 ? (
-          workflow ? (
-            <WorkflowEmptyState progress={workflowProgress} />
-          ) : (
-            <p className="text-sm text-foreground-muted">
-              <Trans>Working…</Trans>
-            </p>
-          )
+    <MessageList
+      threadId={threadId}
+      entries={entries}
+      isTurnActive={stickToBottom}
+      markTailAsLive={stickToBottom}
+      canRevertCheckpoints={false}
+      scrollClassName="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
+      contentClassName="poracode-subagent-list-content min-h-full px-3 pt-3"
+      header={
+        workflow ? <WorkflowOverlayHeader workflow={workflow} progress={workflowProgress} /> : null
+      }
+      emptyContent={
+        workflow ? (
+          <WorkflowEmptyState progress={workflowProgress} />
         ) : (
-          entries.map((entry, index) => (
-            <ChatItemRow
-              key={entry.id}
-              threadId={threadId}
-              entry={entry}
-              isLastEntry={stickToBottom && index === entries.length - 1}
-              checkpointRevert={null}
-            />
-          ))
-        )}
-      </div>
-    </div>
+          <p className="text-sm text-foreground-muted">
+            <Trans>Working…</Trans>
+          </p>
+        )
+      }
+    />
   );
 }
 

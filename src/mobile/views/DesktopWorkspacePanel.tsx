@@ -26,6 +26,11 @@ import { showTerminalPanel } from "@/renderer/actions/terminalActions";
 import { useProjectTreeStore } from "@/renderer/state/projectTreeStore";
 import { buildFileEditorContext, openFileInEditor } from "@/renderer/utils/gitHelpers";
 import { ProjectFilesPanel } from "@/renderer/views/FileEditorOverlay/parts/ProjectFilesPanel";
+import {
+  SubAgentContent,
+  SubAgentHeaderText,
+} from "@/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay";
+import { useAppStore } from "@/renderer/state/appStore";
 import { GitReviewPanelContent } from "@/renderer/views/MainView/parts/RightPanel/parts/GitReviewPanelContent";
 import { DevTerminalPanel } from "@/renderer/views/MainView/parts/RightPanel/parts/DevTerminalPanel/DevTerminalPanel";
 import { NotesPanel } from "@/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/NotesPanel";
@@ -62,7 +67,8 @@ function isDesktopPanelTab(tab: RightPanelTab): tab is DesktopPanelTab {
     tab === "terminal" ||
     tab === "usage" ||
     tab === "notes" ||
-    tab === "ports"
+    tab === "ports" ||
+    tab === "subagent"
   );
 }
 
@@ -92,6 +98,8 @@ export function DesktopWorkspacePanel(props: {
   const initialFolderPath = useDesktopPanelStore((state) => state.initialFolderPath);
   const initialLineNumber = useDesktopPanelStore((state) => state.initialLineNumber);
   const openRequestKey = useDesktopPanelStore((state) => state.openRequestKey);
+  const subAgentThreadId = useDesktopPanelStore((state) => state.subAgentThreadId);
+  const subAgentParentItemId = useDesktopPanelStore((state) => state.subAgentParentItemId);
   const threadId = storedThreadId ?? currentThreadId;
   const thread = remote.threads.find((entry) => entry.id === threadId) ?? null;
   const project = thread
@@ -103,6 +111,19 @@ export function DesktopWorkspacePanel(props: {
     threadId ? state.byThread[threadId]?.isRepo === true : false,
   );
   const filesTarget = threadId ? buildFilesTarget(remote, threadId) : null;
+  const subAgentItemExists = useAppStore((state) =>
+    subAgentThreadId && subAgentParentItemId
+      ? state.runtimeItemsByIdByThread[subAgentThreadId]?.[subAgentParentItemId] !== undefined
+      : false,
+  );
+  const subAgentInCurrentThread =
+    subAgentThreadId !== null &&
+    subAgentParentItemId !== null &&
+    subAgentThreadId === currentThreadId &&
+    subAgentItemExists;
+  const subAgentTarget = subAgentInCurrentThread
+    ? buildFilesTarget(remote, subAgentThreadId)
+    : null;
   const gitTarget = threadId && isRepo ? buildGitTarget(remote, threadId) : null;
   const filesRootContext = filesTarget
     ? buildFileEditorContext(filesTarget.project, filesTarget.worktreePath, thread?.worktreeBranch)
@@ -114,7 +135,12 @@ export function DesktopWorkspacePanel(props: {
           ...(filesTarget.worktreePath ? { worktreePath: filesTarget.worktreePath } : {}),
         }
       : null;
-  const visibleTab = activeTab === "git" && !gitTarget ? "files" : activeTab;
+  const visibleTab =
+    activeTab === "git" && !gitTarget
+      ? "files"
+      : activeTab === "subagent" && !subAgentInCurrentThread
+        ? "files"
+        : activeTab;
   const projectId = filesTarget?.project.id ?? null;
   const worktreePath = filesTarget?.worktreePath;
   const worktreeBranch = thread?.worktreeBranch;
@@ -311,6 +337,8 @@ export function DesktopWorkspacePanel(props: {
         return t`Notes`;
       case "ports":
         return t`Ports`;
+      case "subagent":
+        return t`Subagent`;
     }
   }
 
@@ -319,7 +347,9 @@ export function DesktopWorkspacePanel(props: {
       ? t`Usage`
       : visibleTab === "ports"
         ? t`Ports`
-        : (filesTarget?.rootLabel ?? undefined);
+        : visibleTab === "subagent"
+          ? undefined
+          : (filesTarget?.rootLabel ?? undefined);
 
   return (
     <div ref={toolsRef} className="m-desktop-tools">
@@ -349,7 +379,11 @@ export function DesktopWorkspacePanel(props: {
               <UnifiedRightPanel
                 activeTab={visibleTab}
                 onTabChange={(tab) => {
-                  if (isDesktopPanelTab(tab) && (tab !== "git" || gitTarget)) {
+                  if (
+                    isDesktopPanelTab(tab) &&
+                    (tab !== "git" || gitTarget) &&
+                    (tab !== "subagent" || subAgentInCurrentThread)
+                  ) {
                     useDesktopPanelStore.getState().setActiveTab(tab);
                   }
                 }}
@@ -398,6 +432,19 @@ export function DesktopWorkspacePanel(props: {
                   ) : null
                 }
                 portsContent={openedTabs.has("ports") ? <PortsView /> : null}
+                subagentContent={
+                  openedTabs.has("subagent") && subAgentInCurrentThread ? (
+                    <SubAgentContent
+                      key={`${subAgentThreadId}:${subAgentParentItemId}`}
+                      threadId={subAgentThreadId}
+                      parentItemId={subAgentParentItemId}
+                      hideHeader
+                      {...(subAgentTarget
+                        ? { projectLocation: subAgentTarget.projectLocation }
+                        : {})}
+                    />
+                  ) : null
+                }
                 showTerminalTab={filesTarget !== null}
                 showGitTab={gitTarget !== null}
                 showFilesTab={filesTarget !== null}
@@ -405,6 +452,28 @@ export function DesktopWorkspacePanel(props: {
                 showUsageTab={remote.activeDesktop !== null}
                 showBrowserTab={false}
                 showPortsTab={remote.activeDesktop !== null}
+                showSubagentTab={subAgentInCurrentThread}
+                {...(subAgentInCurrentThread
+                  ? {
+                      subagentModel: (
+                        <SubAgentHeaderText
+                          threadId={subAgentThreadId}
+                          parentItemId={subAgentParentItemId}
+                          compact
+                          part="description"
+                        />
+                      ),
+                      subagentTitle: (
+                        <SubAgentHeaderText
+                          threadId={subAgentThreadId}
+                          parentItemId={subAgentParentItemId}
+                          compact
+                          part="title"
+                        />
+                      ),
+                      onCloseSubagent: () => useDesktopPanelStore.getState().closeSubAgent(),
+                    }
+                  : {})}
                 projectName={projectName}
                 onClose={() => useDesktopPanelStore.getState().close()}
               />

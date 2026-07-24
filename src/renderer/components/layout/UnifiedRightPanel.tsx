@@ -1,5 +1,6 @@
 import { type CSSProperties, type ReactNode } from "react";
 import {
+  Bot,
   FileDiff,
   FolderOpen,
   Gauge,
@@ -10,6 +11,7 @@ import {
   PictureInPicture2,
   TerminalSquare,
   Waypoints,
+  X,
 } from "lucide-react";
 import { useLingui } from "@lingui/react/macro";
 import { PanelHeaderProjectName } from "@/renderer/components/layout/PanelHeaderProjectName";
@@ -32,6 +34,9 @@ export function UnifiedRightPanel(props: {
   usageContent?: ReactNode;
   notesContent?: ReactNode;
   portsContent?: ReactNode;
+  subagentContent?: ReactNode;
+  subagentModel?: ReactNode;
+  subagentTitle?: ReactNode;
   /** Tab-specific action buttons rendered in the header when the usage tab is active. */
   usageHeaderActions?: ReactNode;
   showTerminalTab?: boolean;
@@ -40,7 +45,9 @@ export function UnifiedRightPanel(props: {
   showUsageTab?: boolean;
   showNotesTab?: boolean;
   showPortsTab?: boolean;
+  showSubagentTab?: boolean;
   showBrowserTab?: boolean;
+  onCloseSubagent?: () => void;
   projectName: string | undefined;
   onExpandGitToOverlay?: () => void;
   onExpandFilesToOverlay?: () => void;
@@ -65,6 +72,9 @@ export function UnifiedRightPanel(props: {
     usageContent,
     notesContent,
     portsContent,
+    subagentContent,
+    subagentModel,
+    subagentTitle,
     usageHeaderActions,
     showTerminalTab = true,
     showFilesTab = true,
@@ -72,7 +82,9 @@ export function UnifiedRightPanel(props: {
     showUsageTab = true,
     showNotesTab = true,
     showPortsTab = false,
+    showSubagentTab = false,
     showBrowserTab = true,
+    onCloseSubagent,
     projectName,
     onExpandGitToOverlay,
     onExpandFilesToOverlay,
@@ -88,6 +100,8 @@ export function UnifiedRightPanel(props: {
     onClose,
   } = props;
   const { t } = useLingui();
+  const hasSubagentModel = activeTab === "subagent" && subagentModel !== undefined;
+  const hasSubagentTitle = activeTab === "subagent" && subagentTitle !== undefined;
 
   /** Inline opacity/transition so animation is not dropped if Tailwind misses dynamic class strings. */
   const tabLayerStyle = (tab: RightPanelTab): CSSProperties => {
@@ -102,6 +116,14 @@ export function UnifiedRightPanel(props: {
 
   const dragCtl = "poracode-overlay-header__controls";
   const tabs = [
+    {
+      id: "subagent",
+      label: t`Subagent`,
+      icon: Bot,
+      content: subagentContent,
+      visible: showSubagentTab,
+      onOpen: undefined,
+    },
     {
       id: "terminal",
       label: t`Terminal`,
@@ -165,15 +187,17 @@ export function UnifiedRightPanel(props: {
       data-poracode-panel=""
       className="flex h-full min-h-0 flex-col bg-[var(--content-background)]"
     >
-      <div className={`poracode-overlay-header ${panelHeaderRowClass}`}>
-        {projectName && (
+      <div className={`poracode-overlay-header ${panelHeaderRowClass}`} data-active-tab={activeTab}>
+        {hasSubagentModel ? (
+          <div className="flex min-w-0 flex-1 items-center">{subagentModel}</div>
+        ) : projectName ? (
           <PanelHeaderProjectName
             name={projectName}
             maxWidthClass="max-w-[100px]"
             triggerClassName={dragCtl}
           />
-        )}
-        <div className="flex-1" />
+        ) : null}
+        {hasSubagentModel ? null : <div className="flex-1" />}
         {activeTab === "git" && onExpandGitToOverlay && (
           <button
             type="button"
@@ -230,7 +254,7 @@ export function UnifiedRightPanel(props: {
                 else onTabChange(tab.id);
               }}
             >
-              <Icon className="size-4" />
+              <Icon className="size-3.5" />
             </button>
           );
         })}
@@ -240,9 +264,24 @@ export function UnifiedRightPanel(props: {
           title={t`Hide panel`}
           onClick={onClose}
         >
-          <PanelRightClose className="size-4" />
+          <PanelRightClose className="size-3.5" />
         </button>
       </div>
+      {hasSubagentTitle ? (
+        <div className="poracode-right-panel-subagent-meta flex h-6 shrink-0 items-center gap-2 border-b border-[color:var(--border)] px-3">
+          <div className="min-w-0 flex-1">{subagentTitle}</div>
+          {onCloseSubagent ? (
+            <button
+              type="button"
+              className={`${dragCtl} ${panelHeaderIconButtonClass}`}
+              title={t`Close subagent`}
+              onClick={onCloseSubagent}
+            >
+              <X className="size-3.5" />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* Content — stacked layers cross-fade on tab change */}
       <div className="relative min-h-0 flex-1 overflow-hidden">

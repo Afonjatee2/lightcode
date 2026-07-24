@@ -236,6 +236,7 @@ describe("screenDepth", () => {
     expect(screenDepth("/settings/models")).toBe(3);
     expect(screenDepth("/settings/schedules")).toBe(3);
     expect(screenDepth("/workspace/t1")).toBe(2);
+    expect(screenDepth("/subagent/t1/parent-1")).toBe(2);
     expect(screenDepth("/notes/t1")).toBe(2);
     expect(screenDepth("/terminal/p1")).toBe(2);
     expect(screenDepth("/pr/42")).toBe(2);
@@ -247,6 +248,7 @@ describe("threadIdFromPath", () => {
     expect(threadIdFromPath("/thread/thread%20one")).toBe("thread one");
     expect(threadIdFromPath("/workspace/thread%20one")).toBe("thread one");
     expect(threadIdFromPath("/notes/thread%20one")).toBe("thread one");
+    expect(threadIdFromPath("/subagent/thread%20one/parent-1")).toBe("thread one");
     expect(threadIdFromPath("/settings")).toBeNull();
   });
 });
@@ -264,6 +266,8 @@ describe("navigationTransitionType", () => {
     expect(navigationTransitionType("/settings/models", "/settings/desktop")).toBe("pop");
     expect(navigationTransitionType("/thread/abc", "/workspace/abc")).toBe("push");
     expect(navigationTransitionType("/workspace/abc", "/thread/abc")).toBe("pop");
+    expect(navigationTransitionType("/thread/abc", "/subagent/abc/parent-1")).toBe("push");
+    expect(navigationTransitionType("/subagent/abc/parent-1", "/thread/abc")).toBe("pop");
     expect(navigationTransitionType("/thread/abc", "/notes/abc")).toBe("push");
     expect(navigationTransitionType("/notes/abc", "/thread/abc")).toBe("pop");
   });

@@ -2119,6 +2119,7 @@ msgstr "検索を閉じる"
 msgid "Close Split"
 msgstr "分割を閉じる"
 
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
 msgid "Close subagent"
 msgstr "サブエージェントを閉じる"
@@ -5198,6 +5199,7 @@ msgid "Loading threads"
 msgstr "スレッドを読み込み中"
 
 #: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/HostFolderPicker.tsx
 #: src/renderer/app.tsx
@@ -6400,7 +6402,7 @@ msgstr "このリモートマシンには対応エージェントがインスト
 msgid "No supported agents detected"
 msgstr "サポートされているエージェントが検出されませんでした"
 
-#: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "No thread selected"
 msgstr "スレッドが選択されていません"
@@ -7101,7 +7103,7 @@ msgstr "許可"
 msgid "Pi"
 msgstr "Pi"
 
-#: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "Pick a thread from the list to follow the agent from here."
 msgstr "ここからエージェントを追うには、一覧からスレッドを選択してください。"
@@ -9403,6 +9405,8 @@ msgstr "このデバイスに保存されます。デスクトップ側の値は
 #~ msgid "Stored on this phone; the desktop keeps its own values."
 #~ msgstr "このスマートフォンに保存されます。デスクトップ側は独自の値を保持します。"
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
 msgid "Subagent"
 msgstr "サブエージェント"

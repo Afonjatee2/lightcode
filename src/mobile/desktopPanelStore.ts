@@ -3,7 +3,7 @@ import type { RightPanelTab } from "@/renderer/state/panelStore";
 
 export type DesktopPanelTab = Extract<
   RightPanelTab,
-  "git" | "files" | "terminal" | "usage" | "notes" | "ports"
+  "git" | "files" | "terminal" | "usage" | "notes" | "ports" | "subagent"
 >;
 
 interface DesktopPanelState {
@@ -14,13 +14,17 @@ interface DesktopPanelState {
   readonly initialFolderPath: string | null;
   readonly initialLineNumber: number | null;
   readonly openRequestKey: number;
+  readonly subAgentThreadId: string | null;
+  readonly subAgentParentItemId: string | null;
   readonly show: (tab: DesktopPanelTab, threadId?: string | null) => void;
   readonly toggle: (tab: DesktopPanelTab, threadId?: string | null) => void;
   readonly showFile: (threadId: string, path: string, lineNumber?: number) => void;
   readonly showFolder: (threadId: string, path: string) => void;
+  readonly showSubAgent: (threadId: string, parentItemId: string) => void;
   readonly setActiveTab: (tab: DesktopPanelTab) => void;
   readonly setThreadId: (threadId: string | null) => void;
   readonly close: () => void;
+  readonly closeSubAgent: () => void;
   readonly reset: () => void;
 }
 
@@ -36,6 +40,8 @@ export const useDesktopPanelStore = create<DesktopPanelState>()((set) => ({
   initialFolderPath: null,
   initialLineNumber: null,
   openRequestKey: 0,
+  subAgentThreadId: null,
+  subAgentParentItemId: null,
   show: (tab, threadId) =>
     set((state) => ({
       open: true,
@@ -71,7 +77,19 @@ export const useDesktopPanelStore = create<DesktopPanelState>()((set) => ({
       initialLineNumber: null,
       openRequestKey: state.openRequestKey + 1,
     })),
-  setActiveTab: (activeTab) => set({ activeTab, open: true }),
+  showSubAgent: (threadId, parentItemId) =>
+    set({
+      open: true,
+      activeTab: "subagent",
+      subAgentThreadId: threadId,
+      subAgentParentItemId: parentItemId,
+    }),
+  setActiveTab: (activeTab) =>
+    set((state) =>
+      activeTab === "subagent" && (!state.subAgentThreadId || !state.subAgentParentItemId)
+        ? {}
+        : { activeTab, open: true },
+    ),
   setThreadId: (threadId) =>
     set((state) =>
       state.threadId === threadId
@@ -84,6 +102,12 @@ export const useDesktopPanelStore = create<DesktopPanelState>()((set) => ({
           },
     ),
   close: () => set({ open: false }),
+  closeSubAgent: () =>
+    set({
+      open: false,
+      subAgentThreadId: null,
+      subAgentParentItemId: null,
+    }),
   reset: () =>
     set({
       open: false,
@@ -93,5 +117,7 @@ export const useDesktopPanelStore = create<DesktopPanelState>()((set) => ({
       initialFolderPath: null,
       initialLineNumber: null,
       openRequestKey: 0,
+      subAgentThreadId: null,
+      subAgentParentItemId: null,
     }),
 }));

@@ -11,6 +11,7 @@ import {
   DesktopsRoute,
   NotesRoute,
   SettingsSectionRoute,
+  SubAgentRoute,
   TerminalRoute,
   ThreadRoute,
   ThreadsRoute,
@@ -75,7 +76,12 @@ const fixtures = vi.hoisted(() => {
 
   return {
     project,
-    params: { threadId: routedThread.id, projectId: project.id, section: "usage" },
+    params: {
+      threadId: routedThread.id,
+      parentItemId: "parent-1",
+      projectId: project.id,
+      section: "usage",
+    },
     search: {} as {
       worktree?: string;
       action?: string;
@@ -138,6 +144,7 @@ vi.mock("./useMediaQuery", () => ({
 vi.mock("./views/ThreadView", () => ({
   ThreadView: (props: {
     thread: Thread | null;
+    onOpenSubAgent: (parentItemId: string) => void;
     onOpenNotes: () => void;
     onOpenTerminal: () => void;
     onOpenWorkspace: (tab: "changes" | "files") => void;
@@ -153,6 +160,17 @@ vi.mock("./views/ThreadView", () => ({
       <button type="button" onClick={() => props.onOpenWorkspace("changes")}>
         Open Git
       </button>
+      <button type="button" onClick={() => props.onOpenSubAgent("parent-1")}>
+        Open subagent
+      </button>
+    </div>
+  ),
+}));
+
+vi.mock("@/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay", () => ({
+  SubAgentContent: (props: { threadId: string; parentItemId: string; hideHeader?: boolean }) => (
+    <div data-testid="subagent-content" data-hide-header={props.hideHeader || undefined}>
+      {props.threadId}:{props.parentItemId}
     </div>
   ),
 }));
@@ -290,6 +308,7 @@ describe("mobile route components", () => {
 
   beforeEach(() => {
     fixtures.params.threadId = "thread-routed";
+    fixtures.params.parentItemId = "parent-1";
     fixtures.params.projectId = "project-1";
     fixtures.search = {};
     fixtures.remote.connection = "online";
@@ -311,7 +330,13 @@ describe("mobile route components", () => {
     notesMounts.count = 0;
     media.wide = false;
     media.rightPanel = false;
-    useDesktopPanelStore.setState({ open: false, activeTab: "files", threadId: null });
+    useDesktopPanelStore.setState({
+      open: false,
+      activeTab: "files",
+      threadId: null,
+      subAgentThreadId: null,
+      subAgentParentItemId: null,
+    });
     mobileViews.threadsProps = null;
     mobileViews.quickComposeProps = null;
     useAppStore.setState({ pendingDraftWorktreeSelections: {} });
@@ -513,6 +538,58 @@ describe("mobile route components", () => {
       threadId: "thread-routed",
     });
     expect(fixtures.navigate).not.toHaveBeenCalled();
+  });
+
+  it("routes a phone subagent into its own history-backed page", async () => {
+    render(<ThreadRoute />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open subagent" }));
+
+    expect(fixtures.navigate).toHaveBeenCalledWith({
+      to: "/subagent/$threadId/$parentItemId",
+      params: { threadId: "thread-routed", parentItemId: "parent-1" },
+    });
+  });
+
+  it("opens a desktop-width PWA subagent in the temporary right-panel tab", async () => {
+    media.wide = true;
+    media.rightPanel = true;
+    render(<ThreadRoute />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open subagent" }));
+
+    expect(useDesktopPanelStore.getState()).toMatchObject({
+      open: true,
+      activeTab: "subagent",
+      subAgentThreadId: "thread-routed",
+      subAgentParentItemId: "parent-1",
+    });
+    expect(fixtures.navigate).not.toHaveBeenCalled();
+  });
+
+  it("renders the routed subagent target and migrates deep links into the desktop panel", async () => {
+    const { unmount } = render(<SubAgentRoute />);
+    expect(screen.getByTestId("subagent-content")).toHaveTextContent("thread-routed:parent-1");
+    expect(screen.getByTestId("subagent-content")).toHaveAttribute("data-hide-header", "true");
+    unmount();
+
+    media.wide = true;
+    media.rightPanel = true;
+    render(<SubAgentRoute />);
+
+    await waitFor(() => {
+      expect(useDesktopPanelStore.getState()).toMatchObject({
+        open: true,
+        activeTab: "subagent",
+        subAgentThreadId: "thread-routed",
+        subAgentParentItemId: "parent-1",
+      });
+    });
+    expect(fixtures.navigate).toHaveBeenCalledWith({
+      to: "/thread/$threadId",
+      params: { threadId: "thread-routed" },
+      replace: true,
+    });
   });
 
   it("opens Git in the desktop panel without navigating or remounting the thread route", async () => {

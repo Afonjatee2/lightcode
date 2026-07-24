@@ -2120,6 +2120,7 @@ msgstr "Zamknij wyszukiwanie"
 msgid "Close Split"
 msgstr "Zamknij podział"
 
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
 msgid "Close subagent"
 msgstr "Zamknij subagenta"
@@ -5199,6 +5200,7 @@ msgid "Loading threads"
 msgstr "Ładowanie wątków"
 
 #: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/HostFolderPicker.tsx
 #: src/renderer/app.tsx
@@ -6402,7 +6404,7 @@ msgstr "Na tym komputerze zdalnym nie zainstalowano obsługiwanych agentów. Zai
 msgid "No supported agents detected"
 msgstr "Nie wykryto obsługiwanych agentów"
 
-#: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "No thread selected"
 msgstr "Nie wybrano wątku"
@@ -7103,7 +7105,7 @@ msgstr "pozwolenie"
 msgid "Pi"
 msgstr "Pi"
 
-#: src/mobile/routeComponents.tsx
+#: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "Pick a thread from the list to follow the agent from here."
 msgstr "Wybierz wątek z listy, aby śledzić agenta stąd."
@@ -9405,6 +9407,8 @@ msgstr "Przechowywane na tym urządzeniu; komputer zachowuje własne wartości."
 #~ msgid "Stored on this phone; the desktop keeps its own values."
 #~ msgstr "Przechowywane na tym telefonie; desktop zachowuje własne wartości."
 
+#: src/mobile/views/DesktopWorkspacePanel.tsx
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
 msgid "Subagent"
 msgstr "Subagent"

@@ -312,6 +312,50 @@ html[data-mobile-platform="ios"][data-mobile-standalone="true"] #root {
     );
   }
 
+  /* The routed subagent uses the same document-backed shell geometry as the
+     main thread. Its LegendList remains the only scroller, but the shell paints
+     through Safari's covered toolbar band and the virtualized tail owns enough
+     real scroll range to bring the final child row back above the glass. */
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]:has(
+    .m-shell[data-chrome="subagent"]
+  ),
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]:has(
+      .m-shell[data-chrome="subagent"]
+    )
+    body {
+    height: auto;
+    overflow: hidden;
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]:has(
+      .m-shell[data-chrome="subagent"]
+    )
+    #root {
+    position: static;
+    height: auto;
+    overflow: visible;
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell[data-chrome="subagent"] {
+    height: calc(100svh + var(--m-browser-band-paint));
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell[data-chrome="subagent"]::before,
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell[data-chrome="subagent"]
+    > .m-topbar {
+    position: fixed;
+  }
+
+  html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
+    .m-shell[data-chrome="subagent"]
+    .m-subagent-page
+    [data-chat-virtual-size-box="true"] {
+    padding-bottom: calc(var(--m-browser-list-tail) + var(--m-browser-toolbar-safe-area));
+  }
+
   /* Subscreens use the same in-flow large-viewport shell as threads so
      Safari can derive the covered bottom band from the app background. The
      shell is a flex column, so the top bar stays in flow (a fixed topbar
@@ -350,7 +394,7 @@ html[data-mobile-platform="ios"][data-mobile-standalone="true"] #root {
   html[data-mobile-platform="ios"][data-mobile-browser-chrome="true"]
     .m-shell[data-chrome="subscreen"]
     > .m-main
-    > .m-page {
+    > .m-page:not(.m-subagent-page) {
     padding-bottom: var(--m-browser-edge-gap);
   }
 }
@@ -428,6 +472,23 @@ html[data-theme="dark"][data-theme-preset="default"] .m-shell:not(.m-shell--wide
   overflow: hidden;
 }
 
+.m-thread-route-host {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Keep the main thread's exact DOM and scroll node alive behind the pushed
+   subagent page. `visibility` removes it from paint and hit testing without
+   collapsing the virtualizer's measured viewport. */
+.m-thread-route-host[data-covered="true"] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .m-main > .m-page {
   overflow-y: auto;
 }
@@ -477,6 +538,11 @@ html[data-theme="dark"][data-theme-preset="default"] .m-shell:not(.m-shell--wide
   position: absolute;
   z-index: 7;
   inset: 0 0 auto;
+  /* Opening search hides the brand, which is normally the in-flow element
+     that gives this border-box header its safe-area + control height. Keep
+     that full height while only the absolutely positioned search remains so
+     its bottom edge cannot jump into the iOS status bar. */
+  min-height: var(--m-home-header-clearance);
   background: color-mix(in oklab, var(--background) 78%, transparent);
   backdrop-filter: saturate(140%) blur(16px);
   -webkit-backdrop-filter: saturate(140%) blur(16px);
@@ -516,16 +582,19 @@ html[data-theme="dark"][data-theme-preset="default"] .m-shell:not(.m-shell--wide
 /* One glass slab behind BOTH the top bar and the git sub-bar: the bars
    themselves stay transparent so the pair reads as a single surface with a
    single bottom edge instead of two stacked strips. */
-.m-shell[data-chrome="thread"]::before {
+.m-shell:is([data-chrome="thread"], [data-chrome="subagent"])::before {
   content: "";
   position: absolute;
   z-index: 6;
   inset: 0 0 auto;
-  height: var(--m-thread-chrome-clearance);
   pointer-events: none;
-  background: color-mix(in oklab, var(--background) 55%, transparent);
+  background: color-mix(in oklab, var(--background) 64%, transparent);
   backdrop-filter: saturate(140%) blur(20px);
   -webkit-backdrop-filter: saturate(140%) blur(20px);
+}
+
+.m-shell[data-chrome="thread"]::before {
+  height: var(--m-thread-chrome-clearance);
 }
 
 .m-shell[data-chrome="thread"] > .m-topbar {
@@ -555,6 +624,29 @@ html[data-theme="dark"][data-theme-preset="default"] .m-shell:not(.m-shell--wide
    column starts below the floating chrome instead. */
 .m-shell[data-chrome="thread"] .m-thread--terminal .m-thread-content {
   padding-top: calc(var(--m-thread-chrome-clearance) + 0.375rem);
+}
+
+/* A subagent is a pushed chat page, so its one-row header uses the same glass
+   and under-header transcript behavior as the main thread. */
+.m-shell[data-chrome="subagent"] {
+  position: relative;
+  --m-subagent-chrome-clearance: calc(env(safe-area-inset-top) + var(--m-tap-min));
+}
+
+.m-shell[data-chrome="subagent"]::before {
+  height: var(--m-subagent-chrome-clearance);
+}
+
+.m-shell[data-chrome="subagent"] > .m-topbar {
+  position: absolute;
+  z-index: 7;
+  inset: 0 0 auto;
+  background: transparent;
+}
+
+.m-shell[data-chrome="subagent"] .m-subagent-page [data-poracode-chat-scroller] {
+  padding-top: calc(var(--m-subagent-chrome-clearance) + 0.375rem);
+  scroll-padding-top: var(--m-subagent-chrome-clearance);
 }
 
 /* App chrome — top bar, bottom tab bar, the threads list, portaled sheets, and
@@ -995,12 +1087,17 @@ html[data-theme="dark"][data-theme-preset="default"] .m-shell:not(.m-shell--wide
 }
 
 .m-topbar-search > .m-threads__picker {
+  min-width: 0;
+  flex: 1;
   padding: 0;
   background: transparent;
 }
 
 .m-topbar-search:has(.m-search-float) {
   right: 0.625rem;
+  /* Give the portaled picker wrapper a definite full-width host instead of
+     inheriting the compact width used by the project-filter-only state. */
+  width: calc(100% - 1.25rem);
   max-width: none;
 }
 
@@ -2300,6 +2397,23 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   flex: 1;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* A routed subagent page owns its scroll inside the shared virtualized
+   transcript. Keep the page itself flush; trailing Safari/home-indicator
+   clearance belongs to LegendList's measured content box so it scrolls with
+   the final child row instead of shrinking the viewport from outside. */
+.m-subagent-page {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  gap: 0;
+  overflow: hidden !important;
+  padding: 0;
+}
+
+.m-subagent-page [data-chat-virtual-size-box="true"] {
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
 }
 
 /* GUI chat scrolls UNDER the floating composer: the column runs to the screen
@@ -5620,6 +5734,41 @@ html[data-mobile-platform="ios"]
 }
 
 @keyframes m-lightweight-thread-list-pop {
+  from {
+    transform: translate3d(-25%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* The pushed subagent is already a separate absolutely positioned page. Move
+   only that new lightweight layer and its new header; the parent thread stays
+   mounted and Safari never snapshots either virtualized transcript. */
+html[data-mobile-platform="ios"] .m-shell--lightweight-subagent-push > .m-topbar,
+html[data-mobile-platform="ios"] .m-shell--lightweight-subagent-push .m-subagent-page {
+  animation: m-lightweight-subagent-push 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+  will-change: transform;
+}
+
+@keyframes m-lightweight-subagent-push {
+  from {
+    transform: translate3d(100%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Back reveals the parent thread that NarrowShell kept mounted throughout the
+   subagent route. Animate only that incoming shell; the potentially huge
+   outgoing subagent transcript is removed without a Safari snapshot. */
+html[data-mobile-platform="ios"] .m-shell--lightweight-subagent-pop > :is(.m-topbar, .m-main) {
+  animation: m-lightweight-subagent-pop 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+  will-change: transform;
+}
+
+@keyframes m-lightweight-subagent-pop {
   from {
     transform: translate3d(-25%, 0, 0);
   }

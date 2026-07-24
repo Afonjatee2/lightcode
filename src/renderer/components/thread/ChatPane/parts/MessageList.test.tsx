@@ -28,6 +28,7 @@ type MockLegendProps = {
   recycleItems: boolean;
   renderItem: (input: { item: ChatTimelineEntry; index: number }) => React.ReactNode;
   keyExtractor: (item: ChatTimelineEntry, index: number) => string;
+  ListHeaderComponent?: React.ReactNode;
   ListEmptyComponent?: React.ReactNode;
   ListFooterComponent?: React.ReactNode;
   className?: string;
@@ -107,6 +108,7 @@ vi.mock("@legendapp/list/react", async () => {
             className={`legend-list-content-container ${props.contentContainerClassName ?? ""}`}
             style={props.contentContainerStyle}
           >
+            {props.ListHeaderComponent}
             {props.data.length === 0 ? props.ListEmptyComponent : null}
             {props.data.map((item, index) => (
               <React.Fragment key={props.keyExtractor(item, index)}>
@@ -247,6 +249,19 @@ describe("MessageList", () => {
     unmount();
     expect(setScrollContainer).toHaveBeenLastCalledWith(null);
     expect(scrollContentRef.current).toBeNull();
+  });
+
+  it("keeps optional header content inside LegendList's measured content box", () => {
+    const { container } = render(
+      <MessageList
+        threadId="thread-1"
+        entries={makeEntries(["item-1"])}
+        header={<div data-testid="virtual-header">Header</div>}
+      />,
+    );
+
+    const content = container.querySelector("[data-chat-virtual-size-box='true']");
+    expect(content).toContainElement(screen.getByTestId("virtual-header"));
   });
 
   it("delegates bottom and find navigation to LegendList", () => {
@@ -431,6 +446,60 @@ describe("MessageList", () => {
       expect(onLiveVirtualizerLayoutChange).toHaveBeenCalledOnce();
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it("remeasures live DOM growth before paint even without another provider delta", () => {
+    const resizeCallbacks: ResizeObserverCallback[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          resizeCallbacks.push(callback);
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+
+    const threadId = "thread-1";
+    const onLiveVirtualizerLayoutChange = vi.fn<() => void>();
+    seedStartedItem(threadId, "assistant-1", "assistant_message");
+    const view = render(
+      <MessageList
+        threadId={threadId}
+        entries={makeEntries(["assistant-1"])}
+        onLiveVirtualizerLayoutChange={onLiveVirtualizerLayoutChange}
+      />,
+    );
+
+    try {
+      const row = view.container.querySelector<HTMLElement>(
+        "[data-chat-virtual-row='true'][data-item-id='assistant-1']",
+      );
+      expect(row).not.toBeNull();
+      Object.defineProperties(row!, {
+        offsetHeight: { configurable: true, value: 118 },
+        offsetWidth: { configurable: true, value: 500 },
+      });
+      setItemSizeMock.mockClear();
+      onLiveVirtualizerLayoutChange.mockClear();
+
+      act(() => {
+        for (const callback of resizeCallbacks) {
+          callback([{ target: row! } as unknown as ResizeObserverEntry], {} as ResizeObserver);
+        }
+      });
+
+      expect(onLiveVirtualizerLayoutChange).toHaveBeenCalledOnce();
+      expect(setItemSizeMock).toHaveBeenCalledWith("assistant-1", {
+        height: 118,
+        width: 500,
+      });
+    } finally {
+      view.unmount();
+      vi.unstubAllGlobals();
     }
   });
 

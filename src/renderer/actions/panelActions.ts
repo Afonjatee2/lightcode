@@ -1,4 +1,4 @@
-import type { Thread } from "@/shared/contracts";
+import type { ProjectLocation, Thread } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
@@ -47,6 +47,10 @@ export function closePanelsForUnloadedThread(thread: Thread): void {
     )
   ) {
     panelStore.setFilesPanelContext(null);
+  }
+
+  if (panelStore.subAgentPanelContext?.threadId === thread.id) {
+    panelStore.setSubAgentPanelContext(null);
   }
 
   const fileRoot = useFileEditorStore.getState().rootContext;
@@ -124,6 +128,21 @@ export function openProjectSettings(projectId: string): void {
 /** Closes git/files side and right-panel content only. Does not hide the dev terminal (bottom or right). */
 export function closeAllPanels(): void {
   usePanelStore.getState().closeAllPanels();
+}
+
+/** Show one subagent as a temporary right-panel tab beside its parent thread. */
+export function showSubAgentPanel(
+  threadId: string,
+  parentItemId: string,
+  projectLocation?: ProjectLocation,
+): void {
+  const panelStore = usePanelStore.getState();
+  panelStore.setSubAgentPanelContext({
+    threadId,
+    parentItemId,
+    ...(projectLocation ? { projectLocation } : {}),
+  });
+  panelStore.setRightPanelTab("subagent");
 }
 
 /** Dismiss every panel that can occupy the right edge — used by the overlay backdrop. */

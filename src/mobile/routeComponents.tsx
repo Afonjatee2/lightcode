@@ -9,12 +9,11 @@ import {
 } from "react";
 import { toast } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { MessageCircle } from "lucide-react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useAppStore } from "@/renderer/state/appStore";
-import type { Thread } from "@/shared/contracts";
+import { SubAgentContent } from "@/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay";
 import { getBasename } from "@/shared/pathUtils";
-import { buildWorktreeLocation } from "@/shared/worktree";
+import { buildWorktreeLocation, resolveProjectLocation } from "@/shared/worktree";
 import { useGitSummariesStore } from "./gitSummaries";
 import { useMobileApp, useRemote } from "./remoteContext";
 import {
@@ -22,7 +21,6 @@ import {
   buildGitTarget,
   openWorktreeDraft,
   preselectWorktreeDraft,
-  runThreadAction,
 } from "./navHelpers";
 import {
   clearPairingLaunch,
@@ -33,12 +31,13 @@ import {
   subscribePairingLaunch,
 } from "./pairing";
 import { MobileSetupEmptyState, type MobileSetupKind } from "./setupEmptyState";
-import { EmptyState } from "./components";
 import { isDesktopSettingsSection } from "./settingsSections";
 import type { MobileSshPairRequest } from "./views/DesktopsView";
 import { useGitSummaryHydration } from "./useGitSummaryHydration";
 import { DESKTOP_RIGHT_PANEL_QUERY, useMediaQuery, WIDE_SHELL_QUERY } from "./useMediaQuery";
 import { useDesktopPanelStore } from "./desktopPanelStore";
+import { useNarrowThreadHost } from "./narrowThreadHostContext";
+import { ThreadDetail } from "./ThreadDetail";
 import { DesktopsView } from "./views/DesktopsView";
 import { ManageProjectsView } from "./views/ManageProjectsView";
 import { MoreView } from "./views/MoreView";
@@ -50,10 +49,6 @@ const NewThreadFlow = lazy(() =>
 const QuickCompose = lazy(() =>
   import("./views/QuickCompose").then((module) => ({ default: module.QuickCompose })),
 );
-const ThreadView = lazy(() =>
-  import("./views/ThreadView").then((module) => ({ default: module.ThreadView })),
-);
-
 const BrowserView = lazy(() =>
   import("./views/BrowserView").then((module) => ({ default: module.BrowserView })),
 );
@@ -83,6 +78,7 @@ const UsagePanel = lazy(() =>
 // Typed route APIs (params/search) — decoupled from the route consts so this
 // file never imports router.tsx (which imports these components).
 const threadRouteApi = getRouteApi("/thread/$threadId");
+const subAgentRouteApi = getRouteApi("/subagent/$threadId/$parentItemId");
 const notesRouteApi = getRouteApi("/notes/$threadId");
 const settingsSectionRouteApi = getRouteApi("/settings/$section");
 const workspaceRouteApi = getRouteApi("/workspace/$threadId");
@@ -127,146 +123,6 @@ function FullscreenLazyRoute(props: { readonly children: ReactNode }) {
     >
       {props.children}
     </Suspense>
-  );
-}
-
-/**
- * Shared thread detail pane. Used by the /thread/:id route and, in the wide
- * layout, by the /threads route (where the list lives in the sidebar and the
- * detail shows the selected thread, or an empty state when none is selected).
- */
-function ThreadDetail(props: { readonly thread: Thread | null; readonly hideHeader: boolean }) {
-  const remote = useRemote();
-  const navigate = useNavigate();
-  const useRightPanel = useMediaQuery(DESKTOP_RIGHT_PANEL_QUERY);
-  const thread = props.thread;
-  const threadId = thread?.id ?? null;
-  // Ensure the displayed thread is actually OPEN, not just rendered: the wide
-  // shell auto-selects the most recent thread and deep links land here
-  // directly — neither goes through a list click. Opening marks the thread
-  // watched in the shared store (clearing a stale finished/done badge so live
-  // idle events don't keep re-earning it) and loads its history snapshot.
-  // openThread is idempotent and guards against duplicate in-flight loads, so
-  // the click path (store already watching, snapshot still fetching) is cheap.
-  //
-  // Also keyed on the active desktop id: on a cold deep-link load the thread is
-  // seeded from the localStorage mirror (so threadId is stable from the first
-  // render) while the desktop connection is still being established async.
-  // openThread bails when activeDesktop is null, so without this dep the effect
-  // never retries once the desktop connects and the history snapshot never
-  // loads — a blank transcript. The watched+hasSnapshot guard keeps the retry
-  // from redundantly reopening an already-loaded thread.
-  const activeDesktopId = remote.activeDesktop?.desktopId ?? null;
-  useEffect(() => {
-    if (!threadId) return;
-    const state = useAppStore.getState();
-    const watched = state.view.kind === "thread" && state.view.panes.includes(threadId);
-    const hasSnapshot = remote.selectedThreadSnapshot?.thread.id === threadId;
-    if (watched && hasSnapshot) return;
-    const target = remote.threads.find((entry) => entry.id === threadId);
-    if (target) void remote.openThread(target);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the displayed thread id + active desktop; openThread guards the racing click path
-  }, [threadId, activeDesktopId]);
-  if (!thread) {
-    return (
-      <section className="m-thread">
-        <EmptyState
-          icon={<MessageCircle className="size-5" />}
-          title={<Trans>No thread selected</Trans>}
-          hint={<Trans>Pick a thread from the list to follow the agent from here.</Trans>}
-        />
-      </section>
-    );
-  }
-  // Still fetching this thread's history when no snapshot matches it yet.
-  const loading = remote.selectedThreadSnapshot?.thread.id !== thread.id;
-  return (
-    <LazyRoute>
-      <ThreadView
-        thread={thread}
-        terminalScrollback={remote.selectedThreadSnapshot?.terminalScrollback}
-        terminalSize={remote.selectedThreadSnapshot?.terminalSize}
-        hideHeader={props.hideHeader}
-        loading={loading}
-        onThreadAction={(action) =>
-          runThreadAction(remote, thread, action, () => void navigate({ to: "/threads" }))
-        }
-        onSubmitInput={(prompt, segments) => remote.sendPrompt(prompt, segments)}
-        onOpenWorkspace={(tab) => {
-          if (useRightPanel) {
-            useDesktopPanelStore.getState().show(tab === "changes" ? "git" : "files", thread.id);
-            return;
-          }
-          void navigate({
-            to: "/workspace/$threadId",
-            params: { threadId: thread.id },
-            search: { tab },
-          });
-        }}
-        onOpenWorkspaceFile={(path, lineNumber) => {
-          if (useRightPanel) {
-            useDesktopPanelStore.getState().showFile(thread.id, path, lineNumber);
-            return;
-          }
-          void navigate({
-            to: "/workspace/$threadId",
-            params: { threadId: thread.id },
-            search: {
-              tab: "files",
-              file: path,
-              ...(lineNumber !== undefined ? { line: lineNumber } : {}),
-            },
-          });
-        }}
-        onOpenWorkspaceFolder={(path) => {
-          if (useRightPanel) {
-            useDesktopPanelStore.getState().showFolder(thread.id, path);
-            return;
-          }
-          void navigate({
-            to: "/workspace/$threadId",
-            params: { threadId: thread.id },
-            search: { tab: "files", folder: path },
-          });
-        }}
-        onOpenTerminal={() => {
-          if (useRightPanel) {
-            useDesktopPanelStore.getState().show("terminal", thread.id);
-            return;
-          }
-          void navigate({
-            to: "/terminal/$projectId",
-            params: { projectId: thread.projectId },
-            search: {
-              fromThread: thread.id,
-              ...(thread.worktreePath ? { worktree: thread.worktreePath } : {}),
-            },
-          });
-        }}
-        onOpenNotes={() => {
-          if (useRightPanel) {
-            useDesktopPanelStore.getState().show("notes", thread.id);
-            return;
-          }
-          void navigate({
-            to: "/notes/$threadId",
-            params: { threadId: thread.id },
-          });
-        }}
-        onNewThreadInWorktree={(input) => {
-          if (props.hideHeader) {
-            preselectWorktreeDraft(input);
-            void navigate({ to: "/threads" });
-            return;
-          }
-          void openWorktreeDraft(input, () => navigate({ to: "/new" }));
-        }}
-        onDeleteWorktreeGroup={(input) => {
-          void remote.deleteWorktreeGroup(input);
-          void navigate({ to: "/threads" });
-        }}
-      />
-    </LazyRoute>
   );
 }
 
@@ -418,11 +274,67 @@ export function ThreadRoute() {
   const { threadId } = threadRouteApi.useParams();
   const remote = useRemote();
   const isWide = useMediaQuery(WIDE_SHELL_QUERY);
+  const narrowShellOwnsThread = useNarrowThreadHost();
   // Opening (store watch + snapshot load) is owned by ThreadDetail's effect: it
   // also covers the fallback-selected thread on reloads, which a check against
   // remote.selectedThread here would wrongly consider already open.
   const thread = remote.threads.find((entry) => entry.id === threadId) ?? null;
+  if (!isWide && narrowShellOwnsThread) return null;
   return <ThreadDetail thread={thread} hideHeader={!isWide} />;
+}
+
+/** A history-backed subagent page on phones; desktop-width PWA shells migrate it into the panel. */
+export function SubAgentRoute() {
+  const { threadId, parentItemId } = subAgentRouteApi.useParams();
+  const remote = useRemote();
+  const navigate = useNavigate();
+  const useRightPanel = useMediaQuery(DESKTOP_RIGHT_PANEL_QUERY);
+  const thread = remote.threads.find((entry) => entry.id === threadId) ?? null;
+  const project = thread
+    ? (remote.projects.find((entry) => entry.id === thread.projectId) ?? null)
+    : null;
+  const activeDesktopId = remote.activeDesktop?.desktopId ?? null;
+  const hasSnapshot = remote.selectedThreadSnapshot?.thread.id === threadId;
+
+  useEffect(() => {
+    if (!thread || hasSnapshot) return;
+    void remote.openThread(thread);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on route target + connection; openThread deduplicates in-flight history loads
+  }, [activeDesktopId, hasSnapshot, threadId]);
+
+  useEffect(() => {
+    if (!useRightPanel) return;
+    useDesktopPanelStore.getState().showSubAgent(threadId, parentItemId);
+    void navigate({
+      to: "/thread/$threadId",
+      params: { threadId },
+      replace: true,
+    });
+  }, [navigate, parentItemId, threadId, useRightPanel]);
+
+  if (useRightPanel) return null;
+
+  const projectLocation =
+    thread && project ? resolveProjectLocation(project.location, thread.worktreePath) : undefined;
+
+  return (
+    <LazyRoute>
+      <section className="m-page m-subagent-page">
+        {hasSnapshot ? (
+          <SubAgentContent
+            threadId={threadId}
+            parentItemId={parentItemId}
+            hideHeader
+            {...(projectLocation ? { projectLocation } : {})}
+          />
+        ) : (
+          <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-muted">
+            <Trans>Loading…</Trans>
+          </div>
+        )}
+      </section>
+    </LazyRoute>
+  );
 }
 
 /**

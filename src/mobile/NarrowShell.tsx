@@ -11,10 +11,13 @@ import {
   Server,
   Settings2,
 } from "lucide-react";
-import { Outlet, useNavigate } from "@tanstack/react-router";
+import { Outlet, useNavigate, useRouter } from "@tanstack/react-router";
 import { BrandWordmark } from "@/renderer/components/common/BrandWordmark";
+import { SubAgentHeaderText } from "@/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay";
 import { ConnectionPill, SheetMenu } from "./components";
+import { NarrowThreadHostProvider } from "./narrowThreadHostContext";
 import { preselectWorktreeDraft, runThreadAction } from "./navHelpers";
+import { ThreadDetail } from "./ThreadDetail";
 import { ThreadTitleRow } from "./ThreadTitleRow";
 import { ThreadUsageIndicator } from "./ThreadUsageIndicator";
 import { useHeldThreadHeader } from "./useHeldThreadHeader";
@@ -96,8 +99,15 @@ export function NarrowShell(props: {
 }) {
   const { remote, chrome, pathname } = props;
   const navigate = useNavigate();
+  const router = useRouter();
   const { t } = useLingui();
   const hasActiveDesktop = remote.activeDesktop !== null;
+  const hostedThreadId =
+    chrome.layout === "thread" || chrome.layout === "subagent" ? chrome.threadId : null;
+  const hostedThread = hostedThreadId
+    ? (remote.threads.find((thread) => thread.id === hostedThreadId) ?? null)
+    : null;
+  const subagentCoversThread = chrome.layout === "subagent";
   const shellRef = useRef<HTMLDivElement | null>(null);
   useLightweightThreadListPop(shellRef, pathname);
   const ignoreSearchClickRef = useRef(false);
@@ -113,11 +123,26 @@ export function NarrowShell(props: {
   // Edge-swipe back mirrors the header back button: subscreens pop to their
   // parent, a thread pops to the list. Home has nowhere to go; fullscreen
   // routes own their chrome (and their own horizontal gestures).
-  const swipeBackTo =
-    chrome.layout === "thread" ? "/threads" : chrome.layout === "subscreen" ? chrome.backTo : null;
-  useSwipeBack(shellRef, swipeBackTo !== null, () => {
-    if (swipeBackTo) void navigate({ to: swipeBackTo });
-  });
+  const canSwipeBack =
+    chrome.layout === "thread" || chrome.layout === "subscreen" || chrome.layout === "subagent";
+  const navigateBack = () => {
+    if (chrome.layout === "thread") {
+      void navigate({ to: "/threads" });
+    } else if (chrome.layout === "subscreen") {
+      void navigate({ to: chrome.backTo });
+    } else if (chrome.layout === "subagent") {
+      if (router.history.canGoBack()) {
+        router.history.back();
+      } else {
+        void navigate({
+          to: "/thread/$threadId",
+          params: { threadId: chrome.threadId },
+          replace: true,
+        });
+      }
+    }
+  };
+  useSwipeBack(shellRef, canSwipeBack, navigateBack);
 
   const { headerThread, visibleHeldThreadHeader } = useHeldThreadHeader({
     pathname,
@@ -196,6 +221,13 @@ export function NarrowShell(props: {
             )}
             {headerThread ? <ThreadUsageIndicator thread={headerThread} /> : null}
           </>
+        ) : chrome.layout === "subagent" ? (
+          <>
+            <button className="m-back" type="button" onClick={navigateBack}>
+              <ChevronLeft className="size-5" />
+            </button>
+            <SubAgentHeaderText threadId={chrome.threadId} parentItemId={chrome.parentItemId} />
+          </>
         ) : chrome.layout === "subscreen" ? (
           <>
             <button
@@ -250,7 +282,19 @@ export function NarrowShell(props: {
       ) : null}
 
       <main className="m-main">
-        <Outlet />
+        <NarrowThreadHostProvider value>
+          {hostedThreadId ? (
+            <div
+              className="m-thread-route-host"
+              data-covered={subagentCoversThread || undefined}
+              aria-hidden={subagentCoversThread || undefined}
+              {...(subagentCoversThread ? { inert: true } : {})}
+            >
+              <ThreadDetail thread={hostedThread} hideHeader />
+            </div>
+          ) : null}
+          <Outlet />
+        </NarrowThreadHostProvider>
       </main>
       {chrome.layout === "home" ? (
         <div className="m-home-compose-actions">

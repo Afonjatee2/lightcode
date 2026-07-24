@@ -2,6 +2,7 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Project, Thread } from "@/shared/contracts";
+import { useAppStore } from "@/renderer/state/appStore";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import { useDesktopPanelStore } from "../desktopPanelStore";
 import { useGitSummariesStore } from "../gitSummaries";
@@ -68,6 +69,27 @@ vi.mock("@/renderer/views/FileEditorOverlay/parts/ProjectFilesPanel", () => ({
   ),
 }));
 
+vi.mock("@/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay", () => ({
+  SubAgentContent: (props: { threadId: string; parentItemId: string; hideHeader?: boolean }) => (
+    <div data-testid="subagent-panel" data-hide-header={props.hideHeader || undefined}>
+      {props.threadId}:{props.parentItemId}
+    </div>
+  ),
+  SubAgentHeaderText: (props: {
+    threadId: string;
+    parentItemId: string;
+    compact?: boolean;
+    part?: "all" | "title" | "description";
+  }) => (
+    <div
+      data-testid={`subagent-header-${props.part ?? "all"}`}
+      data-compact={props.compact || undefined}
+    >
+      {props.threadId}:{props.parentItemId}
+    </div>
+  ),
+}));
+
 const project: Project = {
   id: "project-1",
   name: "Repo",
@@ -115,6 +137,21 @@ describe("DesktopWorkspacePanel", () => {
       initialFolderPath: null,
       initialLineNumber: null,
       openRequestKey: 0,
+      subAgentThreadId: null,
+      subAgentParentItemId: null,
+    });
+    useAppStore.setState({
+      runtimeItemsByIdByThread: {
+        [thread.id]: {
+          "parent-1": {
+            id: "parent-1",
+            type: "tool_call",
+            state: "started",
+            payload: { name: "Task", status: "running", isSubAgent: true },
+            streams: {},
+          },
+        },
+      },
     });
     const gitSummary = {
       isRepo: true,
@@ -201,5 +238,72 @@ describe("DesktopWorkspacePanel", () => {
       />,
     );
     expect(openFileInEditor).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a temporary subagent tab beside the parent thread", () => {
+    useDesktopPanelStore.getState().showSubAgent(thread.id, "parent-1");
+
+    renderPanel();
+
+    expect(screen.getByTestId("subagent-panel")).toHaveTextContent("thread-1:parent-1");
+    expect(screen.getByTestId("subagent-panel")).toHaveAttribute("data-hide-header", "true");
+    expect(screen.getByTestId("subagent-header-title")).toHaveAttribute("data-compact", "true");
+    expect(screen.getByTestId("subagent-header-description")).toHaveAttribute(
+      "data-compact",
+      "true",
+    );
+    expect(
+      screen.getByTestId("subagent-header-description").closest('[data-active-tab="subagent"]'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("subagent-header-title").closest(".poracode-right-panel-subagent-meta"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close subagent" }).parentElement).toHaveClass(
+      "poracode-right-panel-subagent-meta",
+    );
+    expect(
+      screen
+        .getAllByRole("button", { name: "Subagent" })
+        .some((element) => element instanceof HTMLButtonElement),
+    ).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide panel" }));
+    expect(useDesktopPanelStore.getState()).toMatchObject({
+      open: false,
+      subAgentThreadId: thread.id,
+      subAgentParentItemId: "parent-1",
+    });
+  });
+
+  it("closes the temporary subagent explicitly from the panel header", () => {
+    useDesktopPanelStore.getState().showSubAgent(thread.id, "parent-1");
+    renderPanel();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close subagent" }));
+    expect(useDesktopPanelStore.getState()).toMatchObject({
+      open: false,
+      subAgentThreadId: null,
+      subAgentParentItemId: null,
+    });
+  });
+
+  it("hides a retained subagent outside its parent thread context", () => {
+    useDesktopPanelStore.getState().showSubAgent(thread.id, "parent-1");
+
+    render(<DesktopWorkspacePanel remote={remote} currentThreadId="thread-2" />);
+
+    expect(screen.queryByTestId("subagent-panel")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Subagent" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("files-view")).toBeInTheDocument();
+  });
+
+  it("falls back to another tab when the retained subagent item no longer exists", () => {
+    useDesktopPanelStore.getState().showSubAgent(thread.id, "missing-parent");
+
+    renderPanel();
+
+    expect(screen.queryByTestId("subagent-panel")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Subagent" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("files-view")).toBeInTheDocument();
   });
 });
