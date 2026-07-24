@@ -2339,7 +2339,7 @@ msgstr "Tên khách hàng"
 msgid "Client Name"
 msgstr "Tên khách hàng"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Client Update"
 msgstr "Cập nhật khách hàng"
 
@@ -3275,6 +3275,10 @@ msgstr "Không thể lưu dự án chiến dịch."
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not save the campaign workspace thread."
 msgstr "Không thể lưu luồng không gian làm việc chiến dịch."
+
+#: src/renderer/actions/campaignTopicThreadActions.ts
+msgid "Could not save the topic thread."
+msgstr "Không thể lưu luồng chủ đề."
 
 #: src/renderer/components/mcp/useMcpServerOauth.ts
 msgid "Could not sign in to {serverName}: {message}"
@@ -4461,7 +4465,7 @@ msgstr "Biến môi trường"
 msgid "Environment variables (optional)"
 msgstr "Biến môi trường (không bắt buộc)"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "EOC Report"
 msgstr "Báo cáo EOC"
 
@@ -5181,7 +5185,7 @@ msgstr "Gemini"
 
 #: src/mobile/settingsSections.ts
 #: src/renderer/commands/shortcutCatalog.ts
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
@@ -6685,7 +6689,7 @@ msgstr "Mô hình"
 msgid "Modes"
 msgstr "Chế độ"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Monitoring"
 msgstr "Giám sát"
 
@@ -7058,6 +7062,10 @@ msgstr "Không có hồ sơ Claude bổ sung."
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/useGitReviewActions.ts
 msgid "No agent available to generate PR summary"
 msgstr "Không có tác nhân nào để tạo bản tóm tắt PR"
+
+#: src/renderer/actions/campaignTopicThreadActions.ts
+msgid "No agent is available to create this topic thread."
+msgstr "Không có tác nhân nào khả dụng để tạo luồng chủ đề này."
 
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "No agents in this phase."
@@ -8035,7 +8043,7 @@ msgid "Overriding the global setting for this project."
 msgstr "Ghi đè cài đặt chung cho dự án này."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Pacing"
 msgstr "Tiến độ"
 
@@ -8315,7 +8323,7 @@ msgstr "Khác biệt kế hoạch và nguồn gốc"
 msgid "Plan fact"
 msgstr "Sự kiện kế hoạch"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Plan Revision"
 msgstr "Điều chỉnh kế hoạch"
@@ -12171,6 +12179,10 @@ msgstr "Không phân giai đoạn:"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Unpin"
 msgstr "Bỏ ghim"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Unread activity"
+msgstr "Hoạt động chưa đọc"
 
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/FileRow.tsx

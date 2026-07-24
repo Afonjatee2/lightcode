@@ -3869,7 +3869,7 @@ html[data-poracode-drag-active="true"] [data-poracode-chat-scroller="true"] {
   color: var(--muted);
   border-bottom: 2px solid transparent;
   white-space: nowrap;
-  cursor: default;
+  cursor: pointer;
   user-select: none;
 }
 
