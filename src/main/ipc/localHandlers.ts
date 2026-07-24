@@ -37,6 +37,7 @@ import {
   writeImageFile,
 } from "../attachments/localFiles";
 import { createProjectDirectory } from "../projectDirectory";
+import { ensureCampaignWorkspaceDir } from "../campaignWorkspaceDir";
 import { diffSyncedThreadIds } from "./threadSyncBroadcast";
 import { showOsNotification } from "../osNotifications";
 import { showAndFocusWindow } from "../window/showAndFocusWindow";
@@ -210,6 +211,10 @@ export function createLocalIpcHandlers(
       return true;
     },
     createProjectDirectory: (payload) => createProjectDirectory(payload),
+    ensureCampaignWorkspaceDir: (payload) => {
+      const baseDir = options.requirePoracodePaths().baseDir;
+      return ensureCampaignWorkspaceDir(baseDir, payload);
+    },
     // Desktop-as-client: proxy a remote Poracode server request through the
     // main process (no browser CORS). Restricted to http(s) and a bounded
     // response so a hostile/buggy peer can't exfiltrate via odd schemes or

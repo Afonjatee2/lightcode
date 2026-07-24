@@ -55,6 +55,7 @@ import { SchedulesView } from "@/renderer/views/SchedulesView/SchedulesView";
 import { buildProjectDraftConfig } from "./draftConfig";
 import { ThreadPane } from "./parts/ThreadPane";
 import { DraftPane } from "./parts/DraftPane";
+import { CampaignModeGate } from "@/renderer/views/MainView/parts/CampaignModeGate";
 
 export async function startThreadFromDraft(
   project: Project,
@@ -304,12 +305,14 @@ export function AppContent() {
     }
     return (
       <div className="h-full">
-        <DraftViewContent
-          key={draftProject.id}
-          project={draftProject}
-          lastDraftConfig={draftLastDraftConfig}
-          onStart={(input) => startThreadFromDraft(draftProject, input)}
-        />
+        <CampaignModeGate projectId={draftProject.id}>
+          <DraftViewContent
+            key={draftProject.id}
+            project={draftProject}
+            lastDraftConfig={draftLastDraftConfig}
+            onStart={(input) => startThreadFromDraft(draftProject, input)}
+          />
+        </CampaignModeGate>
       </div>
     );
   }
@@ -346,6 +349,8 @@ export function AppContent() {
 
     function renderPane(paneId: string, rect: Rect) {
       const paneDraftProjectId = parseDraftProjectId(paneId);
+      const paneProjectId =
+        paneDraftProjectId ?? storeThreads.find((thread) => thread.id === paneId)?.projectId;
       const paneAlign = findPaneAlign(paneLayout, paneId);
       // Only the top-left pane's own header is the topmost row in the content
       // area when there's no group header — that's when it needs traffic-light
@@ -385,7 +390,11 @@ export function AppContent() {
           tabIndex={-1}
           onFocusCapture={() => useAppStore.getState().setFocusedPane(paneId)}
         >
-          {paneContent}
+          {paneProjectId ? (
+            <CampaignModeGate projectId={paneProjectId}>{paneContent}</CampaignModeGate>
+          ) : (
+            paneContent
+          )}
         </div>
       );
     }

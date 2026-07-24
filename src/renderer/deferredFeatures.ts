@@ -34,6 +34,12 @@ export const DeferredCloneProjectModal = preloadable(() =>
   ),
 );
 
+export const DeferredCreateCampaignProjectModal = preloadable(() =>
+  import("@/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog").then(
+    (module) => module.CreateCampaignWorkspaceDialog,
+  ),
+);
+
 export const DeferredProjectAuxiliaryPanel = preloadable(() =>
   import("@/renderer/views/MainView/parts/ProjectAuxiliaryPanel").then(
     (module) => module.ProjectAuxiliaryPanel,
@@ -106,6 +112,7 @@ const prewarmTasks = [
   DeferredSettingsOverlay.preload,
   DeferredCreateProjectModal.preload,
   DeferredCloneProjectModal.preload,
+  DeferredCreateCampaignProjectModal.preload,
   DeferredProjectSettingsOverlay.preload,
   DeferredProjectAuxiliaryPanel.preload,
   DeferredDevTerminalPanel.preload,

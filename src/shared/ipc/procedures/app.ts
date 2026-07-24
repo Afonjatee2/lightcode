@@ -10,6 +10,7 @@ import { defineIpcProcedure, defineNoArgProcedure, definePayloadProcedure } from
 import {
   copyImageToClipboardPayloadSchema,
   createProjectDirectoryPayloadSchema,
+  ensureCampaignWorkspaceDirPayloadSchema,
   openExternalPayloadSchema,
   pickFilesOptionsSchema,
   saveClipboardImagePayloadSchema,
@@ -17,6 +18,8 @@ import {
   saveImageFilePayloadSchema,
   showNotificationPayloadSchema,
   type CreateProjectDirectoryResult,
+  type EnsureCampaignWorkspaceDirPayload,
+  type EnsureCampaignWorkspaceDirResult,
 } from "../schemas";
 
 export const publishRemoteGitSummariesPayloadSchema = z.object({
@@ -141,6 +144,11 @@ export const appProcedures = {
     CreateProjectDirectoryResult,
     "main-local"
   >("createProjectDirectory", "main-local", createProjectDirectoryPayloadSchema),
+  ensureCampaignWorkspaceDir: definePayloadProcedure<
+    EnsureCampaignWorkspaceDirPayload,
+    EnsureCampaignWorkspaceDirResult,
+    "main-local"
+  >("ensureCampaignWorkspaceDir", "main-local", ensureCampaignWorkspaceDirPayloadSchema),
   listWslDistros: defineNoArgProcedure<string[], "supervisor">("listWslDistros", "supervisor"),
   openExternal: defineIpcProcedure<[string], string, void, "main-local">(
     "openExternal",

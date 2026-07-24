@@ -20,6 +20,7 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
   const projectTree = runtime.projectTreeService;
   const lsp = runtime.lspManager;
   const mcpProbe = runtime.mcpProbeService;
+  const mcpToolCall = runtime.mcpToolCallService;
   const mcpOAuth = runtime.mcpOAuthService;
   const externalMcpDiscovery = runtime.externalMcpDiscoveryService;
   const skills = runtime.skillsService;
@@ -272,6 +273,7 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     lspSendMessage: (payload) => lsp.sendMessage(payload),
     discoverExternalMcpServers: (payload) => externalMcpDiscovery.discover(payload),
     probeMcpServer: (payload) => mcpProbe.probe(payload),
+    callMcpTool: (payload) => mcpToolCall.call(payload),
     beginMcpServerOauth: (payload) => mcpOAuth.begin(payload),
     waitMcpServerOauth: (payload) => mcpOAuth.wait(payload),
     clearMcpServerOauth: (payload) => mcpOAuth.clear(payload),

@@ -65,6 +65,7 @@ import { resolveWslHelpersDir } from "./wsl/wslDeploy";
 import { resolveWslHostAccess } from "./wsl/hostAccess";
 import { McpOAuthService } from "./mcp/McpOAuthService";
 import { McpProbeService } from "./mcp/McpProbeService";
+import { McpToolCallService } from "./mcp/McpToolCallService";
 import { prepareMcpToolFilters } from "./mcp/McpToolFilterService";
 import { ExternalMcpDiscoveryService } from "./mcp/ExternalMcpDiscoveryService";
 import { SkillsService } from "./skills/SkillsService";
@@ -148,6 +149,7 @@ export class SupervisorRuntime {
   readonly externalMcpDiscoveryService = new ExternalMcpDiscoveryService();
   readonly mcpOAuthService: McpOAuthService;
   readonly mcpProbeService: McpProbeService;
+  readonly mcpToolCallService: McpToolCallService;
   readonly skillsService: SkillsService;
   private readonly crossagentMcpIngress: CrossagentMcpIngress;
   private readonly subagentRunManager: SubagentRunManager;
@@ -194,6 +196,9 @@ export class SupervisorRuntime {
     this.baseDir = baseDir;
     this.mcpOAuthService = new McpOAuthService({ baseDir });
     this.mcpProbeService = new McpProbeService({
+      applyAuthorization: (server) => this.mcpOAuthService.applyAuthorizationToServer(server),
+    });
+    this.mcpToolCallService = new McpToolCallService({
       applyAuthorization: (server) => this.mcpOAuthService.applyAuthorizationToServer(server),
     });
     const paths = resolvePoracodePaths(baseDir);
@@ -858,6 +863,7 @@ export class SupervisorRuntime {
   async disposeAsync(): Promise<void> {
     this.usageService.stop();
     this.mcpProbeService.dispose();
+    this.mcpToolCallService.dispose();
     this.mcpOAuthService.dispose();
     this.lspManager.dispose();
     await this._projectWatcher?.dispose();

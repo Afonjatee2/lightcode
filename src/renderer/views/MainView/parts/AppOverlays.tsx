@@ -7,6 +7,7 @@ import { OverlayShell } from "@/renderer/components/layout/OverlayShell";
 import {
   DeferredBrowserHost as PrewarmedBrowserHost,
   DeferredCloneProjectModal as PrewarmedCloneProjectModal,
+  DeferredCreateCampaignProjectModal as PrewarmedCreateCampaignProjectModal,
   DeferredCreateProjectModal as PrewarmedCreateProjectModal,
   DeferredFileEditorOverlay,
   DeferredGitReviewOverlay,
@@ -214,6 +215,7 @@ export function AppOverlays() {
       <DeferredLoginTerminalOverlay />
       <DeferredCreateProjectModal />
       <DeferredCloneProjectModal />
+      <DeferredCreateCampaignProjectModal />
     </>
   );
 }
@@ -269,6 +271,16 @@ function DeferredCloneProjectModal() {
   return enabled ? (
     <Suspense>
       <PrewarmedCloneProjectModal />
+    </Suspense>
+  ) : null;
+}
+
+function DeferredCreateCampaignProjectModal() {
+  const open = usePanelStore((state) => state.createCampaignProjectModalOpen);
+  const enabled = useEverEnabled(open);
+  return enabled ? (
+    <Suspense>
+      <PrewarmedCreateCampaignProjectModal />
     </Suspense>
   ) : null;
 }

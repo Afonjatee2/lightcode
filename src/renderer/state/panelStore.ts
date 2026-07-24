@@ -55,6 +55,8 @@ interface PanelState {
   createProjectModalOpen: boolean;
   /** Whether the "Clone a repository" modal is open. */
   cloneProjectModalOpen: boolean;
+  /** Whether the "Create Campaign Workspace" modal is open. */
+  createCampaignProjectModalOpen: boolean;
   setGitReviewContext: (ctx: GitReviewContext | null) => void;
   setThreadSortMode: (mode: ThreadSortMode) => void;
   setGitReviewAsPanel: (v: boolean) => void;
@@ -83,6 +85,8 @@ interface PanelState {
   closeCreateProjectModal: () => void;
   openCloneProjectModal: () => void;
   closeCloneProjectModal: () => void;
+  openCreateCampaignProjectModal: () => void;
+  closeCreateCampaignProjectModal: () => void;
   closeAllPanels: () => void;
 }
 
@@ -152,6 +156,7 @@ export const usePanelStore = create<PanelState>()((set) => ({
   threadSearchOpen: false,
   createProjectModalOpen: false,
   cloneProjectModalOpen: false,
+  createCampaignProjectModalOpen: false,
 
   setGitReviewContext: (ctx) => {
     const prev = usePanelStore.getState().gitReviewContext;
@@ -284,6 +289,14 @@ export const usePanelStore = create<PanelState>()((set) => ({
     set((state) => (state.cloneProjectModalOpen ? {} : { cloneProjectModalOpen: true })),
   closeCloneProjectModal: () =>
     set((state) => (state.cloneProjectModalOpen ? { cloneProjectModalOpen: false } : {})),
+  openCreateCampaignProjectModal: () =>
+    set((state) =>
+      state.createCampaignProjectModalOpen ? {} : { createCampaignProjectModalOpen: true },
+    ),
+  closeCreateCampaignProjectModal: () =>
+    set((state) =>
+      state.createCampaignProjectModalOpen ? { createCampaignProjectModalOpen: false } : {},
+    ),
   closeAllPanels: () => {
     set((state) => {
       // The floating browser overlay (drawer/fullscreen) is intentionally NOT

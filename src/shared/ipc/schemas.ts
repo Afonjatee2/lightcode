@@ -82,6 +82,18 @@ export interface CreateProjectDirectoryResult {
   path: string;
 }
 
+export const ensureCampaignWorkspaceDirPayloadSchema = z.object({
+  projectId: z.string().min(1),
+  name: z.string().optional(),
+});
+export type EnsureCampaignWorkspaceDirPayload = z.infer<
+  typeof ensureCampaignWorkspaceDirPayloadSchema
+>;
+export interface EnsureCampaignWorkspaceDirResult {
+  path: string;
+  location: z.infer<typeof projectLocationSchema>;
+}
+
 export const readThreadPayloadSchema = z.object({
   threadId: z.string().min(1),
 });

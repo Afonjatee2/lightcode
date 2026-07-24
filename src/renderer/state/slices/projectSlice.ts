@@ -7,7 +7,10 @@ import type {
   ProjectWorktreeLocation,
   AppView,
   McpServer,
+  McpProfile,
+  CampaignProjectExtension,
 } from "@/shared/contracts";
+import { projectSchema } from "@/shared/contracts";
 import { HOME_PROJECT_ID, HOME_PROJECT_NAME } from "@/shared/homeScope";
 import { isDraftPaneId, parseDraftProjectId } from "@/shared/paneId";
 import { getProjectName } from "@/shared/wsl";
@@ -38,6 +41,13 @@ function projectDraftConfigEqual(
 export interface ProjectSlice {
   projects: Project[];
   addProject: (location: ProjectLocation, nameOverride?: string) => Project;
+  addCampaignProject: (
+    location: ProjectLocation,
+    campaignExtension: CampaignProjectExtension,
+    nameOverride?: string,
+    /** Explicit project ID. Generated when omitted. */
+    projectId?: string,
+  ) => Project;
   ensureHomeProject: (location: ProjectLocation) => Project;
   deleteProject: (projectId: string) => void;
   updateProjectDraftConfig: (projectId: string, draftConfig: ProjectDraftConfig) => void;
@@ -52,6 +62,8 @@ export interface ProjectSlice {
   ) => void;
   /** An empty list clears the project override entirely. */
   updateProjectMcpServers: (projectId: string, mcpServers: McpServer[]) => void;
+  /** No-op for non-campaign projects or projects without a campaignExtension yet. */
+  updateProjectCampaignMcpProfile: (projectId: string, mcpProfile: McpProfile) => void;
   updateProjectLocation: (projectId: string, location: ProjectLocation) => void;
   renameProject: (projectId: string, name: string) => void;
   setProjectDisabled: (projectId: string, disabled: boolean) => void;
@@ -67,6 +79,26 @@ export const createProjectSlice: SliceCreator<ProjectSlice> = (set) => ({
       location,
       createdAt: new Date().toISOString(),
     };
+
+    set((state) => ({
+      projects: [project, ...state.projects],
+    }));
+
+    return project;
+  },
+  addCampaignProject: (location, campaignExtension, nameOverride, projectId) => {
+    const project: Project = {
+      id: projectId ?? crypto.randomUUID(),
+      name: nameOverride?.trim() || getProjectName(location),
+      purpose: "campaign",
+      campaignExtension,
+      location,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Validate at the canonical creation boundary — must be a complete,
+    // valid campaign Project before it enters state.
+    projectSchema.parse(project);
 
     set((state) => ({
       projects: [project, ...state.projects],
@@ -217,6 +249,16 @@ export const createProjectSlice: SliceCreator<ProjectSlice> = (set) => ({
           return rest;
         }
         return { ...project, mcpServers };
+      }),
+    })),
+  updateProjectCampaignMcpProfile: (projectId, mcpProfile) =>
+    set((state) => ({
+      projects: state.projects.map((project) => {
+        if (project.id !== projectId || !project.campaignExtension) return project;
+        return {
+          ...project,
+          campaignExtension: { ...project.campaignExtension, mcpProfile },
+        };
       }),
     })),
   updateProjectLocation: (projectId, location) =>
