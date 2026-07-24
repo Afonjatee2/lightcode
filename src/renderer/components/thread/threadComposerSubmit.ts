@@ -8,7 +8,9 @@ import type {
   ThreadPresentationMode,
   UserInputOption,
 } from "@/shared/contracts";
+import { isMentionParseError, parseMention, resolveCampaignGroupId } from "@/shared/consultations";
 import { friendlyError } from "@/shared/messages";
+import { submitConsultation } from "@/renderer/actions/consultationActions";
 import {
   changeThreadConfig,
   resolveThreadServerRequest,
@@ -65,6 +67,65 @@ export interface ComposerSubmitContext {
 }
 
 /**
+ * Consultation interception (Part 6). In a campaign thread (the project carries
+ * a `campaignGroupId`), a message that parses as a known `@mention` is routed
+ * through the consultation IPC instead of the normal agent turn — the supervisor
+ * parses the mention (source of truth), submits the durable consultation and the
+ * dock renders the card. A message with NO known mention is a normal message and
+ * falls through to the regular send. A malformed mention (missing instruction,
+ * ambiguous, ...) surfaces a structured parser error and is NOT sent. Returns
+ * true when the message was handled (consultation or parser error) so the caller
+ * skips the normal submit — guaranteeing a single submission.
+ *
+ * The composer is NOT cleared eagerly. Text is preserved until the consultation
+ * IPC resolves successfully; a rejection restores the input. A thread-scoped
+ * guard prevents duplicate submissions while a consultation is in flight per
+ * thread, but simultaneous submissions across different threads are allowed.
+ */
+const submittingThreads = new Set<string>();
+
+function tryRouteConsultation(flat: string, ctx: ComposerSubmitContext): boolean {
+  const { thread } = ctx;
+  const project = useAppStore.getState().projects.find((item) => item.id === thread.projectId);
+  const campaignGroupId = project ? resolveCampaignGroupId(project) : undefined;
+  if (!campaignGroupId) return false;
+
+  const parsed = parseMention(flat);
+  if (isMentionParseError(parsed)) {
+    if (parsed.code === "unknown_mention") return false;
+    toast.warning(parsed.message);
+    return true;
+  }
+
+  if (submittingThreads.has(thread.id)) return true;
+  submittingThreads.add(thread.id);
+
+  void submitConsultation({
+    projectId: thread.projectId,
+    parentThreadId: thread.id,
+    campaignGroupId,
+    message: flat,
+  }).then((result) => {
+    if (!result.ok) {
+      toast.warning(result.message);
+      return;
+    }
+    ctx.setPrompt("");
+    ctx.setHasContent(false);
+    ctx.latestSegmentsRef.current = [];
+    ctx.mentionRef.current?.clear();
+    ctx.mentionRef.current?.focus();
+  }).catch((error: unknown) => {
+    // Thrown IPC failures: preserve text and surface the repository's safe,
+    // user-facing error format rather than an arbitrary internal exception.
+    toast.warning(friendlyError(error));
+  }).finally(() => {
+    submittingThreads.delete(thread.id);
+  });
+  return true;
+}
+
+/**
  * The composer submit pipeline, extracted verbatim from
  * `ThreadComposerSection`: attachment/selector segment assembly, local slash
  * commands, the optional pre-send approval denial, the pending-steer staging
@@ -94,6 +155,7 @@ export function submitComposerPrompt(segments: PromptSegment[], ctx: ComposerSub
   const allSegments = [...attachmentSegments, ...selectorSegments, ...boundSegments];
   const flat = flattenSegments(allSegments);
   if (flat.length === 0 || !ctx.canSubmit) return;
+  if (tryRouteConsultation(flat, ctx)) return;
   const clearComposerText = () => {
     ctx.setPrompt("");
     ctx.setHasContent(false);

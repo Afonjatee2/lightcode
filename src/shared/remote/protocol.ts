@@ -2,7 +2,7 @@ import { z } from "zod";
 import {
   agentStatusSchema,
   cloneRepoSourceSchema,
-  projectSchema,
+  projectWithoutMcpServersSchema,
   scheduledTaskIdPayloadSchema,
   scheduledTaskInputSchema,
   scheduledTaskSchema,
@@ -218,7 +218,7 @@ export const remoteProjectCommandSchema = z.discriminatedUnion("kind", [
 export type RemoteProjectCommand = z.infer<typeof remoteProjectCommandSchema>;
 
 /** Project metadata safe to expose remotely; MCP definitions may contain secrets. */
-export const remoteProjectSchema = projectSchema.omit({ mcpServers: true });
+export const remoteProjectSchema = projectWithoutMcpServersSchema;
 export type RemoteProject = z.infer<typeof remoteProjectSchema>;
 
 /** Result of a project command: the full updated list plus the affected row. */

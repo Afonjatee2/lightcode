@@ -1,4 +1,4 @@
-import { getSqlite } from "./connection";
+import { getSqlite, runWriteTransaction } from "./connection";
 import { safeParse } from "./rowMappers";
 
 export type RemoteCommandClaim =
@@ -9,7 +9,7 @@ export type RemoteCommandClaim =
 
 export function dbClaimRemoteCommand(commandId: string, route: string): RemoteCommandClaim {
   const sqlite = getSqlite();
-  const claim = sqlite.transaction((): RemoteCommandClaim => {
+  return runWriteTransaction(sqlite, (): RemoteCommandClaim => {
     const now = Date.now();
     const existing = sqlite
       .prepare("SELECT route, state, response FROM remote_command_receipts WHERE command_id = ?")
@@ -33,7 +33,6 @@ export function dbClaimRemoteCommand(commandId: string, route: string): RemoteCo
       .run(commandId, route, now, now);
     return { state: "claimed" };
   });
-  return claim();
 }
 
 export function dbCompleteRemoteCommand(commandId: string, response: unknown): void {

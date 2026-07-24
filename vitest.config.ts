@@ -49,6 +49,7 @@ export default defineConfig({
           include: ["src/**/*.test.{ts,tsx}"],
           exclude: ["src/renderer/**/*.test.{ts,tsx}", "src/mobile/**/*.test.tsx"],
           environment: "node",
+          globalSetup: ["./src/test/prepareSqliteNative.ts"],
         },
       },
       {

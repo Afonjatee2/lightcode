@@ -231,6 +231,11 @@ msgstr "{0} ejecución"
 msgid "{0} runs"
 msgstr "{0} ejecuciones"
 
+#. placeholder {0}: evidenceFreshness.staleSourceCount
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "{0} stale data source(s)"
+msgstr "{0} fuente(s) de datos obsoleta(s)"
+
 #. placeholder {0}: threads.length
 #: src/mobile/views/ThreadsView.tsx
 msgid "{0} threads"
@@ -504,6 +509,10 @@ msgstr "{usedLabel} tokens"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/ModelVisibilityDropdown.tsx
 msgid "{visibleCount} of {totalCount} visible"
 msgstr "{visibleCount} de {totalCount} visibles"
+
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "@codex check the budget pacing"
+msgstr "@codex verificar el ritmo del presupuesto"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "/absolute/path/to/project"
@@ -888,6 +897,10 @@ msgstr "Agentes"
 msgid "Agents · General"
 msgstr "Agentes · General"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Aggregated findings:"
+msgstr "Hallazgos agregados:"
+
 #. Settings section: AI / assistant configuration
 #. Settings section: AI / assistant configuration
 #: src/mobile/settingsSections.ts
@@ -950,6 +963,10 @@ msgstr "Todos los dispositivos"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "All efforts"
 msgstr "Todos los niveles de esfuerzo"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "All failed"
+msgstr "Todos fallaron"
 
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 #: src/renderer/views/PrReviewOverlay/PrReviewOverlay.tsx
@@ -1512,6 +1529,10 @@ msgstr "Inicio de sesión en el navegador"
 msgid "Browser tabs"
 msgstr "Pestañas del navegador"
 
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Budget data not available"
+msgstr "Datos de presupuesto no disponibles"
+
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Budget limit reached"
 msgstr "Límite de presupuesto alcanzado"
@@ -1572,6 +1593,10 @@ msgstr "Solo en caché"
 msgid "Camera access blocked"
 msgstr "Acceso a la cámara bloqueado"
 
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Campaign plan not available"
+msgstr "Plan de campaña no disponible"
+
 #: src/mobile/views/PortsView.tsx
 msgid "Can't load ports"
 msgstr "No se pudieron cargar los puertos"
@@ -1581,6 +1606,7 @@ msgstr "No se pudieron cargar los puertos"
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/components/common/ConfirmDialog.tsx
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
@@ -1612,6 +1638,10 @@ msgstr "Cancelar"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Cancel new Claude profile"
 msgstr "Cancelar nuevo perfil de Claude"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Cancel panel"
+msgstr "Cancelar panel"
 
 #: src/renderer/components/thread/ThreadPendingSteerStrip.tsx
 msgid "Cancel pending steer"
@@ -2308,6 +2338,11 @@ msgstr "Compara esta huella digital con la que aparece en tu servidor."
 #~ msgid "Comparing candidates…"
 #~ msgstr "Comparando candidatos…"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "complete"
+msgstr "completado"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Complete"
 msgstr "Completado"
@@ -2348,6 +2383,11 @@ msgstr "completado"
 #: src/renderer/utils/prStatus.ts
 msgid "Completed"
 msgstr "Completado"
+
+#. placeholder {0}: completedAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Completed {0}"
+msgstr "Completado {0}"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
@@ -2499,6 +2539,26 @@ msgstr "Conexiones"
 msgid "Console"
 msgstr "Consola"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Consult"
+msgstr "Consultar"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation complete"
+msgstr "Consulta completada"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation failed"
+msgstr "La consulta falló"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation was cancelled"
+msgstr "La consulta fue cancelada"
+
+#: src/renderer/components/consultations/ConsultationDock.tsx
+msgid "Consultations"
+msgstr "Consultas"
+
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Contains sensitive values; add manually"
 msgstr "Contiene valores confidenciales; añádelo manualmente"
@@ -2559,6 +2619,10 @@ msgstr "Continuar en..."
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control an external Chrome browser."
 msgstr "Controla un navegador Chrome externo."
+
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Control Centre connection unavailable"
+msgstr "Centro de Control no disponible"
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control the desktop."
@@ -2874,6 +2938,11 @@ msgstr "Crear con un agente"
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #~ msgid "Create:"
 #~ msgstr "Crear:"
+
+#. placeholder {0}: createdAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Created {0}"
+msgstr "Creado {0}"
 
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
 msgid "Created a worktree on \"{newBranch}\", but the changes conflicted and remain in a git stash — resolve them in the worktree."
@@ -3435,6 +3504,7 @@ msgstr "No volver a preguntar"
 msgid "Don't show hook install proposal"
 msgstr "No mostrar la propuesta de instalación de hooks"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "done"
@@ -3775,6 +3845,16 @@ msgstr "Cada hora"
 msgid "Every hour at {0} minutes past"
 msgstr "Cada hora, a los {0} minutos"
 
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Evidence freshness unknown"
+msgstr "Actualidad de la evidencia desconocida"
+
+#. placeholder {0}: oldest.toLocaleDateString()
+#. placeholder {1}: newest.toLocaleDateString()
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Evidence from {0} to {1}"
+msgstr "Evidencia del {0} al {1}"
+
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Exclude patterns"
@@ -3941,6 +4021,7 @@ msgstr "Extrayendo contexto de {0}..."
 msgid "Factory Droid"
 msgstr "Factory Droid"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 #: src/renderer/views/LoginTerminalOverlay/LoginTerminalOverlay.tsx
 msgid "failed"
@@ -4089,6 +4170,10 @@ msgstr "Filtrar skills por estado"
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Filters"
 msgstr "Filtros"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Finalise"
+msgstr "Finalizar"
 
 #: src/renderer/commands/registry.ts
 #: src/renderer/components/find/FindBar.tsx
@@ -4745,6 +4830,11 @@ msgstr "Se importó 1 skill."
 msgid "Improved"
 msgstr "Mejorado"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "In progress"
+msgstr "En progreso"
+
 #: src/mobile/QrScanner.tsx
 msgid "In-app camera scanning only works over HTTPS. Use your phone's camera app to scan the desktop QR code, or enter the endpoint and token below."
 msgstr "El escaneo con cámara dentro de la app solo funciona con HTTPS. Usa la app de cámara del teléfono para escanear el código QR del escritorio, o introduce el endpoint y el token abajo."
@@ -4939,6 +5029,10 @@ msgstr "Mantener Poracode en la bandeja del sistema cuando se inicie automática
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Keep the system awake while any thread is actively working."
 msgstr "Mantener el sistema activo mientras cualquier hilo esté trabajando."
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Key findings:"
+msgstr "Hallazgos clave:"
 
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Kill bash"
@@ -5626,6 +5720,10 @@ msgstr "Notificaciones push móviles"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Mode"
 msgstr "Modo"
+
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Mode:"
+msgstr "Modo:"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Model"
@@ -6923,9 +7021,26 @@ msgid "Pairing…"
 msgstr "Emparejando…"
 
 #: src/renderer/commands/shortcutCatalog.ts
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Panel"
 msgstr "Panel"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel Consultation"
+msgstr "Panel de Consulta"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel consultation was cancelled"
+msgstr "La consulta del panel fue cancelada"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel failed"
+msgstr "El panel falló"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel synthesis complete"
+msgstr "Síntesis del panel completada"
 
 #: src/renderer/commands/shortcutCatalog.ts
 msgid "Panels and overlays"
@@ -7028,6 +7143,10 @@ msgstr "Dirección pendiente"
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/PermissionDetailsLine.tsx
 msgid "permission"
 msgstr "permiso"
+
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Permission-restricted content hidden"
+msgstr "Contenido restringido oculto"
 
 #: src/mobile/routeComponents.tsx
 #: src/mobile/views/ThreadView.tsx
@@ -7350,6 +7469,10 @@ msgstr "El proveedor no ha informado del uso de tokens."
 msgid "Provider presets"
 msgstr "Preajustes de proveedor"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Provider:"
+msgstr "Proveedor:"
+
 #. plural
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/authHelpers.ts
 msgid "providers"
@@ -7553,6 +7676,10 @@ msgstr "Instalaciones recientes"
 #: src/renderer/views/HomeView.tsx
 msgid "Recent threads"
 msgstr "Hilos recientes"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Recommendations:"
+msgstr "Recomendaciones:"
 
 #: src/mobile/components.tsx
 msgid "Reconnect"
@@ -7995,6 +8122,7 @@ msgstr "Reanudar"
 #: src/mobile/views/BrowserView.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/mobile/views/TerminalView.tsx
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -8016,6 +8144,14 @@ msgstr "Reintentar la limpieza"
 #: src/mobile/components.tsx
 msgid "Retry now"
 msgstr "Reintentar ahora"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Retry of panel"
+msgstr "Reintento del panel"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Retry panel"
+msgstr "Reintentar panel"
 
 #: src/renderer/hooks/usePrWriteActions.ts
 msgid "Retry with admin"
@@ -8133,6 +8269,10 @@ msgstr "Panel derecho"
 msgid "Right-click to switch ring"
 msgstr "Haz clic derecho para cambiar de anillo"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Role:"
+msgstr "Rol:"
+
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
@@ -8217,6 +8357,7 @@ msgstr "Ejecutar comando de terminal"
 msgid "Run this schedule automatically on the schedule below."
 msgstr "Ejecutar esta programación automáticamente según la programación de abajo."
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "running"
@@ -9109,6 +9250,10 @@ msgstr "Preparado"
 msgid "Staged ({0})"
 msgstr "Preparado ({0})"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Standard"
+msgstr "Estándar"
+
 #: src/renderer/commands/registry.ts
 msgid "Star or unstar the current chat or model"
 msgstr "Marcar o desmarcar como favorito el chat o modelo actual"
@@ -9193,6 +9338,11 @@ msgstr "Empieza con una programación"
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Start Without Context"
 msgstr "Iniciar sin contexto"
+
+#. placeholder {0}: startedAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Started {0}"
+msgstr "Iniciado {0}"
 
 #: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
 msgid "Started {targetLabel} thread"
@@ -10425,6 +10575,10 @@ msgstr "Desinstalar"
 msgid "Unknown"
 msgstr "Desconocido"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Unknown mention. Try @codex, @claude, @daily-operator, @verify, etc."
+msgstr "Mención desconocida. Prueba @codex, @claude, @daily-operator, @verify, etc."
+
 #: src/renderer/notifications.ts
 msgid "Unknown project"
 msgstr "Proyecto desconocido"
@@ -10727,6 +10881,10 @@ msgstr "Ver {0}"
 #: src/renderer/views/SettingsOverlay/parts/ChangelogSettings.tsx
 msgid "View all releases on GitHub"
 msgstr "Ver todas las versiones en GitHub"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "View child thread"
+msgstr "Ver hilo secundario"
 
 #: src/mobile/views/GitActionSheet.tsx
 msgid "View diff"

@@ -1,5 +1,6 @@
 import { appProcedures } from "./procedures/app";
 import { browserProcedures } from "./procedures/browser";
+import { consultationProcedures } from "./procedures/consultation";
 import { dbProcedures } from "./procedures/db";
 import { experimentProcedures } from "./procedures/experiment";
 import { githubProcedures } from "./procedures/github";
@@ -34,6 +35,7 @@ export const groupedIpcProcedures = {
   profile: profileProcedures,
   schedules: scheduleProcedures,
   skills: skillProcedures,
+  consultation: consultationProcedures,
 } as const;
 
 export const ipcProcedureMap = {
@@ -54,6 +56,7 @@ export const ipcProcedureMap = {
   ...profileProcedures,
   ...scheduleProcedures,
   ...skillProcedures,
+  ...consultationProcedures,
 } as const;
 
 export type IpcProcedureMap = typeof ipcProcedureMap;

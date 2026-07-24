@@ -231,6 +231,11 @@ msgstr "{0} lần chạy"
 msgid "{0} runs"
 msgstr "{0} lần chạy"
 
+#. placeholder {0}: evidenceFreshness.staleSourceCount
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "{0} stale data source(s)"
+msgstr "{0} nguồn dữ liệu lỗi thời"
+
 #. placeholder {0}: threads.length
 #: src/mobile/views/ThreadsView.tsx
 msgid "{0} threads"
@@ -504,6 +509,10 @@ msgstr "{usedLabel} mã thông báo"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/ModelVisibilityDropdown.tsx
 msgid "{visibleCount} of {totalCount} visible"
 msgstr "{visibleCount} trong số {totalCount} hiển thị"
+
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "@codex check the budget pacing"
+msgstr "@codex kiểm tra tiến độ ngân sách"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "/absolute/path/to/project"
@@ -888,6 +897,10 @@ msgstr "Tác nhân"
 msgid "Agents · General"
 msgstr "Tác nhân · Chung"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Aggregated findings:"
+msgstr "Phát hiện tổng hợp:"
+
 #. Settings section: AI / assistant configuration
 #. Settings section: AI / assistant configuration
 #: src/mobile/settingsSections.ts
@@ -950,6 +963,10 @@ msgstr "Tất cả thiết bị"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "All efforts"
 msgstr "Tất cả mức nỗ lực"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "All failed"
+msgstr "Tất cả thất bại"
 
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 #: src/renderer/views/PrReviewOverlay/PrReviewOverlay.tsx
@@ -1512,6 +1529,10 @@ msgstr "Đăng nhập bằng trình duyệt"
 msgid "Browser tabs"
 msgstr "Thẻ trình duyệt"
 
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Budget data not available"
+msgstr "Dữ liệu ngân sách không khả dụng"
+
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Budget limit reached"
 msgstr "Đã đạt đến giới hạn ngân sách"
@@ -1572,6 +1593,10 @@ msgstr "Chỉ có trong bộ nhớ đệm"
 msgid "Camera access blocked"
 msgstr "Quyền truy cập camera bị chặn"
 
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Campaign plan not available"
+msgstr "Kế hoạch chiến dịch không khả dụng"
+
 #: src/mobile/views/PortsView.tsx
 msgid "Can't load ports"
 msgstr "Không thể tải danh sách cổng"
@@ -1581,6 +1606,7 @@ msgstr "Không thể tải danh sách cổng"
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/components/common/ConfirmDialog.tsx
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
@@ -1612,6 +1638,10 @@ msgstr "Hủy bỏ"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Cancel new Claude profile"
 msgstr "Hủy tạo hồ sơ Claude mới"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Cancel panel"
+msgstr "Hủy hội đồng"
 
 #: src/renderer/components/thread/ThreadPendingSteerStrip.tsx
 msgid "Cancel pending steer"
@@ -2308,6 +2338,11 @@ msgstr "So sánh dấu vân tay này với dấu vân tay hiển thị trên má
 #~ msgid "Comparing candidates…"
 #~ msgstr "Đang so sánh các ứng viên…"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "complete"
+msgstr "hoàn tất"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Complete"
 msgstr "Hoàn thành"
@@ -2348,6 +2383,11 @@ msgstr "hoàn thành"
 #: src/renderer/utils/prStatus.ts
 msgid "Completed"
 msgstr "Đã hoàn tất"
+
+#. placeholder {0}: completedAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Completed {0}"
+msgstr "Đã hoàn thành {0}"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
@@ -2499,6 +2539,26 @@ msgstr "Kết nối"
 msgid "Console"
 msgstr "Console"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Consult"
+msgstr "Tư vấn"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation complete"
+msgstr "Tư vấn hoàn tất"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation failed"
+msgstr "Tư vấn thất bại"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation was cancelled"
+msgstr "Tư vấn đã bị hủy"
+
+#: src/renderer/components/consultations/ConsultationDock.tsx
+msgid "Consultations"
+msgstr "Tư vấn"
+
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Contains sensitive values; add manually"
 msgstr "Có chứa giá trị nhạy cảm; hãy thêm thủ công"
@@ -2559,6 +2619,10 @@ msgstr "Tiếp tục trong..."
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control an external Chrome browser."
 msgstr "Điều khiển trình duyệt Chrome bên ngoài."
+
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Control Centre connection unavailable"
+msgstr "Trung tâm điều khiển không khả dụng"
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control the desktop."
@@ -2874,6 +2938,11 @@ msgstr "Tạo bằng tác nhân"
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #~ msgid "Create:"
 #~ msgstr "Tạo:"
+
+#. placeholder {0}: createdAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Created {0}"
+msgstr "Đã tạo {0}"
 
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
 msgid "Created a worktree on \"{newBranch}\", but the changes conflicted and remain in a git stash — resolve them in the worktree."
@@ -3435,6 +3504,7 @@ msgstr "Đừng hỏi lại"
 msgid "Don't show hook install proposal"
 msgstr "Không hiển thị đề xuất cài đặt hook"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "done"
@@ -3775,6 +3845,16 @@ msgstr "Mỗi giờ"
 msgid "Every hour at {0} minutes past"
 msgstr "Mỗi giờ vào phút thứ {0}"
 
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Evidence freshness unknown"
+msgstr "Không rõ độ mới của bằng chứng"
+
+#. placeholder {0}: oldest.toLocaleDateString()
+#. placeholder {1}: newest.toLocaleDateString()
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Evidence from {0} to {1}"
+msgstr "Bằng chứng từ {0} đến {1}"
+
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Exclude patterns"
@@ -3941,6 +4021,7 @@ msgstr "Đang trích xuất ngữ cảnh từ {0}..."
 msgid "Factory Droid"
 msgstr "Factory Droid"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 #: src/renderer/views/LoginTerminalOverlay/LoginTerminalOverlay.tsx
 msgid "failed"
@@ -4089,6 +4170,10 @@ msgstr "Lọc skill theo trạng thái"
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Filters"
 msgstr "Bộ lọc"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Finalise"
+msgstr "Hoàn tất"
 
 #: src/renderer/commands/registry.ts
 #: src/renderer/components/find/FindBar.tsx
@@ -4745,6 +4830,11 @@ msgstr "Đã nhập 1 skill."
 msgid "Improved"
 msgstr "Cải thiện"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "In progress"
+msgstr "Đang tiến hành"
+
 #: src/mobile/QrScanner.tsx
 msgid "In-app camera scanning only works over HTTPS. Use your phone's camera app to scan the desktop QR code, or enter the endpoint and token below."
 msgstr "Quét bằng camera trong ứng dụng chỉ hoạt động qua HTTPS. Dùng ứng dụng camera trên điện thoại để quét mã QR của desktop, hoặc nhập endpoint và token bên dưới."
@@ -4939,6 +5029,10 @@ msgstr "Giữ Poracode trong khay hệ thống khi ứng dụng khởi chạy c�
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Keep the system awake while any thread is actively working."
 msgstr "Giữ cho hệ thống luôn hoạt động trong khi bất kỳ luồng nào đang hoạt động tích cực."
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Key findings:"
+msgstr "Phát hiện chính:"
 
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Kill bash"
@@ -5626,6 +5720,10 @@ msgstr "Thông báo đẩy trên di động"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Mode"
 msgstr "Chế độ"
+
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Mode:"
+msgstr "Chế độ:"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Model"
@@ -6923,9 +7021,26 @@ msgid "Pairing…"
 msgstr "Đang ghép đôi…"
 
 #: src/renderer/commands/shortcutCatalog.ts
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Panel"
 msgstr "bảng điều khiển"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel Consultation"
+msgstr "Bảng tư vấn"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel consultation was cancelled"
+msgstr "Phiên tư vấn hội đồng đã bị hủy"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel failed"
+msgstr "Hội đồng thất bại"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel synthesis complete"
+msgstr "Tổng hợp bảng đã hoàn tất"
 
 #: src/renderer/commands/shortcutCatalog.ts
 msgid "Panels and overlays"
@@ -7028,6 +7143,10 @@ msgstr "Đang chờ chỉ đạo"
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/PermissionDetailsLine.tsx
 msgid "permission"
 msgstr "sự cho phép"
+
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Permission-restricted content hidden"
+msgstr "Nội dung bị hạn chế quyền đã ẩn"
 
 #: src/mobile/routeComponents.tsx
 #: src/mobile/views/ThreadView.tsx
@@ -7350,6 +7469,10 @@ msgstr "Nhà cung cấp chưa báo cáo việc sử dụng mã thông báo."
 msgid "Provider presets"
 msgstr "Cấu hình nhà cung cấp"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Provider:"
+msgstr "Nhà cung cấp:"
+
 #. plural
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/authHelpers.ts
 msgid "providers"
@@ -7553,6 +7676,10 @@ msgstr "Lượt cài đặt gần đây"
 #: src/renderer/views/HomeView.tsx
 msgid "Recent threads"
 msgstr "Luồng gần đây"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Recommendations:"
+msgstr "Khuyến nghị:"
 
 #: src/mobile/components.tsx
 msgid "Reconnect"
@@ -7995,6 +8122,7 @@ msgstr "Tiếp tục"
 #: src/mobile/views/BrowserView.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/mobile/views/TerminalView.tsx
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -8016,6 +8144,14 @@ msgstr "Thử dọn dẹp lại"
 #: src/mobile/components.tsx
 msgid "Retry now"
 msgstr "Thử lại ngay"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Retry of panel"
+msgstr "Lần thử lại của hội đồng"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Retry panel"
+msgstr "Thử lại hội đồng"
 
 #: src/renderer/hooks/usePrWriteActions.ts
 msgid "Retry with admin"
@@ -8133,6 +8269,10 @@ msgstr "Bảng bên phải"
 msgid "Right-click to switch ring"
 msgstr "Nhấp chuột phải để đổi vòng"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Role:"
+msgstr "Vai trò:"
+
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
@@ -8217,6 +8357,7 @@ msgstr "Chạy lệnh Terminal"
 msgid "Run this schedule automatically on the schedule below."
 msgstr "Tự động chạy lịch này theo lịch bên dưới."
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "running"
@@ -9109,6 +9250,10 @@ msgstr "Đã stage"
 msgid "Staged ({0})"
 msgstr "Đã stage ({0})"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Standard"
+msgstr "Tiêu chuẩn"
+
 #: src/renderer/commands/registry.ts
 msgid "Star or unstar the current chat or model"
 msgstr "Thêm hoặc xóa yêu thích cho cuộc trò chuyện hoặc mô hình hiện tại"
@@ -9193,6 +9338,11 @@ msgstr "Bắt đầu bằng một lịch"
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Start Without Context"
 msgstr "Bắt đầu không có bối cảnh"
+
+#. placeholder {0}: startedAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Started {0}"
+msgstr "Đã bắt đầu {0}"
 
 #: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
 msgid "Started {targetLabel} thread"
@@ -10425,6 +10575,10 @@ msgstr "Gỡ cài đặt"
 msgid "Unknown"
 msgstr "Không xác định"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Unknown mention. Try @codex, @claude, @daily-operator, @verify, etc."
+msgstr "Đề cập không xác định. Hãy thử @codex, @claude, @daily-operator, @verify, v.v."
+
 #: src/renderer/notifications.ts
 msgid "Unknown project"
 msgstr "Dự án không xác định"
@@ -10727,6 +10881,10 @@ msgstr "Xem {0}"
 #: src/renderer/views/SettingsOverlay/parts/ChangelogSettings.tsx
 msgid "View all releases on GitHub"
 msgstr "Xem tất cả bản phát hành trên GitHub"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "View child thread"
+msgstr "Xem luồng con"
 
 #: src/mobile/views/GitActionSheet.tsx
 msgid "View diff"

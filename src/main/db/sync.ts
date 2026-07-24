@@ -6,18 +6,37 @@ import {
   type Thread,
 } from "@/shared/contracts";
 import type { DbPersistExperimentStatePayload } from "@/shared/ipc";
-import { getSqlite } from "./connection";
+import {
+  getSqlite,
+  isProjectIdKnown,
+  isThreadIdKnown,
+  markProjectIdsKnown,
+  markThreadIdsKnown,
+  runWriteTransaction,
+} from "./connection";
 import { notifyProjectThreadDataChanged } from "./projectThreadChanges";
 import { locationToRow } from "./rowMappers";
 
 /**
  * Bulk-sync the full project and thread lists from the renderer store.
  * Uses a transaction for atomicity — either everything writes or nothing.
+ *
+ * This is a full-snapshot reconciliation: any project/thread missing from
+ * `projectsData`/`threadsData` is deleted, since that's how the renderer
+ * store expresses "the user removed this." But other writers persist a
+ * project/thread directly (home-scope bootstrap, orchestrator child threads,
+ * remote/mobile thread commands) without going through the renderer's store.
+ * If the renderer's in-memory snapshot is still stale when one of those rows
+ * lands, treating "missing from incoming" as "the user deleted it" would
+ * delete a row the renderer never had a chance to learn about. Deletion is
+ * therefore gated on `isProjectIdKnown`/`isThreadIdKnown` — the renderer must
+ * have actually seen the id before (via its initial hydration read or a
+ * previous snapshot) for its absence to mean anything.
  */
 export function dbSyncAll(projectsData: Project[], threadsData: Thread[], viewJson: string): void {
   const sqlite = getSqlite();
 
-  sqlite.transaction(() => {
+  runWriteTransaction(sqlite, () => {
     const existingProjectIds = new Set(
       (sqlite.prepare("SELECT id FROM projects").all() as Array<{ id: string }>).map((r) => r.id),
     );
@@ -27,7 +46,7 @@ export function dbSyncAll(projectsData: Project[], threadsData: Thread[], viewJs
     const upsertProject = prepareProjectSyncStatement(sqlite);
 
     for (const pid of existingProjectIds) {
-      if (!incomingProjectIds.has(pid)) {
+      if (!incomingProjectIds.has(pid) && isProjectIdKnown(pid)) {
         deleteProject.run(pid);
         deleteProjectNotes.run(pid);
       }
@@ -35,6 +54,7 @@ export function dbSyncAll(projectsData: Project[], threadsData: Thread[], viewJs
     for (let i = 0; i < projectsData.length; i++) {
       runProjectSync(upsertProject, projectsData[i]!, i);
     }
+    markProjectIdsKnown(incomingProjectIds);
 
     const existingThreadIds = new Set(
       (sqlite.prepare("SELECT id FROM threads").all() as Array<{ id: string }>).map((r) => r.id),
@@ -44,26 +64,27 @@ export function dbSyncAll(projectsData: Project[], threadsData: Thread[], viewJs
     const upsertThread = prepareThreadSyncStatement(sqlite);
 
     for (const tid of existingThreadIds) {
-      if (!incomingThreadIds.has(tid)) {
+      if (!incomingThreadIds.has(tid) && isThreadIdKnown(tid)) {
         deleteThread.run(tid);
       }
     }
     for (let i = 0; i < threadsData.length; i++) {
       runThreadSync(upsertThread, threadsData[i]!, i);
     }
+    markThreadIdsKnown(incomingThreadIds);
 
     sqlite
       .prepare(
         "INSERT INTO app_state (key, value) VALUES ('view', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
       )
       .run(viewJson);
-  })();
+  });
   notifyProjectThreadDataChanged();
 }
 
 export function dbPersistExperimentState(payload: DbPersistExperimentStatePayload): void {
   const sqlite = getSqlite();
-  sqlite.transaction(() => {
+  runWriteTransaction(sqlite, () => {
     const deleteThread = sqlite.prepare("DELETE FROM threads WHERE id = ?");
     for (const threadId of payload.deletedThreadIds) deleteThread.run(threadId);
 
@@ -83,7 +104,7 @@ export function dbPersistExperimentState(payload: DbPersistExperimentStatePayloa
           version: EXPERIMENT_STORE_VERSION,
         }),
       );
-  })();
+  });
 }
 
 type SqliteStatement = ReturnType<InstanceType<typeof Database>["prepare"]>;
@@ -92,12 +113,12 @@ function prepareProjectSyncStatement(sqlite: InstanceType<typeof Database>): Sql
   return sqlite.prepare(`
     INSERT INTO projects (
       id, name, location_kind, location_path, location_distro, location_linux_path,
-      location_unc_path, last_draft_config, scripts, search_settings, mcp_servers, disabled,
-      sort_order, created_at
+      location_unc_path, last_draft_config, scripts, search_settings, mcp_servers,
+      purpose, campaign_extension, campaign_group_id, disabled, sort_order, created_at
     ) VALUES (
       @id, @name, @locationKind, @locationPath, @locationDistro, @locationLinuxPath,
-      @locationUncPath, @lastDraftConfig, @scripts, @searchSettings, @mcpServers, @disabled,
-      @sortOrder, @createdAt
+      @locationUncPath, @lastDraftConfig, @scripts, @searchSettings, @mcpServers,
+      @purpose, @campaignExtension, @campaignGroupId, @disabled, @sortOrder, @createdAt
     )
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
@@ -110,6 +131,9 @@ function prepareProjectSyncStatement(sqlite: InstanceType<typeof Database>): Sql
       scripts = excluded.scripts,
       search_settings = excluded.search_settings,
       mcp_servers = excluded.mcp_servers,
+      purpose = excluded.purpose,
+      campaign_extension = excluded.campaign_extension,
+      campaign_group_id = excluded.campaign_group_id,
       disabled = excluded.disabled,
       sort_order = excluded.sort_order
   `);
@@ -124,6 +148,9 @@ function runProjectSync(stmt: SqliteStatement, project: Project, sortOrder: numb
     scripts: project.scripts ? JSON.stringify(project.scripts) : null,
     searchSettings: project.searchSettings ? JSON.stringify(project.searchSettings) : null,
     mcpServers: project.mcpServers ? JSON.stringify(project.mcpServers) : null,
+    purpose: project.purpose ?? null,
+    campaignExtension: project.campaignExtension ? JSON.stringify(project.campaignExtension) : null,
+    campaignGroupId: project.campaignExtension?.campaignGroupId ?? null,
     disabled: project.disabled ? 1 : 0,
     sortOrder,
     createdAt: project.createdAt,

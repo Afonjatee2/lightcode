@@ -231,6 +231,11 @@ msgstr "{0}회 실행"
 msgid "{0} runs"
 msgstr "{0}회 실행"
 
+#. placeholder {0}: evidenceFreshness.staleSourceCount
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "{0} stale data source(s)"
+msgstr "오래된 데이터 소스 {0}개"
+
 #. placeholder {0}: threads.length
 #: src/mobile/views/ThreadsView.tsx
 msgid "{0} threads"
@@ -504,6 +509,10 @@ msgstr "{usedLabel} 토큰"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/ModelVisibilityDropdown.tsx
 msgid "{visibleCount} of {totalCount} visible"
 msgstr "{totalCount}개 중 {visibleCount}개 표시"
+
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "@codex check the budget pacing"
+msgstr "@codex 예산 진행 속도 확인"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "/absolute/path/to/project"
@@ -888,6 +897,10 @@ msgstr "에이전트"
 msgid "Agents · General"
 msgstr "에이전트 · 일반"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Aggregated findings:"
+msgstr "종합 발견 사항:"
+
 #. Settings section: AI / assistant configuration
 #. Settings section: AI / assistant configuration
 #: src/mobile/settingsSections.ts
@@ -950,6 +963,10 @@ msgstr "모든 기기"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "All efforts"
 msgstr "모든 추론 강도"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "All failed"
+msgstr "모두 실패"
 
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 #: src/renderer/views/PrReviewOverlay/PrReviewOverlay.tsx
@@ -1512,6 +1529,10 @@ msgstr "브라우저로 로그인"
 msgid "Browser tabs"
 msgstr "브라우저 탭"
 
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Budget data not available"
+msgstr "예산 데이터 사용 불가"
+
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Budget limit reached"
 msgstr "예산 한도 도달"
@@ -1572,6 +1593,10 @@ msgstr "캐시만 있음"
 msgid "Camera access blocked"
 msgstr "카메라 접근이 차단됨"
 
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Campaign plan not available"
+msgstr "캠페인 계획 사용 불가"
+
 #: src/mobile/views/PortsView.tsx
 msgid "Can't load ports"
 msgstr "포트를 불러올 수 없습니다"
@@ -1581,6 +1606,7 @@ msgstr "포트를 불러올 수 없습니다"
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/components/common/ConfirmDialog.tsx
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
@@ -1612,6 +1638,10 @@ msgstr "취소"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Cancel new Claude profile"
 msgstr "새 Claude 프로필 취소"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Cancel panel"
+msgstr "패널 취소"
 
 #: src/renderer/components/thread/ThreadPendingSteerStrip.tsx
 msgid "Cancel pending steer"
@@ -2308,6 +2338,11 @@ msgstr "이 지문을 서버에 표시된 지문과 비교하세요."
 #~ msgid "Comparing candidates…"
 #~ msgstr "후보 비교 중…"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "complete"
+msgstr "완료"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Complete"
 msgstr "완료"
@@ -2348,6 +2383,11 @@ msgstr "완료"
 #: src/renderer/utils/prStatus.ts
 msgid "Completed"
 msgstr "완료됨"
+
+#. placeholder {0}: completedAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Completed {0}"
+msgstr "완료: {0}"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
@@ -2499,6 +2539,26 @@ msgstr "연결"
 msgid "Console"
 msgstr "콘솔"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Consult"
+msgstr "상담"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation complete"
+msgstr "상담 완료"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation failed"
+msgstr "상담 실패"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation was cancelled"
+msgstr "상담이 취소되었습니다"
+
+#: src/renderer/components/consultations/ConsultationDock.tsx
+msgid "Consultations"
+msgstr "상담"
+
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Contains sensitive values; add manually"
 msgstr "민감한 값이 포함되어 있습니다. 직접 추가하세요"
@@ -2559,6 +2619,10 @@ msgstr "다음에서 계속..."
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control an external Chrome browser."
 msgstr "외부 Chrome 브라우저를 제어합니다."
+
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Control Centre connection unavailable"
+msgstr "제어 센터 연결 불가"
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control the desktop."
@@ -2874,6 +2938,11 @@ msgstr "에이전트로 만들기"
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #~ msgid "Create:"
 #~ msgstr "생성:"
+
+#. placeholder {0}: createdAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Created {0}"
+msgstr "생성: {0}"
 
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
 msgid "Created a worktree on \"{newBranch}\", but the changes conflicted and remain in a git stash — resolve them in the worktree."
@@ -3435,6 +3504,7 @@ msgstr "다시 묻지 마세요"
 msgid "Don't show hook install proposal"
 msgstr "후크 설치 제안을 표시하지 않음"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "done"
@@ -3775,6 +3845,16 @@ msgstr "매시간"
 msgid "Every hour at {0} minutes past"
 msgstr "매시 {0}분"
 
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Evidence freshness unknown"
+msgstr "증거 최신 상태 알 수 없음"
+
+#. placeholder {0}: oldest.toLocaleDateString()
+#. placeholder {1}: newest.toLocaleDateString()
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Evidence from {0} to {1}"
+msgstr "{0}부터 {1}까지의 증거"
+
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Exclude patterns"
@@ -3941,6 +4021,7 @@ msgstr "{0}에서 컨텍스트를 추출하는 중..."
 msgid "Factory Droid"
 msgstr "Factory Droid"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 #: src/renderer/views/LoginTerminalOverlay/LoginTerminalOverlay.tsx
 msgid "failed"
@@ -4089,6 +4170,10 @@ msgstr "상태별로 스킬 필터링"
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Filters"
 msgstr "필터"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Finalise"
+msgstr "완료"
 
 #: src/renderer/commands/registry.ts
 #: src/renderer/components/find/FindBar.tsx
@@ -4745,6 +4830,11 @@ msgstr "스킬 1개를 가져왔습니다."
 msgid "Improved"
 msgstr "개선됨"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "In progress"
+msgstr "진행 중"
+
 #: src/mobile/QrScanner.tsx
 msgid "In-app camera scanning only works over HTTPS. Use your phone's camera app to scan the desktop QR code, or enter the endpoint and token below."
 msgstr "앱 내 카메라 스캔은 HTTPS에서만 작동합니다. 휴대폰의 카메라 앱으로 데스크톱 QR 코드를 스캔하거나 아래에 엔드포인트와 토큰을 입력하세요."
@@ -4939,6 +5029,10 @@ msgstr "시작 시 Poracode를 시스템 트레이에 둡니다."
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Keep the system awake while any thread is actively working."
 msgstr "스레드가 활발하게 작동하는 동안 시스템을 활성 상태로 유지합니다."
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Key findings:"
+msgstr "주요 발견 사항:"
 
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Kill bash"
@@ -5626,6 +5720,10 @@ msgstr "모바일 푸시 알림"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Mode"
 msgstr "모드"
+
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Mode:"
+msgstr "모드:"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Model"
@@ -6923,9 +7021,26 @@ msgid "Pairing…"
 msgstr "페어링 중…"
 
 #: src/renderer/commands/shortcutCatalog.ts
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Panel"
 msgstr "패널"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel Consultation"
+msgstr "패널 상담"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel consultation was cancelled"
+msgstr "패널 상담이 취소되었습니다"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel failed"
+msgstr "패널 실패"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel synthesis complete"
+msgstr "패널 종합 완료"
 
 #: src/renderer/commands/shortcutCatalog.ts
 msgid "Panels and overlays"
@@ -7028,6 +7143,10 @@ msgstr "조정 대기 중"
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/PermissionDetailsLine.tsx
 msgid "permission"
 msgstr "권한"
+
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Permission-restricted content hidden"
+msgstr "권한 제한 콘텐츠 숨김"
 
 #: src/mobile/routeComponents.tsx
 #: src/mobile/views/ThreadView.tsx
@@ -7350,6 +7469,10 @@ msgstr "공급자가 토큰 사용을 보고하지 않았습니다."
 msgid "Provider presets"
 msgstr "제공자 프리셋"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Provider:"
+msgstr "제공자:"
+
 #. plural
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/authHelpers.ts
 msgid "providers"
@@ -7553,6 +7676,10 @@ msgstr "최근 설치"
 #: src/renderer/views/HomeView.tsx
 msgid "Recent threads"
 msgstr "최근 스레드"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Recommendations:"
+msgstr "권장 사항:"
 
 #: src/mobile/components.tsx
 msgid "Reconnect"
@@ -7995,6 +8122,7 @@ msgstr "재개"
 #: src/mobile/views/BrowserView.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/mobile/views/TerminalView.tsx
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -8016,6 +8144,14 @@ msgstr "정리 다시 시도"
 #: src/mobile/components.tsx
 msgid "Retry now"
 msgstr "지금 다시 시도"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Retry of panel"
+msgstr "패널 재시도"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Retry panel"
+msgstr "패널 다시 시도"
 
 #: src/renderer/hooks/usePrWriteActions.ts
 msgid "Retry with admin"
@@ -8133,6 +8269,10 @@ msgstr "오른쪽 패널"
 msgid "Right-click to switch ring"
 msgstr "마우스 오른쪽 버튼을 클릭해 링 전환"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Role:"
+msgstr "역할:"
+
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
@@ -8217,6 +8357,7 @@ msgstr "터미널 명령 실행"
 msgid "Run this schedule automatically on the schedule below."
 msgstr "아래 일정에 따라 이 일정을 자동으로 실행합니다."
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "running"
@@ -9109,6 +9250,10 @@ msgstr "스테이지됨"
 msgid "Staged ({0})"
 msgstr "스테이지됨 ({0})"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Standard"
+msgstr "표준"
+
 #: src/renderer/commands/registry.ts
 msgid "Star or unstar the current chat or model"
 msgstr "현재 채팅 또는 모델을 즐겨찾기에 추가하거나 제거"
@@ -9193,6 +9338,11 @@ msgstr "일정으로 시작하기"
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Start Without Context"
 msgstr "맥락 없이 시작하기"
+
+#. placeholder {0}: startedAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Started {0}"
+msgstr "시작: {0}"
 
 #: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
 msgid "Started {targetLabel} thread"
@@ -10425,6 +10575,10 @@ msgstr "제거"
 msgid "Unknown"
 msgstr "알 수 없음"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Unknown mention. Try @codex, @claude, @daily-operator, @verify, etc."
+msgstr "알 수 없는 언급입니다. @codex, @claude, @daily-operator, @verify 등을 시도해 보세요."
+
 #: src/renderer/notifications.ts
 msgid "Unknown project"
 msgstr "알 수 없는 프로젝트"
@@ -10727,6 +10881,10 @@ msgstr "{0} 보기"
 #: src/renderer/views/SettingsOverlay/parts/ChangelogSettings.tsx
 msgid "View all releases on GitHub"
 msgstr "GitHub에서 모든 릴리스 보기"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "View child thread"
+msgstr "하위 스레드 보기"
 
 #: src/mobile/views/GitActionSheet.tsx
 msgid "View diff"

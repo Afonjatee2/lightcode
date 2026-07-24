@@ -1,5 +1,6 @@
 import type { OscShellEvent } from "../osc";
 import type { LspSessionStatus } from "../lsp";
+import type { ConsultationRecord, ConsultationResultRecord } from "../consultations/types";
 import type {
   AgentSlashCommand,
   AgentStatus,
@@ -124,6 +125,18 @@ export type SupervisorEvent =
       status: LspSessionStatus;
       languageId: string;
       error?: string;
+    }
+  /**
+   * Phase 4 consultation lifecycle update. Emitted by the supervisor whenever a
+   * consultation record is saved (queued → building_context → running →
+   * completed/failed/cancelled). `result` is included once the consultation has
+   * produced a persisted result, so the renderer can render the card and its
+   * outcome without a second round-trip.
+   */
+  | {
+      type: "consultation-updated";
+      record: ConsultationRecord;
+      result: ConsultationResultRecord | null;
     };
 
 const AGENT_STATUS_SUPERVISOR_EVENT_TYPES = [

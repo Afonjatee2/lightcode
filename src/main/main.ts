@@ -720,7 +720,6 @@ if (!hasSingleInstanceLock) {
           const children = dbGetThreads().filter(
             (thread) => thread.parentThreadId && !thread.archived,
           );
-          if (children.length === 0) return;
           void supervisorClient
             .call("seedOrchestratorChildren", {
               children: children.map((thread) => ({

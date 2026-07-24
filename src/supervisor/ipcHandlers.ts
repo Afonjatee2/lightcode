@@ -282,5 +282,54 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     importSkills: (payload) => skills.import(payload),
     listSkillMarketplace: (payload) => skills.listMarketplace(payload),
     installMarketplaceSkill: (payload) => skills.installMarketplace(payload),
+    consultationSubmit: (payload) => runtime.consultationSubmissionHandler.submit(payload),
+    consultationSubmitPanel: (payload) => runtime.consultationSubmissionHandler.submitPanel(payload),
+    consultationFinalise: (payload) => runtime.consultationSubmissionHandler.finalise(payload),
+    consultationCancel: async (payload) => ({
+      consultation: await runtime.consultationCoordinator.cancel(payload.id),
+    }),
+    consultationRetry: async (payload) => ({
+      consultation: await runtime.consultationCoordinator.retry(payload.id),
+    }),
+    consultationListForThread: (payload) => {
+      const repository = runtime.consultationStore.getRepository();
+      const consultations = repository.listByParentThread(payload.parentThreadId);
+      const results = consultations
+        .map((record) =>
+          record.resultSummaryId ? repository.getResult(record.resultSummaryId) : null,
+        )
+        .filter((result): result is NonNullable<typeof result> => result !== null);
+      const panelMembers = consultations
+        .filter((record) => record.consultationMode === "panel")
+        .flatMap((record) => repository.listPanelMembers(record.id));
+      const contextPackets = consultations
+        .map((record) =>
+          record.contextPacketId ? repository.getContextPacket(record.contextPacketId) : null,
+        )
+        .filter((packet): packet is NonNullable<typeof packet> => packet !== null);
+      return { consultations, results, panelMembers, contextPackets };
+    },
+    consultationGet: (payload) => {
+      const repository = runtime.consultationStore.getRepository();
+      const consultation = repository.getConsultation(payload.id);
+      const result = consultation?.resultSummaryId
+        ? repository.getResult(consultation.resultSummaryId)
+        : null;
+      const contextPacket = repository.getContextPacketForConsultation(payload.id);
+      return { consultation, result, contextPacket };
+    },
+    consultationSubscribe: (payload) => {
+      const repository = runtime.consultationStore.getRepository();
+      const consultations = repository.listByParentThread(payload.parentThreadId);
+      const results = consultations
+        .map((record) =>
+          record.resultSummaryId ? repository.getResult(record.resultSummaryId) : null,
+        )
+        .filter((result): result is NonNullable<typeof result> => result !== null);
+      const panelMembers = consultations
+        .filter((record) => record.consultationMode === "panel")
+        .flatMap((record) => repository.listPanelMembers(record.id));
+      return { consultations, results, panelMembers };
+    },
   });
 }

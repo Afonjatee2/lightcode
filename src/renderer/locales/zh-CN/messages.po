@@ -231,6 +231,11 @@ msgstr "运行{0}次"
 msgid "{0} runs"
 msgstr "运行{0}次"
 
+#. placeholder {0}: evidenceFreshness.staleSourceCount
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "{0} stale data source(s)"
+msgstr "{0} 个过期数据源"
+
 #. placeholder {0}: threads.length
 #: src/mobile/views/ThreadsView.tsx
 msgid "{0} threads"
@@ -504,6 +509,10 @@ msgstr "{usedLabel} 令牌"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/ModelVisibilityDropdown.tsx
 msgid "{visibleCount} of {totalCount} visible"
 msgstr "{totalCount} 中的 {visibleCount} 个可见"
+
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "@codex check the budget pacing"
+msgstr "@codex 检查预算进度"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "/absolute/path/to/project"
@@ -888,6 +897,10 @@ msgstr "智能体"
 msgid "Agents · General"
 msgstr "代理·一般"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Aggregated findings:"
+msgstr "汇总发现："
+
 #. Settings section: AI / assistant configuration
 #. Settings section: AI / assistant configuration
 #: src/mobile/settingsSections.ts
@@ -950,6 +963,10 @@ msgstr "全部设备"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "All efforts"
 msgstr "全部级别"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "All failed"
+msgstr "全部失败"
 
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 #: src/renderer/views/PrReviewOverlay/PrReviewOverlay.tsx
@@ -1512,6 +1529,10 @@ msgstr "浏览器登录"
 msgid "Browser tabs"
 msgstr "浏览器标签页"
 
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Budget data not available"
+msgstr "预算数据不可用"
+
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Budget limit reached"
 msgstr "已达到预算限额"
@@ -1572,6 +1593,10 @@ msgstr "仅缓存"
 msgid "Camera access blocked"
 msgstr "摄像头访问已被阻止"
 
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Campaign plan not available"
+msgstr "广告计划不可用"
+
 #: src/mobile/views/PortsView.tsx
 msgid "Can't load ports"
 msgstr "无法加载端口"
@@ -1581,6 +1606,7 @@ msgstr "无法加载端口"
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/components/common/ConfirmDialog.tsx
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
@@ -1612,6 +1638,10 @@ msgstr "取消"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Cancel new Claude profile"
 msgstr "取消新的 Claude 配置文件"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Cancel panel"
+msgstr "取消专家组"
 
 #: src/renderer/components/thread/ThreadPendingSteerStrip.tsx
 msgid "Cancel pending steer"
@@ -2308,6 +2338,11 @@ msgstr "请将此指纹与服务器上显示的指纹进行比较。"
 #~ msgid "Comparing candidates…"
 #~ msgstr "正在比较候选…"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "complete"
+msgstr "完成"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Complete"
 msgstr "完成"
@@ -2348,6 +2383,11 @@ msgstr "已完成"
 #: src/renderer/utils/prStatus.ts
 msgid "Completed"
 msgstr "已完成"
+
+#. placeholder {0}: completedAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Completed {0}"
+msgstr "完成于 {0}"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
@@ -2499,6 +2539,26 @@ msgstr "连接"
 msgid "Console"
 msgstr "控制台"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Consult"
+msgstr "咨询"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation complete"
+msgstr "咨询完成"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation failed"
+msgstr "咨询失败"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Consultation was cancelled"
+msgstr "咨询已取消"
+
+#: src/renderer/components/consultations/ConsultationDock.tsx
+msgid "Consultations"
+msgstr "咨询"
+
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Contains sensitive values; add manually"
 msgstr "包含敏感值；请手动添加"
@@ -2559,6 +2619,10 @@ msgstr "在其他工具中继续..."
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control an external Chrome browser."
 msgstr "控制外部 Chrome 浏览器。"
+
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Control Centre connection unavailable"
+msgstr "控制中心连接不可用"
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control the desktop."
@@ -2874,6 +2938,11 @@ msgstr "使用代理创建"
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #~ msgid "Create:"
 #~ msgstr "创建："
+
+#. placeholder {0}: createdAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Created {0}"
+msgstr "创建于 {0}"
 
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
 msgid "Created a worktree on \"{newBranch}\", but the changes conflicted and remain in a git stash — resolve them in the worktree."
@@ -3435,6 +3504,7 @@ msgstr "不要再问"
 msgid "Don't show hook install proposal"
 msgstr "不显示挂钩安装建议"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "done"
@@ -3775,6 +3845,16 @@ msgstr "每小时"
 msgid "Every hour at {0} minutes past"
 msgstr "每小时过 {0} 分钟"
 
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Evidence freshness unknown"
+msgstr "证据时效未知"
+
+#. placeholder {0}: oldest.toLocaleDateString()
+#. placeholder {1}: newest.toLocaleDateString()
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Evidence from {0} to {1}"
+msgstr "证据从 {0} 到 {1}"
+
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Exclude patterns"
@@ -3941,6 +4021,7 @@ msgstr "从{0}中提取上下文 ..."
 msgid "Factory Droid"
 msgstr "Factory Droid"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 #: src/renderer/views/LoginTerminalOverlay/LoginTerminalOverlay.tsx
 msgid "failed"
@@ -4089,6 +4170,10 @@ msgstr "按状态筛选技能"
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Filters"
 msgstr "筛选条件"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Finalise"
+msgstr "完成"
 
 #: src/renderer/commands/registry.ts
 #: src/renderer/components/find/FindBar.tsx
@@ -4745,6 +4830,11 @@ msgstr "已导入 1 个技能。"
 msgid "Improved"
 msgstr "已改进"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "In progress"
+msgstr "进行中"
+
 #: src/mobile/QrScanner.tsx
 msgid "In-app camera scanning only works over HTTPS. Use your phone's camera app to scan the desktop QR code, or enter the endpoint and token below."
 msgstr "应用内摄像头扫描仅支持 HTTPS。请使用手机相机应用扫描桌面的二维码，或在下方输入端点和令牌。"
@@ -4939,6 +5029,10 @@ msgstr "开机启动时将 Poracode 保持在系统托盘中。"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Keep the system awake while any thread is actively working."
 msgstr "当任何线程正在工作时保持系统唤醒状态（不休眠）。"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Key findings:"
+msgstr "关键发现："
 
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Kill bash"
@@ -5625,6 +5719,10 @@ msgstr "移动推送通知"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Mode"
 msgstr "模式"
+
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Mode:"
+msgstr "模式："
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Model"
@@ -6922,9 +7020,26 @@ msgid "Pairing…"
 msgstr "正在配对…"
 
 #: src/renderer/commands/shortcutCatalog.ts
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Panel"
 msgstr "面板"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel Consultation"
+msgstr "小组咨询"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel consultation was cancelled"
+msgstr "专家组咨询已取消"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel failed"
+msgstr "专家组失败"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Panel synthesis complete"
+msgstr "小组综合完成"
 
 #: src/renderer/commands/shortcutCatalog.ts
 msgid "Panels and overlays"
@@ -7027,6 +7142,10 @@ msgstr "等待引导"
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/PermissionDetailsLine.tsx
 msgid "permission"
 msgstr "权限"
+
+#: src/renderer/components/consultations/ContextWarnings.tsx
+msgid "Permission-restricted content hidden"
+msgstr "权限受限内容已隐藏"
 
 #: src/mobile/routeComponents.tsx
 #: src/mobile/views/ThreadView.tsx
@@ -7349,6 +7468,10 @@ msgstr "提供商尚未报告令牌使用情况。"
 msgid "Provider presets"
 msgstr "服务商预设"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Provider:"
+msgstr "提供商："
+
 #. plural
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/authHelpers.ts
 msgid "providers"
@@ -7552,6 +7675,10 @@ msgstr "近期安装量"
 #: src/renderer/views/HomeView.tsx
 msgid "Recent threads"
 msgstr "最近的线程"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Recommendations:"
+msgstr "建议："
 
 #: src/mobile/components.tsx
 msgid "Reconnect"
@@ -7994,6 +8121,7 @@ msgstr "继续"
 #: src/mobile/views/BrowserView.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/mobile/views/TerminalView.tsx
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -8015,6 +8143,14 @@ msgstr "重试清理"
 #: src/mobile/components.tsx
 msgid "Retry now"
 msgstr "立即重试"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Retry of panel"
+msgstr "专家组重试"
+
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
+msgid "Retry panel"
+msgstr "重试专家组"
 
 #: src/renderer/hooks/usePrWriteActions.ts
 msgid "Retry with admin"
@@ -8132,6 +8268,10 @@ msgstr "右面板"
 msgid "Right-click to switch ring"
 msgstr "右键点击以切换环"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Role:"
+msgstr "角色："
+
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
@@ -8216,6 +8356,7 @@ msgstr "运行终端命令"
 msgid "Run this schedule automatically on the schedule below."
 msgstr "按照下方的计划自动运行此计划。"
 
+#: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "running"
@@ -9108,6 +9249,10 @@ msgstr "已暂存"
 msgid "Staged ({0})"
 msgstr "已暂存（{0}）"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Standard"
+msgstr "标准"
+
 #: src/renderer/commands/registry.ts
 msgid "Star or unstar the current chat or model"
 msgstr "收藏或取消收藏当前聊天或模型"
@@ -9192,6 +9337,11 @@ msgstr "从计划开始"
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Start Without Context"
 msgstr "在没有上下文的情况下开始"
+
+#. placeholder {0}: startedAt.toLocaleTimeString()
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Started {0}"
+msgstr "开始于 {0}"
 
 #: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
 msgid "Started {targetLabel} thread"
@@ -10424,6 +10574,10 @@ msgstr "卸载"
 msgid "Unknown"
 msgstr "未知"
 
+#: src/renderer/components/consultations/ConsultationComposer.tsx
+msgid "Unknown mention. Try @codex, @claude, @daily-operator, @verify, etc."
+msgstr "未知提及。请尝试 @codex、@claude、@daily-operator、@verify 等。"
+
 #: src/renderer/notifications.ts
 msgid "Unknown project"
 msgstr "未知项目"
@@ -10726,6 +10880,10 @@ msgstr "查看 {0}"
 #: src/renderer/views/SettingsOverlay/parts/ChangelogSettings.tsx
 msgid "View all releases on GitHub"
 msgstr "在 GitHub 上查看所有版本"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "View child thread"
+msgstr "查看子线程"
 
 #: src/mobile/views/GitActionSheet.tsx
 msgid "View diff"

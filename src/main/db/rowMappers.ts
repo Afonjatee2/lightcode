@@ -1,4 +1,4 @@
-import type { ProjectLocation, Project, Thread } from "@/shared/contracts";
+import { projectSchema, type ProjectLocation, type Project, type Thread } from "@/shared/contracts";
 import * as schema from "../db.schema";
 
 // ── Converters ──────────────────────────────────────────────────────
@@ -35,9 +35,14 @@ function rowToLocation(row: {
 }
 
 export function rowToProject(row: typeof schema.projects.$inferSelect): Project {
-  return {
+  const campaignExtension = row.campaignExtension ? JSON.parse(row.campaignExtension) : undefined;
+  // The legacy campaign_group_id is not a valid fallback: it lacks the names and
+  // defaults required by Phase 3, so inventing empty values would corrupt data.
+  return projectSchema.parse({
     id: row.id,
     name: row.name,
+    ...(row.purpose ? { purpose: row.purpose } : {}),
+    ...(campaignExtension ? { campaignExtension } : {}),
     location: rowToLocation(row),
     ...(row.lastDraftConfig ? { lastDraftConfig: JSON.parse(row.lastDraftConfig) } : {}),
     ...(row.scripts ? { scripts: JSON.parse(row.scripts) } : {}),
@@ -45,7 +50,7 @@ export function rowToProject(row: typeof schema.projects.$inferSelect): Project 
     ...(row.mcpServers ? { mcpServers: JSON.parse(row.mcpServers) } : {}),
     ...(row.disabled ? { disabled: true } : {}),
     createdAt: row.createdAt,
-  };
+  });
 }
 
 export function rowToThread(row: typeof schema.threads.$inferSelect): Thread {

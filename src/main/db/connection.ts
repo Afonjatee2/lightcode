@@ -8,6 +8,21 @@ let _db: ReturnType<typeof drizzle> | undefined;
 let _sqlite: InstanceType<typeof Database> | undefined;
 
 /**
+ * Project/thread ids the renderer's persisted store has actually been shown
+ * — via its initial `dbGetProjects`/`dbGetThreads` hydration read, or via a
+ * prior `dbSyncAll` snapshot it sent. `dbSyncAll` does full-snapshot
+ * reconciliation (anything missing from its incoming arrays is deleted), but
+ * several code paths write a *new* project/thread directly (home-scope
+ * bootstrap, orchestrator child threads, remote/mobile thread commands) while
+ * a renderer window is already live. Without this guard, the very next
+ * unrelated store mutation persists the renderer's still-stale snapshot and
+ * `dbSyncAll` deletes the row it never had a chance to learn about — see
+ * `markProjectIdsKnown`/`markThreadIdsKnown` and their use in `dbSyncAll`.
+ */
+let _knownProjectIds = new Set<string>();
+let _knownThreadIds = new Set<string>();
+
+/**
  * Monotonic counter bumped ONLY by writes the profile actually reads — the
  * durable usage_events log (dbAppendUsageEvents) and identity edits. The profile
  * caches key on this, so high-frequency chat persistence (runtime snapshots/
@@ -90,6 +105,8 @@ export function initDatabase(dbPath: string) {
 
   _sqlite = sqlite;
   _db = drizzle({ client: sqlite, schema });
+  _knownProjectIds = new Set();
+  _knownThreadIds = new Set();
 
   // Create tables if they don't exist.
   sqlite.exec(`
@@ -104,6 +121,9 @@ export function initDatabase(dbPath: string) {
       last_draft_config TEXT,
       scripts TEXT,
       mcp_servers TEXT,
+      purpose TEXT,
+      campaign_extension TEXT,
+      campaign_group_id TEXT,
       disabled INTEGER NOT NULL DEFAULT 0,
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
@@ -221,11 +241,101 @@ export function initDatabase(dbPath: string) {
     );
     CREATE INDEX IF NOT EXISTS idx_remote_command_receipts_updated
       ON remote_command_receipts (updated_at);
+    CREATE TABLE IF NOT EXISTS consultations (
+      id TEXT PRIMARY KEY,
+      parent_project_id TEXT NOT NULL,
+      parent_thread_id TEXT NOT NULL,
+      campaign_group_id TEXT NOT NULL,
+      child_thread_or_run_id TEXT,
+      original_mention TEXT NOT NULL,
+      original_instruction TEXT NOT NULL,
+      resolved_role TEXT NOT NULL,
+      requested_provider TEXT,
+      actual_provider TEXT,
+      requested_model TEXT,
+      actual_model TEXT,
+      consultation_mode TEXT NOT NULL,
+      status TEXT NOT NULL,
+      context_packet_id TEXT,
+      permission_policy_version TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      started_at TEXT,
+      completed_at TEXT,
+      cancelled_at TEXT,
+      failure_code TEXT,
+      safe_failure_message TEXT,
+      result_summary_id TEXT,
+      retry_of_consultation_id TEXT,
+      panel_completion_rule TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_consultations_parent_thread
+      ON consultations (parent_thread_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_consultations_campaign_group
+      ON consultations (campaign_group_id);
+    CREATE INDEX IF NOT EXISTS idx_consultations_status
+      ON consultations (status);
+    CREATE INDEX IF NOT EXISTS idx_consultations_child_run
+      ON consultations (child_thread_or_run_id);
+    CREATE INDEX IF NOT EXISTS idx_consultations_created
+      ON consultations (created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_consultations_retry
+      ON consultations (retry_of_consultation_id);
+    CREATE TABLE IF NOT EXISTS context_packets (
+      id TEXT PRIMARY KEY,
+      consultation_id TEXT NOT NULL REFERENCES consultations(id) ON DELETE CASCADE,
+      structured_context TEXT NOT NULL,
+      content_hash TEXT NOT NULL,
+      contract_version TEXT NOT NULL,
+      redaction_metadata TEXT NOT NULL,
+      evidence_freshness TEXT NOT NULL,
+      missing_data_warnings TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_context_packets_consultation
+      ON context_packets (consultation_id);
+    CREATE TABLE IF NOT EXISTS thread_summaries (
+      id TEXT PRIMARY KEY,
+      thread_id TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      source_cursor TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      model TEXT NOT NULL,
+      content_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_thread_summaries_thread
+      ON thread_summaries (thread_id, created_at DESC);
+    CREATE TABLE IF NOT EXISTS consultation_results (
+      id TEXT PRIMARY KEY,
+      consultation_id TEXT NOT NULL REFERENCES consultations(id) ON DELETE CASCADE,
+      summary TEXT NOT NULL,
+      key_findings TEXT NOT NULL,
+      evidence_references TEXT NOT NULL,
+      assumptions TEXT NOT NULL,
+      uncertainties TEXT NOT NULL,
+      recommended_actions TEXT NOT NULL,
+      suggested_proposal_inputs TEXT NOT NULL,
+      generated_file_references TEXT NOT NULL,
+      completed_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_consultation_results_consultation
+      ON consultation_results (consultation_id);
+    CREATE TABLE IF NOT EXISTS panel_membership (
+      parent_panel_consultation_id TEXT NOT NULL REFERENCES consultations(id) ON DELETE CASCADE,
+      child_consultation_id TEXT NOT NULL REFERENCES consultations(id) ON DELETE CASCADE,
+      member_role TEXT NOT NULL,
+      required_or_optional TEXT NOT NULL,
+      sequence_or_weight INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (parent_panel_consultation_id, child_consultation_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_panel_membership_child
+      ON panel_membership (child_consultation_id);
   `);
 
   // Baseline schema version for future DB migrations.
   // New upgrade steps should live behind this gate when we need them.
-  const SCHEMA_VERSION = 26;
+  const SCHEMA_VERSION = 30;
 
   const storedVersion = Number(
     (
@@ -496,6 +606,131 @@ export function initDatabase(dbPath: string) {
       }
     }
 
+    if (storedVersion < 27) {
+      // Phase 4 campaign consultations: durable consultations, their context
+      // packets, thread summaries, results and panel membership (previously an
+      // in-memory store that did not survive a restart).
+      sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS consultations (
+          id TEXT PRIMARY KEY,
+          parent_project_id TEXT NOT NULL,
+          parent_thread_id TEXT NOT NULL,
+          campaign_group_id TEXT NOT NULL,
+          child_thread_or_run_id TEXT,
+          original_mention TEXT NOT NULL,
+          original_instruction TEXT NOT NULL,
+          resolved_role TEXT NOT NULL,
+          requested_provider TEXT,
+          actual_provider TEXT,
+          requested_model TEXT,
+          actual_model TEXT,
+          consultation_mode TEXT NOT NULL,
+          status TEXT NOT NULL,
+          context_packet_id TEXT,
+          permission_policy_version TEXT NOT NULL,
+          actor TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          started_at TEXT,
+          completed_at TEXT,
+          cancelled_at TEXT,
+          failure_code TEXT,
+          safe_failure_message TEXT,
+          result_summary_id TEXT,
+          retry_of_consultation_id TEXT,
+          panel_completion_rule TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_consultations_parent_thread
+          ON consultations (parent_thread_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_consultations_campaign_group
+          ON consultations (campaign_group_id);
+        CREATE INDEX IF NOT EXISTS idx_consultations_status
+          ON consultations (status);
+        CREATE INDEX IF NOT EXISTS idx_consultations_child_run
+          ON consultations (child_thread_or_run_id);
+        CREATE INDEX IF NOT EXISTS idx_consultations_created
+          ON consultations (created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_consultations_retry
+          ON consultations (retry_of_consultation_id);
+        CREATE TABLE IF NOT EXISTS context_packets (
+          id TEXT PRIMARY KEY,
+          consultation_id TEXT NOT NULL REFERENCES consultations(id) ON DELETE CASCADE,
+          structured_context TEXT NOT NULL,
+          content_hash TEXT NOT NULL,
+          contract_version TEXT NOT NULL,
+          redaction_metadata TEXT NOT NULL,
+          evidence_freshness TEXT NOT NULL,
+          missing_data_warnings TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_context_packets_consultation
+          ON context_packets (consultation_id);
+        CREATE TABLE IF NOT EXISTS thread_summaries (
+          id TEXT PRIMARY KEY,
+          thread_id TEXT NOT NULL,
+          summary TEXT NOT NULL,
+          source_cursor TEXT NOT NULL,
+          provider TEXT NOT NULL,
+          model TEXT NOT NULL,
+          content_hash TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_thread_summaries_thread
+          ON thread_summaries (thread_id, created_at DESC);
+        CREATE TABLE IF NOT EXISTS consultation_results (
+          id TEXT PRIMARY KEY,
+          consultation_id TEXT NOT NULL REFERENCES consultations(id) ON DELETE CASCADE,
+          summary TEXT NOT NULL,
+          key_findings TEXT NOT NULL,
+          evidence_references TEXT NOT NULL,
+          assumptions TEXT NOT NULL,
+          uncertainties TEXT NOT NULL,
+          recommended_actions TEXT NOT NULL,
+          suggested_proposal_inputs TEXT NOT NULL,
+          generated_file_references TEXT NOT NULL,
+          completed_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_consultation_results_consultation
+          ON consultation_results (consultation_id);
+        CREATE TABLE IF NOT EXISTS panel_membership (
+          parent_panel_consultation_id TEXT NOT NULL REFERENCES consultations(id) ON DELETE CASCADE,
+          child_consultation_id TEXT NOT NULL REFERENCES consultations(id) ON DELETE CASCADE,
+          member_role TEXT NOT NULL,
+          required_or_optional TEXT NOT NULL,
+          sequence_or_weight INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (parent_panel_consultation_id, child_consultation_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_panel_membership_child
+          ON panel_membership (child_consultation_id);
+      `);
+    }
+
+    if (storedVersion < 28) {
+      // Legacy bridge retained only for compatibility with earlier Phase 4 work.
+      const cols = sqlite.prepare("PRAGMA table_info(projects)").all() as { name: string }[];
+      if (!cols.some((c) => c.name === "campaign_group_id")) {
+        sqlite.exec("ALTER TABLE projects ADD COLUMN campaign_group_id TEXT");
+      }
+    }
+
+    if (storedVersion < 29) {
+      // Persist the complete Phase 3 project model. Legacy rows that only carry
+      // campaign_group_id are not upgraded with invented names or defaults.
+      const cols = sqlite.prepare("PRAGMA table_info(projects)").all() as { name: string }[];
+      if (!cols.some((c) => c.name === "purpose")) {
+        sqlite.exec("ALTER TABLE projects ADD COLUMN purpose TEXT");
+      }
+      if (!cols.some((c) => c.name === "campaign_extension")) {
+        sqlite.exec("ALTER TABLE projects ADD COLUMN campaign_extension TEXT");
+      }
+    }
+
+    if (storedVersion < 30) {
+      const cols = sqlite.prepare("PRAGMA table_info(consultations)").all() as { name: string }[];
+      if (!cols.some((c) => c.name === "panel_completion_rule")) {
+        sqlite.exec("ALTER TABLE consultations ADD COLUMN panel_completion_rule TEXT");
+      }
+    }
+
     sqlite
       .prepare(
         "INSERT INTO app_state (key, value) VALUES ('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -560,6 +795,49 @@ export function getSqlite(): InstanceType<typeof Database> {
   return _sqlite;
 }
 
+const WRITE_TRANSACTION_MAX_ATTEMPTS = 5;
+const WRITE_TRANSACTION_RETRY_BASE_DELAY_MS = 20;
+
+function isRetryableSqliteBusyError(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === "SQLITE_BUSY" || code === "SQLITE_BUSY_SNAPSHOT";
+}
+
+/** Synchronous sleep — better-sqlite3 is synchronous, so retries here must block, not await. */
+function blockingSleep(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Runs a better-sqlite3 write transaction, retrying the whole thing from
+ * scratch if it collides with another connection's write to the same file.
+ *
+ * The desktop main process and the forked supervisor process each open their
+ * own connection to the same on-disk database (WAL mode is what makes that
+ * safe) — see `ensureSupervisorDatabase` in `supervisorRuntime.ts`. A deferred
+ * `sqlite.transaction()` establishes its read snapshot on its first
+ * statement; if the *other* connection commits a write before this one
+ * attempts to upgrade to a write lock, SQLite returns `SQLITE_BUSY_SNAPSHOT`
+ * immediately — `PRAGMA busy_timeout` does NOT apply to this code, because
+ * waiting cannot help a snapshot that is already stale. The only correct fix
+ * is to restart the transaction so it takes a fresh snapshot; a plain
+ * `SQLITE_BUSY` (lock contention busy_timeout didn't fully absorb) benefits
+ * from the same retry. Left uncaught, either one used to crash the whole
+ * process as an uncaught `SqliteError`.
+ */
+export function runWriteTransaction<T>(sqlite: InstanceType<typeof Database>, fn: () => T): T {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return sqlite.transaction(fn)();
+    } catch (error) {
+      if (attempt >= WRITE_TRANSACTION_MAX_ATTEMPTS || !isRetryableSqliteBusyError(error)) {
+        throw error;
+      }
+      blockingSleep(WRITE_TRANSACTION_RETRY_BASE_DELAY_MS * attempt);
+    }
+  }
+}
+
 export function closeDatabase() {
   const sqlite = _sqlite;
   if (sqlite) {
@@ -577,4 +855,24 @@ export function closeDatabase() {
   }
   _sqlite = undefined;
   _db = undefined;
+  _knownProjectIds = new Set();
+  _knownThreadIds = new Set();
+}
+
+/** Records that the renderer's store has now seen these project ids (see `_knownProjectIds`). */
+export function markProjectIdsKnown(ids: Iterable<string>): void {
+  for (const id of ids) _knownProjectIds.add(id);
+}
+
+/** Records that the renderer's store has now seen these thread ids (see `_knownThreadIds`). */
+export function markThreadIdsKnown(ids: Iterable<string>): void {
+  for (const id of ids) _knownThreadIds.add(id);
+}
+
+export function isProjectIdKnown(id: string): boolean {
+  return _knownProjectIds.has(id);
+}
+
+export function isThreadIdKnown(id: string): boolean {
+  return _knownThreadIds.has(id);
 }

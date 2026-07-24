@@ -68,6 +68,21 @@ import { McpProbeService } from "./mcp/McpProbeService";
 import { prepareMcpToolFilters } from "./mcp/McpToolFilterService";
 import { ExternalMcpDiscoveryService } from "./mcp/ExternalMcpDiscoveryService";
 import { SkillsService } from "./skills/SkillsService";
+import { CampaignAgentRegistry } from "./campaign/campaignAgentRegistry";
+import { ConsultationStore } from "./campaign/consultationStore";
+import { buildCampaignRoutingGuide } from "./campaign/routingGuide";
+import {
+  ConsultationCoordinator,
+  ConsultationSubmissionHandler,
+  createSupervisorConsultationCoordinator,
+  createResultAttacher,
+  McpControlCentreGateway,
+  PoracodeCampaignContextProvider,
+  createParentThreadLoader,
+} from "./consultations";
+import { FixtureCampaignContextProvider, type CampaignContextProvider } from "@/shared/consultations";
+import { closeDatabase, getSqlite, initDatabase } from "@/main/db/connection";
+import { dbGetProject } from "@/main/db";
 
 export { detectWslAgentStatuses, writeSubmittedPrompt };
 
@@ -78,6 +93,31 @@ function toPublicExperimentSnapshot(
     hash: snapshot.hash,
     candidates: snapshot.candidates.map(({ diff: _diff, ...candidate }) => candidate),
   };
+}
+
+/**
+ * The forked supervisor process owns its own SQLite connection (WAL lets it
+ * share the file with the main process). The headless host initialises the DB
+ * before constructing the runtime in-process, so only open it when it is not
+ * already open — never double-init. Best-effort: in environments without a
+ * compatible better-sqlite3 binding (e.g. plain-Node unit tests that construct
+ * a runtime without touching consultations) this logs and continues instead of
+ * crashing runtime construction. Returns true only when this call opened the DB
+ * (so dispose closes exactly what it opened).
+ */
+function ensureSupervisorDatabase(dbPath: string): boolean {
+  try {
+    getSqlite();
+    return false;
+  } catch {
+    try {
+      initDatabase(dbPath);
+      return true;
+    } catch (error) {
+      console.warn("[supervisor] SQLite unavailable; durable consultations disabled:", error);
+      return false;
+    }
+  }
 }
 
 export class SupervisorRuntime {
@@ -112,6 +152,11 @@ export class SupervisorRuntime {
   private readonly crossagentMcpIngress: CrossagentMcpIngress;
   private readonly subagentRunManager: SubagentRunManager;
   private readonly orchestratorThreadManager: OrchestratorThreadManager;
+  readonly campaignAgentRegistry: CampaignAgentRegistry;
+  readonly consultationStore: ConsultationStore;
+  readonly consultationCoordinator: ConsultationCoordinator;
+  readonly consultationSubmissionHandler: ConsultationSubmissionHandler;
+  private supervisorOwnsDatabase = false;
   private wslHookBridge: WslBridgeServer | undefined;
 
   readonly sessions: Map<string, SessionRuntime>;
@@ -156,6 +201,9 @@ export class SupervisorRuntime {
     this.settingsPath = paths.settingsPath;
     this.acpIconsDir = paths.acpIconsDir;
     this.sharedSettingsCache = new SupervisorSharedSettingsCache(this.settingsPath);
+    // Open the supervisor's own SQLite connection (idempotent) so the durable
+    // consultation repository works in the forked supervisor process.
+    this.supervisorOwnsDatabase = ensureSupervisorDatabase(paths.dbPath);
     // The agent/ACP registry cluster. Constructed up front so the initial
     // adapter build below can run before the later-created services exist; those
     // dependencies (status/usage/hook-plugin/sessions) resolve lazily at call
@@ -379,16 +427,66 @@ export class SupervisorRuntime {
         this.threadSessionManager.getThreadIdByProviderSessionId(sessionId),
       // User-configured routing guidance, read live from shared settings (the
       // cache invalidates on file change) so edits take effect on the next turn
-      // without a supervisor restart. Empty/whitespace-only = no guidance.
+      // without a supervisor restart. When no user guide is configured, the
+      // campaign routing guide (Phase 4 campaign agent roles) is served.
       getRoutingGuide: () => {
-        const guide = this.sharedSettingsCache.read().crossagentRoutingGuide.trim();
-        return guide.length > 0 ? guide : undefined;
+        const userGuide = this.sharedSettingsCache.read().crossagentRoutingGuide.trim();
+        if (userGuide.length > 0) return userGuide;
+        return buildCampaignRoutingGuide();
       },
     });
     void this.crossagentMcpIngress.start().catch((error) => {
       console.warn("[supervisor] Crossagents MCP ingress failed to start:", error);
     });
 
+    // Phase 4: Campaign agent registry and consultation store.
+    this.consultationStore = new ConsultationStore();
+    this.campaignAgentRegistry = new CampaignAgentRegistry({
+      getSpawnableAgents: async () => {
+        const { windows } = await this.agentStatusService.getAgentStatuses({ wslDistros: [] });
+        return buildSpawnableAgents(this.adapters, windows);
+      },
+      getCapabilities: (kind) => this.agentStatusService.getCachedCapabilities(kind),
+    });
+
+    // Phase 4: central consultation coordinator (Parts 2-5, 9). Reuses the
+    // orchestrator child-thread lane + the dynamic agent registry and persists
+    // via the SQLite-backed consultation store. Production wiring:
+    //  - parent-thread loader reads the REAL thread messages + permitted attachments;
+    //  - campaign-context provider talks to Control Centre via the narrow MCP
+    //    gateway (the deterministic fixture is used ONLY behind an explicit
+    //    dev flag — production never falls back to it silently);
+    //  - attachResult writes the safe result back into the parent thread;
+    //  - subscribe forwards every lifecycle change to the renderer.
+    const useContextFixture = process.env.PORACODE_CONSULTATION_FIXTURE_CONTEXT === "1";
+    const campaignContextProvider: CampaignContextProvider = useContextFixture
+      ? new FixtureCampaignContextProvider()
+      : new PoracodeCampaignContextProvider(
+          new McpControlCentreGateway({
+            getProjectMcpServers: (projectId) => dbGetProject(projectId)?.mcpServers ?? [],
+            getSharedMcpServers: () => this.sharedSettingsCache.read().mcpServers,
+            applyAuthorization: (server) => this.mcpOAuthService.applyAuthorizationToServer(server),
+          }),
+        );
+    const consultationRepository = this.consultationStore.getRepository();
+    this.consultationCoordinator = createSupervisorConsultationCoordinator({
+      repository: consultationRepository,
+      orchestrator: this.orchestratorThreadManager,
+      registry: this.campaignAgentRegistry,
+      parentThreadLoader: createParentThreadLoader(this.baseDir),
+      contextProvider: campaignContextProvider,
+      attachResult: createResultAttacher({ repository: consultationRepository, emit }),
+    });
+    this.consultationCoordinator.subscribe((record) => {
+      const result = record.resultSummaryId
+        ? consultationRepository.getResult(record.resultSummaryId)
+        : null;
+      emit({ type: "consultation-updated", record, result });
+    });
+    this.consultationSubmissionHandler = new ConsultationSubmissionHandler({
+      coordinator: this.consultationCoordinator,
+      repository: consultationRepository,
+    });
     this.threadSessionManager = new ThreadSessionManager({
       // Tap the outbound stream so the orchestrator lane can track child
       // thread-state transitions (wait_for_thread) without polling.
@@ -744,6 +842,13 @@ export class SupervisorRuntime {
    */
   seedOrchestratorChildren(payload: SeedOrchestratorChildrenPayload): void {
     this.orchestratorThreadManager.rehydrateChildren(payload.children);
+    // Part 9: reconcile durable consultations against actual child-thread state
+    // once the runtime (SQLite + repository + child-thread manager) is wired AND
+    // persisted children have been rehydrated. The coordinator guards against
+    // double reconciliation (idempotent).
+    void this.consultationCoordinator.reconcileOnStartup().catch((error) => {
+      console.warn("[supervisor] Consultation startup reconciliation failed:", error);
+    });
   }
 
   dispose(): void {
@@ -764,6 +869,9 @@ export class SupervisorRuntime {
     });
     const { shutdownSpawnedOpenCodeServers } = await import("./agents/opencode/sdkClient");
     shutdownSpawnedOpenCodeServers();
+    if (this.supervisorOwnsDatabase) {
+      closeDatabase();
+    }
   }
 
   private handlePtyData(session: SessionRuntime, data: string): void {

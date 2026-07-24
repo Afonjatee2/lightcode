@@ -25,6 +25,8 @@ import {
   dbSyncAll,
   dbUpsertProject,
   dbUpsertThread,
+  markProjectIdsKnown,
+  markThreadIdsKnown,
 } from "../db";
 import {
   deleteThreadAttachments,
@@ -409,8 +411,19 @@ export function createLocalIpcHandlers(
       }
       return { nativeCapable };
     },
-    dbGetProjects: () => dbGetProjects(),
-    dbGetThreads: () => dbGetThreads(),
+    // Marks ids "known" to the renderer's store — see the doc comment on
+    // `dbSyncAll` for why this hydration read is the gate that lets its
+    // full-snapshot reconciliation safely delete rows again.
+    dbGetProjects: () => {
+      const projects = dbGetProjects();
+      markProjectIdsKnown(projects.map((project) => project.id));
+      return projects;
+    },
+    dbGetThreads: () => {
+      const threads = dbGetThreads();
+      markThreadIdsKnown(threads.map((thread) => thread.id));
+      return threads;
+    },
     dbGetState: (key) => dbGetState(key),
     dbSetState: ({ key, value }) => dbSetState(key, value),
     dbUpsertProject: (project) => dbUpsertProject(project, 0),

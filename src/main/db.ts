@@ -10,6 +10,8 @@ export {
   resolveBetterSqliteNativeBindingOptions,
   initDatabase,
   closeDatabase,
+  markProjectIdsKnown,
+  markThreadIdsKnown,
 } from "./db/connection";
 
 export {
@@ -68,3 +70,23 @@ export {
   dbInterruptScheduleRuns,
   type ScheduleRunPatch,
 } from "./db/scheduleRuns";
+
+export {
+  dbUpsertConsultation,
+  dbGetConsultation,
+  dbListConsultationsByParentThread,
+  dbListConsultationsByCampaignGroup,
+  dbListConsultationsByStatuses,
+  dbGetConsultationByChildRun,
+  dbListRetriesOf,
+  dbInsertContextPacket,
+  dbGetContextPacket,
+  dbGetContextPacketForConsultation,
+  dbInsertThreadSummary,
+  dbGetLatestThreadSummary,
+  dbInsertConsultationResult,
+  dbGetConsultationResult,
+  dbGetConsultationResultForConsultation,
+  dbInsertPanelMembership,
+  dbListPanelMembers,
+} from "./db/consultations";
