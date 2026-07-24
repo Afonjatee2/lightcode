@@ -158,8 +158,15 @@ msgstr "{0} ({envName}) v{newVersion} sürümüne güncellendi."
 msgid "{0} ({envName}) updated."
 msgstr "{0} ({envName}) güncellendi."
 
+#. placeholder {0}: formatDate(decision.startsAt)
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "{0} → no expiry"
+msgstr "{0} → süresiz"
+
+#. placeholder {0}: active.length
 #. placeholder {0}: context.activeDecisions.length
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
 msgid "{0} active decisions"
 msgstr "{0} aktif karar"
 
@@ -693,9 +700,17 @@ msgstr "\"{0}\" için bu kampanya grubu kimliğiyle zaten bir kampanya çalışm
 msgid "A candidate is no longer on its experiment branch."
 msgstr "Bir aday artık deney şubesinde değil."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "A channel"
+msgstr "Bir kanal"
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "A frozen worktree source requires a full commit hash"
 msgstr "Dondurulmuş bir çalışma ağacı kaynağı tam commit karması gerektirir"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "A platform"
+msgstr "Bir platform"
 
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "A strong root decomposes the task, launches workers in separate Git worktrees, and reviews every diff. Nothing is merged automatically."
@@ -795,6 +810,10 @@ msgstr "{title} için işlemler"
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Active"
 msgstr "Aktif"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Active decisions"
+msgstr "Etkin kararlar"
 
 #: src/mobile/views/PortsView.tsx
 msgid "Active forwards"
@@ -980,6 +999,10 @@ msgstr "eklendi"
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Added"
 msgstr "Eklendi"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Adjust the threshold"
+msgstr "Eşiği ayarla"
 
 #: src/renderer/views/MainView/parts/CampaignModeGate.tsx
 msgid "Advanced Mode (Code)"
@@ -1185,6 +1208,10 @@ msgstr "Çakışan yönetilen becerilerin değiştirilmesine izin ver"
 msgid "Allow the browser to show notifications while the app is in the background."
 msgstr "Uygulama arka plandayken tarayıcının bildirim göstermesine izin verin."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Allow the condition"
+msgstr "Koşula izin ver"
+
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Already configured"
 msgstr "Zaten yapılandırılmış"
@@ -1218,6 +1245,10 @@ msgstr "Beklenen çalışma ağacı sahibi bir şube gerektirir"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "An MCP server with this name already exists."
 msgstr "Bu ada sahip bir MCP sunucusu zaten var."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Annotate only"
+msgstr "Yalnızca not ekle"
 
 #: src/renderer/components/thread/ChatPane/parts/CheckpointRevertControls.tsx
 msgid "Another chat uses this same tree. File restore could overwrite that chat's changes."
@@ -1260,6 +1291,10 @@ msgstr "Görünüm modu"
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Applied"
 msgstr "Uygulandı"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Applies to"
+msgstr "Kapsamı"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Apply provider preset"
@@ -1971,6 +2006,7 @@ msgstr "Portlar yüklenemedi"
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/ThreadRuntimeRequestPanel.tsx
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
@@ -2106,6 +2142,7 @@ msgid "Changes unavailable"
 msgstr "Değişikliklere erişilemiyor"
 
 #. About page label: release channel (stable/nightly)
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Channel"
 msgstr "Kanal"
@@ -2266,6 +2303,10 @@ msgstr "Tee's Cockpit'un arayüzü için görüntüleme dilini seçin."
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "Choose thread to attach to"
 msgstr "Eklenecek konuyu seçin"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Choose what this applies to."
+msgstr "Neyi kapsadığını seçin."
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -3112,10 +3153,19 @@ msgstr "Kontrol Merkezi bağlantısı yok"
 msgid "Control Centre is not available. You can still create a campaign workspace manually, but live campaign context will not load until the MCP connection works."
 msgstr "Kontrol Merkezi kullanılamıyor. Yine de manuel olarak bir kampanya çalışma alanı oluşturabilirsiniz, ancak MCP bağlantısı çalışana kadar canlı kampanya bağlamı yüklenmeyecektir."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Control Centre isn't connected for this project yet."
+msgstr "Control Centre bu proje için henüz bağlı değil."
+
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Control Centre MCP Profile"
 msgstr "Control Centre MCP Profili"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Control Centre needs authorization to list decisions."
+msgstr "Kararları listelemek için Control Centre yetkilendirme gerektiriyor."
+
+#: src/renderer/services/campaignDecisions/recordCampaignDecision.ts
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
@@ -3126,6 +3176,10 @@ msgstr "Kontrol Merkezinin yetkilendirilmesi gerekiyor. MCP ayarlarından yenide
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Control Centre reports the revised plan matches the published plan."
 msgstr "Control Centre, revize planın yayınlanan planla eşleştiğini bildiriyor."
+
+#: src/renderer/services/campaignDecisions/recordCampaignDecision.ts
+msgid "Control Centre returned a response that was too large or malformed. Try again."
+msgstr "Control Centre çok büyük veya bozuk bir yanıt döndürdü. Tekrar deneyin."
 
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Control plane"
@@ -3688,6 +3742,10 @@ msgstr "Karar dosyası"
 msgid "Decision record"
 msgstr "Karar kaydı"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Decision statement"
+msgstr "Karar ifadesi"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Decisions & proposals"
 msgstr "Kararlar ve teklifler"
@@ -4245,6 +4303,14 @@ msgstr "Aracıların kurulum veya iTerm2 bildirimlerine dokunmadan L2'ye (OSC 9;
 msgid "Duplicate server name in scan"
 msgstr "Taramada yinelenen sunucu adı"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "e.g. 30"
+msgstr "örn. 30"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "e.g. Allow TikTok to run up to 30% ahead of pace"
+msgstr "örn. TikTok'un temponun %30 önünde gitmesine izin ver"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "e.g. cg-abc-123"
 msgstr "örn. cg-abc-123"
@@ -4326,6 +4392,10 @@ msgstr "Eşleştirilmiş masaüstünü düzenler ve geri senkronize eder."
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Effect & rollback"
 msgstr "Etki ve geri alma"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Effect on monitoring"
+msgstr "İzleme üzerindeki etki"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Effort"
@@ -4442,6 +4512,10 @@ msgstr "Geliştirilmiş (Kancalar)"
 msgid "Enter a full origin URL like https://code.example.com, with no path."
 msgstr "https://code.example.com gibi, yol içermeyen tam bir kaynak URL'si girin."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Enter a number."
+msgstr "Bir sayı girin."
+
 #: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
 msgid "Enter a port from 1 to 65535."
 msgstr "1 ile 65535 arasında bir bağlantı noktası girin."
@@ -4449,6 +4523,10 @@ msgstr "1 ile 65535 arasında bir bağlantı noktası girin."
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "Enter a repository URL."
 msgstr "Bir depo URL'si girin."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Enter a valid date and time."
+msgstr "Geçerli bir tarih ve saat girin."
 
 #: src/mobile/routeComponents.tsx
 msgid "Enter a valid desktop endpoint."
@@ -4481,6 +4559,10 @@ msgstr "SSH parolasını girin."
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Enter valid JSON."
 msgstr "Geçerli bir JSON girin."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Enter what you decided."
+msgstr "Ne karar verdiğinizi yazın."
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Entity"
@@ -4728,9 +4810,25 @@ msgstr "Deney hakeminin kazananı 1 ile {candidateCount} arasında olmalıdır"
 msgid "Experiment prompt must not be blank"
 msgstr "Deney istemi boş olmamalıdır"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Expired"
+msgstr "Süresi doldu"
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Expires"
 msgstr "Sona erer"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Expires (optional)"
+msgstr "Sona erme (isteğe bağlı)"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Expiry date and time"
+msgstr "Sona erme tarihi ve saati"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Explaining the alert:"
+msgstr "Uyarıyı açıklıyor:"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Export MCP servers"
@@ -6085,6 +6183,10 @@ msgstr "Kampanya bağlamı yükleniyor…"
 msgid "Loading campaigns…"
 msgstr "Kampanyalar yükleniyor…"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Loading decisions…"
+msgstr "Kararlar yükleniyor…"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/parts/SingleFileDiff.tsx
 msgid "Loading diff..."
 msgstr "Fark yükleniyor..."
@@ -7106,6 +7208,10 @@ msgstr "Hayır"
 msgid "No active browser tab"
 msgstr "Etkin tarayıcı sekmesi yok"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "No active decisions."
+msgstr "Etkin karar yok."
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No active session"
 msgstr "Aktif oturum yok"
@@ -7224,6 +7330,7 @@ msgid "No content streams."
 msgstr "İçerik akışı yok."
 
 #: src/renderer/hooks/useControlCentreTool.ts
+#: src/renderer/hooks/useRecordCampaignDecision.ts
 msgid "No Control Centre MCP server is configured for this project."
 msgstr "Bu proje için Kontrol Merkezi MCP sunucusu yapılandırılmadı."
 
@@ -8241,6 +8348,10 @@ msgstr "Parola ifadesi (isteğe bağlı)"
 msgid "Password"
 msgstr "Parola"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Past decisions"
+msgstr "Geçmiş kararlar"
+
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/terminal/XTermSurface.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
@@ -8392,6 +8503,7 @@ msgid "Plan, ask, build…"
 msgstr "Planlayın, sorun, oluşturun…"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Platform"
 msgstr "Platform"
 
@@ -8939,6 +9051,14 @@ msgstr "Hazır. serve etkin olduğunda yeni eşleştirme kodları Tailscale HTTP
 msgid "Ready. Turn this on to advertise the Tailscale HTTPS URL in new pairing codes."
 msgstr "Hazır. Yeni eşleştirme kodlarında Tailscale HTTPS URL'sini duyurmak için bunu açın."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Reason"
+msgstr "Neden"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Reason (optional)"
+msgstr "Neden (isteğe bağlı)"
+
 #: src/renderer/components/common/EffortContextMenu/EffortContextMenu.tsx
 msgid "Reasoning"
 msgstr "Akıl yürütme"
@@ -8983,6 +9103,32 @@ msgstr "Masaüstünüze yeniden bağlanılıyor…"
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
 msgid "Reconstructed from local logs at public API rates — it does not reflect your real bill on subscription plans. Shown only in the usage panel."
 msgstr "Yerel günlüklerden genel API oranlarıyla yeniden oluşturulmuştur; abonelik planlarındaki gerçek faturanızı yansıtmaz. Yalnızca kullanım panelinde gösterilir."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Record"
+msgstr "Kaydet"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Record a decision"
+msgstr "Bir karar kaydet"
+
+#. placeholder {0}: alert.title
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Record a decision for {0}"
+msgstr "{0} için bir karar kaydet"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Record decision"
+msgstr "Kararı kaydet"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Recording…"
+msgstr "Kaydediliyor…"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Records your intent so Control Centre's monitoring can honour it. Nothing is approved, and no budget or platform changes."
+msgstr "Niyetinizi kaydeder, böylece Control Centre'nin izlemesi buna uyabilir. Hiçbir şey onaylanmaz, bütçe veya platform değişmez."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Redact notification content"
@@ -9627,6 +9773,10 @@ msgstr "Revize değer"
 msgid "Revoke {name}"
 msgstr "{name} oturumunu iptal et"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Revoked"
+msgstr "İptal edildi"
+
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Right"
 msgstr "Sağ"
@@ -10054,6 +10204,10 @@ msgstr "{providerLabel} kaynağından {serverName} sunucusunu seç"
 msgid "Select a campaign to view its thread"
 msgstr "Konusunu görüntülemek için bir kampanya seçin"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Select a channel"
+msgstr "Bir kanal seçin"
+
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorModal.tsx
 msgid "Select a file from the tree"
 msgstr "Ağaçtan bir dosya seçin"
@@ -10061,6 +10215,10 @@ msgstr "Ağaçtan bir dosya seçin"
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 msgid "Select a file to start editing."
 msgstr "Düzenlemeye başlamak için bir dosya seçin."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Select a platform"
+msgstr "Bir platform seçin"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #~ msgid "Select a project before importing to Project."
@@ -10837,6 +10995,10 @@ msgstr "Ses girişi başlatılıyor"
 msgid "starting…"
 msgstr "başlıyor…"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Starts immediately"
+msgstr "Hemen başlar"
+
 #: src/renderer/views/MainView/parts/PullFromSourceDialog.tsx
 msgid "Stash & Pull"
 msgstr "Sakla ve Çek"
@@ -11012,6 +11174,10 @@ msgstr "Destek:"
 #: src/renderer/components/common/ProviderModelMenu/ProviderModelMenu.tsx
 msgid "Supports Fast mode"
 msgstr "Hızlı modu destekler"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Suppress the alert"
+msgstr "Uyarıyı bastır"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/NotesPanel.tsx
 msgid "Swap notes and to-dos"
@@ -11348,6 +11514,10 @@ msgstr "Deney adayının çalışma ağacı kullanılamıyor."
 msgid "The experiment prompt is too long."
 msgstr "Deney istemi çok uzun."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "The expiry must be in the future."
+msgstr "Sona erme tarihi gelecekte olmalıdır."
+
 #. placeholder {0}: createTarget.wslDistro
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "the global {0} WSL scope"
@@ -11456,6 +11626,10 @@ msgstr "Beceri marketplace'i yüklenemedi."
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "the target provider"
 msgstr "hedef sağlayıcı"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "The whole campaign"
+msgstr "Tüm kampanya"
 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "the Windows user"
@@ -11705,6 +11879,10 @@ msgstr "Konular"
 msgid "Threads marked done that have not been touched for this many days are archived automatically on app launch. Set to 0 to disable."
 msgstr "Bu kadar gün boyunca dokunulmayan ve tamamlandı olarak işaretlenen konular, uygulama başlatıldığında otomatik olarak arşivlenir. Devre dışı bırakmak için 0'a ayarlayın."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Threshold value"
+msgstr "Eşik değeri"
+
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Time"
 msgstr "Saat"
@@ -11792,6 +11970,14 @@ msgstr "Token"
 #: src/renderer/views/ProfileOverlay/parts/ModelUsage.tsx
 msgid "Tokens from {0}"
 msgstr "{0} kaynağından token"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Tolerance %"
+msgstr "Tolerans %"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Tolerance percent"
+msgstr "Tolerans yüzdesi"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Tool restrictions cannot be imported"
@@ -12700,6 +12886,10 @@ msgstr "Haftalık"
 msgid "Weekly review"
 msgstr "Haftalık değerlendirme"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "What did you decide?"
+msgstr "Neye karar verdiniz?"
+
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #~ msgid "What should the agent do?"
 #~ msgstr "Aracı ne yapmalı?"
@@ -12712,6 +12902,10 @@ msgstr "Uzak aracı ne üzerinde çalışmalı?"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "What the Create PR button does by default: open a dialog to edit the title and description first, or auto-generate them and create the PR in one click. You can also switch this from the button's menu."
 msgstr "PR Oluştur düğmesinin varsayılan olarak yaptığı şey: Önce başlığı ve açıklamayı düzenlemek için bir iletişim kutusu açın veya bunları otomatik olarak oluşturun ve tek tıklamayla PR oluşturun. Bunu düğmenin menüsünden de değiştirebilirsiniz."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "What this decision applies to"
+msgstr "Bu kararın kapsamı"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "What this server provides"
@@ -12793,6 +12987,10 @@ msgstr "Terminal panelinin göründüğü yer."
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Which campaigns are off pace this week?"
 msgstr "Bu hafta temposu geride kalan kampanyalar hangileri?"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Why is this the right call?"
+msgstr "Bu neden doğru karar?"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Why this is risky"

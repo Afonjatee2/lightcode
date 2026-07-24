@@ -87,6 +87,27 @@ export interface CampaignContextDecisionViewModel {
   createdAt: string;
 }
 
+/**
+ * A campaign decision projected for the workspace panel. Sourced from
+ * `get_campaign_decisions` (not the narrow context-packet summary), so it
+ * carries the validity window and the server-resolved `effectiveStatus`.
+ * `isActive` mirrors `effectiveStatus` verbatim — the client never re-derives
+ * active/expired from timestamps; the server is the sole authority.
+ */
+export interface CampaignDecisionViewModel {
+  id: string;
+  title: string;
+  description: string | null;
+  decisionType: string;
+  status: "active" | "expired" | "revoked";
+  effectiveStatus: "active" | "expired" | "revoked";
+  isActive: boolean;
+  /** Server-assigned window start (ISO). */
+  startsAt: string;
+  /** ISO, or null for an open-ended decision. */
+  expiresAt: string | null;
+}
+
 export interface CampaignContextProposalViewModel {
   id: string;
   title: string;

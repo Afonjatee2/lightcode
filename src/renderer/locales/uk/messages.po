@@ -158,8 +158,15 @@ msgstr "{0} ({envName}) оновлено до v{newVersion}."
 msgid "{0} ({envName}) updated."
 msgstr "{0} ({envName}) оновлено."
 
+#. placeholder {0}: formatDate(decision.startsAt)
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "{0} → no expiry"
+msgstr "{0} → без завершення"
+
+#. placeholder {0}: active.length
 #. placeholder {0}: context.activeDecisions.length
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
 msgid "{0} active decisions"
 msgstr "{0} активних рішень"
 
@@ -693,9 +700,17 @@ msgstr "Робоча область кампанії для \"{0}\" вже іс�
 msgid "A candidate is no longer on its experiment branch."
 msgstr "Один із кандидатів більше не перебуває в гілці експерименту."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "A channel"
+msgstr "Канал"
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "A frozen worktree source requires a full commit hash"
 msgstr "Для замороженого джерела worktree потрібен повний хеш коміту"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "A platform"
+msgstr "Платформа"
 
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "A strong root decomposes the task, launches workers in separate Git worktrees, and reviews every diff. Nothing is merged automatically."
@@ -795,6 +810,10 @@ msgstr "Дії для {title}"
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Active"
 msgstr "Активно"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Active decisions"
+msgstr "Активні рішення"
 
 #: src/mobile/views/PortsView.tsx
 msgid "Active forwards"
@@ -980,6 +999,10 @@ msgstr "додано"
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Added"
 msgstr "Додано"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Adjust the threshold"
+msgstr "Змінити поріг"
 
 #: src/renderer/views/MainView/parts/CampaignModeGate.tsx
 msgid "Advanced Mode (Code)"
@@ -1185,6 +1208,10 @@ msgstr "Дозволити заміну конфліктних керовани�
 msgid "Allow the browser to show notifications while the app is in the background."
 msgstr "Дозвольте браузеру показувати сповіщення, поки застосунок працює у фоновому режимі."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Allow the condition"
+msgstr "Дозволити умову"
+
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Already configured"
 msgstr "Уже налаштовано"
@@ -1218,6 +1245,10 @@ msgstr "Для очікуваного власника worktree потрібна
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "An MCP server with this name already exists."
 msgstr "Сервер MCP із такою назвою вже існує."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Annotate only"
+msgstr "Лише примітка"
 
 #: src/renderer/components/thread/ChatPane/parts/CheckpointRevertControls.tsx
 msgid "Another chat uses this same tree. File restore could overwrite that chat's changes."
@@ -1260,6 +1291,10 @@ msgstr "Режим зовнішнього вигляду"
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Applied"
 msgstr "Застосовано"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Applies to"
+msgstr "Застосовується до"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Apply provider preset"
@@ -1971,6 +2006,7 @@ msgstr "Не вдалося завантажити порти"
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/ThreadRuntimeRequestPanel.tsx
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
@@ -2106,6 +2142,7 @@ msgid "Changes unavailable"
 msgstr "Зміни недоступні"
 
 #. About page label: release channel (stable/nightly)
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Channel"
 msgstr "Канал"
@@ -2266,6 +2303,10 @@ msgstr "Виберіть мову відображення інтерфейсу 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "Choose thread to attach to"
 msgstr "Виберіть тред для прикріплення"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Choose what this applies to."
+msgstr "Виберіть, до чого це застосовується."
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -3112,10 +3153,19 @@ msgstr "Центр керування недоступний"
 msgid "Control Centre is not available. You can still create a campaign workspace manually, but live campaign context will not load until the MCP connection works."
 msgstr "Центр керування недоступний. Ви все ще можете створити робочу область кампанії вручну, але контекст кампанії в реальному часі не завантажиться, поки не запрацює з'єднання MCP."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Control Centre isn't connected for this project yet."
+msgstr "Control Centre ще не підключено для цього проєкту."
+
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Control Centre MCP Profile"
 msgstr "Профіль MCP Control Centre"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Control Centre needs authorization to list decisions."
+msgstr "Щоб показати рішення, Control Centre потребує авторизації."
+
+#: src/renderer/services/campaignDecisions/recordCampaignDecision.ts
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
@@ -3126,6 +3176,10 @@ msgstr "Центру керування потрібна авторизація.
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Control Centre reports the revised plan matches the published plan."
 msgstr "Control Centre повідомляє, що переглянутий план збігається з опублікованим."
+
+#: src/renderer/services/campaignDecisions/recordCampaignDecision.ts
+msgid "Control Centre returned a response that was too large or malformed. Try again."
+msgstr "Control Centre повернув завелику або пошкоджену відповідь. Спробуйте ще раз."
 
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Control plane"
@@ -3688,6 +3742,10 @@ msgstr "Досьє рішення"
 msgid "Decision record"
 msgstr "Запис рішення"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Decision statement"
+msgstr "Формулювання рішення"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Decisions & proposals"
 msgstr "Рішення та пропозиції"
@@ -4245,6 +4303,14 @@ msgstr "Відкидає вхідні конверти хуків на супе�
 msgid "Duplicate server name in scan"
 msgstr "Повторювана назва сервера в результатах сканування"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "e.g. 30"
+msgstr "напр., 30"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "e.g. Allow TikTok to run up to 30% ahead of pace"
+msgstr "напр., дозволити TikTok випереджати темп до 30%"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "e.g. cg-abc-123"
 msgstr "напр. cg-abc-123"
@@ -4326,6 +4392,10 @@ msgstr "Змінює підключений десктоп і синхроніз
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Effect & rollback"
 msgstr "Ефект і відкат"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Effect on monitoring"
+msgstr "Вплив на моніторинг"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Effort"
@@ -4442,6 +4512,10 @@ msgstr "Розширений (Hooks)"
 msgid "Enter a full origin URL like https://code.example.com, with no path."
 msgstr "Введіть повний URL джерела, наприклад https://code.example.com, без шляху."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Enter a number."
+msgstr "Введіть число."
+
 #: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
 msgid "Enter a port from 1 to 65535."
 msgstr "Введіть порт від 1 до 65535."
@@ -4449,6 +4523,10 @@ msgstr "Введіть порт від 1 до 65535."
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "Enter a repository URL."
 msgstr "Введіть URL репозиторію."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Enter a valid date and time."
+msgstr "Введіть коректні дату й час."
 
 #: src/mobile/routeComponents.tsx
 msgid "Enter a valid desktop endpoint."
@@ -4481,6 +4559,10 @@ msgstr "Введіть пароль SSH."
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Enter valid JSON."
 msgstr "Введіть допустимий JSON."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Enter what you decided."
+msgstr "Вкажіть, що ви вирішили."
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Entity"
@@ -4728,9 +4810,25 @@ msgstr "Номер переможця експерименту має бути �
 msgid "Experiment prompt must not be blank"
 msgstr "Промпт експерименту не може бути порожнім"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Expired"
+msgstr "Завершено"
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Expires"
 msgstr "Закінчується"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Expires (optional)"
+msgstr "Завершується (необов'язково)"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Expiry date and time"
+msgstr "Дата й час завершення"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Explaining the alert:"
+msgstr "Пояснює сповіщення:"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Export MCP servers"
@@ -6085,6 +6183,10 @@ msgstr "Завантаження контексту кампанії…"
 msgid "Loading campaigns…"
 msgstr "Завантаження кампаній…"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Loading decisions…"
+msgstr "Завантаження рішень…"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/parts/SingleFileDiff.tsx
 msgid "Loading diff..."
 msgstr "Завантаження різниці..."
@@ -7106,6 +7208,10 @@ msgstr "Ні"
 msgid "No active browser tab"
 msgstr "Немає активної вкладки браузера"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "No active decisions."
+msgstr "Немає активних рішень."
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No active session"
 msgstr "Немає активної сесії"
@@ -7224,6 +7330,7 @@ msgid "No content streams."
 msgstr "Немає потоків вмісту."
 
 #: src/renderer/hooks/useControlCentreTool.ts
+#: src/renderer/hooks/useRecordCampaignDecision.ts
 msgid "No Control Centre MCP server is configured for this project."
 msgstr "Для цього проєкту не налаштовано MCP-сервер Центру керування."
 
@@ -8241,6 +8348,10 @@ msgstr "Парольна фраза (необов’язково)"
 msgid "Password"
 msgstr "Пароль"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Past decisions"
+msgstr "Минулі рішення"
+
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/terminal/XTermSurface.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
@@ -8392,6 +8503,7 @@ msgid "Plan, ask, build…"
 msgstr "Плануйте, запитуйте, створюйте…"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Platform"
 msgstr "Платформа"
 
@@ -8939,6 +9051,14 @@ msgstr "Готово. Нові коди сполучення оголошува�
 msgid "Ready. Turn this on to advertise the Tailscale HTTPS URL in new pairing codes."
 msgstr "Готово. Увімкніть, щоб оголошувати HTTPS-URL Tailscale у нових кодах сполучення."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Reason"
+msgstr "Причина"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Reason (optional)"
+msgstr "Причина (необов'язково)"
+
 #: src/renderer/components/common/EffortContextMenu/EffortContextMenu.tsx
 msgid "Reasoning"
 msgstr "Міркування"
@@ -8983,6 +9103,32 @@ msgstr "Перепідключення до десктопа…"
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
 msgid "Reconstructed from local logs at public API rates — it does not reflect your real bill on subscription plans. Shown only in the usage panel."
 msgstr "Відтворено з локальних журналів за публічними тарифами API — це не відображає ваш реальний рахунок за тарифними планами підписки. Показується лише на панелі використання."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Record"
+msgstr "Записати"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Record a decision"
+msgstr "Записати рішення"
+
+#. placeholder {0}: alert.title
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Record a decision for {0}"
+msgstr "Записати рішення для {0}"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Record decision"
+msgstr "Записати рішення"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Recording…"
+msgstr "Запис…"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Records your intent so Control Centre's monitoring can honour it. Nothing is approved, and no budget or platform changes."
+msgstr "Записує ваш намір, щоб моніторинг Control Centre міг його враховувати. Нічого не затверджується, бюджет і платформи не змінюються."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Redact notification content"
@@ -9627,6 +9773,10 @@ msgstr "Переглянуте значення"
 msgid "Revoke {name}"
 msgstr "Відкликати {name}"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Revoked"
+msgstr "Скасовано"
+
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Right"
 msgstr "Праворуч"
@@ -10054,6 +10204,10 @@ msgstr "Вибрати {serverName} з {providerLabel}"
 msgid "Select a campaign to view its thread"
 msgstr "Виберіть кампанію, щоб переглянути її тред"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Select a channel"
+msgstr "Виберіть канал"
+
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorModal.tsx
 msgid "Select a file from the tree"
 msgstr "Виберіть файл із дерева"
@@ -10061,6 +10215,10 @@ msgstr "Виберіть файл із дерева"
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 msgid "Select a file to start editing."
 msgstr "Виберіть файл, щоб почати редагування."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Select a platform"
+msgstr "Виберіть платформу"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #~ msgid "Select a project before importing to Project."
@@ -10837,6 +10995,10 @@ msgstr "Запуск голосового введення"
 msgid "starting…"
 msgstr "запуск…"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Starts immediately"
+msgstr "Починається негайно"
+
 #: src/renderer/views/MainView/parts/PullFromSourceDialog.tsx
 msgid "Stash & Pull"
 msgstr "Сховати та отримати (pull)"
@@ -11012,6 +11174,10 @@ msgstr "Підтримка:"
 #: src/renderer/components/common/ProviderModelMenu/ProviderModelMenu.tsx
 msgid "Supports Fast mode"
 msgstr "Підтримує швидкий режим"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Suppress the alert"
+msgstr "Приховати сповіщення"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/NotesPanel.tsx
 msgid "Swap notes and to-dos"
@@ -11348,6 +11514,10 @@ msgstr "Worktree кандидата експерименту недоступн�
 msgid "The experiment prompt is too long."
 msgstr "Промпт експерименту задовгий."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "The expiry must be in the future."
+msgstr "Дата завершення має бути в майбутньому."
+
 #. placeholder {0}: createTarget.wslDistro
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "the global {0} WSL scope"
@@ -11456,6 +11626,10 @@ msgstr "Не вдалося завантажити маркетплейс нав
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "the target provider"
 msgstr "цільовий провайдер"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "The whole campaign"
+msgstr "Уся кампанія"
 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "the Windows user"
@@ -11705,6 +11879,10 @@ msgstr "Треди"
 msgid "Threads marked done that have not been touched for this many days are archived automatically on app launch. Set to 0 to disable."
 msgstr "Треди, позначені як завершені, до яких не торкалися стільки днів, автоматично архівуються під час запуску програми. Встановіть 0, щоб вимкнути."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Threshold value"
+msgstr "Значення порога"
+
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Time"
 msgstr "Час"
@@ -11792,6 +11970,14 @@ msgstr "Токени"
 #: src/renderer/views/ProfileOverlay/parts/ModelUsage.tsx
 msgid "Tokens from {0}"
 msgstr "Токени з {0}"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Tolerance %"
+msgstr "Допуск %"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Tolerance percent"
+msgstr "Відсоток допуску"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Tool restrictions cannot be imported"
@@ -12700,6 +12886,10 @@ msgstr "Щотижня"
 msgid "Weekly review"
 msgstr "Щотижневий огляд"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "What did you decide?"
+msgstr "Що ви вирішили?"
+
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #~ msgid "What should the agent do?"
 #~ msgstr "Що має зробити агент?"
@@ -12712,6 +12902,10 @@ msgstr "Над чим має працювати віддалений агент?
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "What the Create PR button does by default: open a dialog to edit the title and description first, or auto-generate them and create the PR in one click. You can also switch this from the button's menu."
 msgstr "Що робить кнопка створення PR за замовчуванням: спершу відкриває діалог для редагування заголовка та опису, або генерує їх автоматично та створює PR одним кліком. Це також можна перемкнути в меню кнопки."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "What this decision applies to"
+msgstr "До чого застосовується це рішення"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "What this server provides"
@@ -12793,6 +12987,10 @@ msgstr "Де з'являється панель термінала."
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Which campaigns are off pace this week?"
 msgstr "Які кампанії відстають від темпу цього тижня?"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Why is this the right call?"
+msgstr "Чому це правильне рішення?"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Why this is risky"

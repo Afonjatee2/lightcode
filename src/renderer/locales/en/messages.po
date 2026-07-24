@@ -158,8 +158,15 @@ msgstr "{0} ({envName}) updated to v{newVersion}."
 msgid "{0} ({envName}) updated."
 msgstr "{0} ({envName}) updated."
 
+#. placeholder {0}: formatDate(decision.startsAt)
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "{0} → no expiry"
+msgstr "{0} → no expiry"
+
+#. placeholder {0}: active.length
 #. placeholder {0}: context.activeDecisions.length
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
 msgid "{0} active decisions"
 msgstr "{0} active decisions"
 
@@ -693,9 +700,17 @@ msgstr "A campaign workspace for \"{0}\" already exists with this campaign group
 msgid "A candidate is no longer on its experiment branch."
 msgstr "A candidate is no longer on its experiment branch."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "A channel"
+msgstr "A channel"
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "A frozen worktree source requires a full commit hash"
 msgstr "A frozen worktree source requires a full commit hash"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "A platform"
+msgstr "A platform"
 
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "A strong root decomposes the task, launches workers in separate Git worktrees, and reviews every diff. Nothing is merged automatically."
@@ -795,6 +810,10 @@ msgstr "Actions for {title}"
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Active"
 msgstr "Active"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Active decisions"
+msgstr "Active decisions"
 
 #: src/mobile/views/PortsView.tsx
 msgid "Active forwards"
@@ -980,6 +999,10 @@ msgstr "added"
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Added"
 msgstr "Added"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Adjust the threshold"
+msgstr "Adjust the threshold"
 
 #: src/renderer/views/MainView/parts/CampaignModeGate.tsx
 msgid "Advanced Mode (Code)"
@@ -1185,6 +1208,10 @@ msgstr "Allow replacing conflicting managed skills"
 msgid "Allow the browser to show notifications while the app is in the background."
 msgstr "Allow the browser to show notifications while the app is in the background."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Allow the condition"
+msgstr "Allow the condition"
+
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Already configured"
 msgstr "Already configured"
@@ -1218,6 +1245,10 @@ msgstr "An expected worktree owner requires a branch"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "An MCP server with this name already exists."
 msgstr "An MCP server with this name already exists."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Annotate only"
+msgstr "Annotate only"
 
 #: src/renderer/components/thread/ChatPane/parts/CheckpointRevertControls.tsx
 msgid "Another chat uses this same tree. File restore could overwrite that chat's changes."
@@ -1260,6 +1291,10 @@ msgstr "Appearance mode"
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Applied"
 msgstr "Applied"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Applies to"
+msgstr "Applies to"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Apply provider preset"
@@ -1971,6 +2006,7 @@ msgstr "Can't load ports"
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/ThreadRuntimeRequestPanel.tsx
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
@@ -2106,6 +2142,7 @@ msgid "Changes unavailable"
 msgstr "Changes unavailable"
 
 #. About page label: release channel (stable/nightly)
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Channel"
 msgstr "Channel"
@@ -2266,6 +2303,10 @@ msgstr "Choose the display language for Tee's Cockpit's interface."
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "Choose thread to attach to"
 msgstr "Choose thread to attach to"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Choose what this applies to."
+msgstr "Choose what this applies to."
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -3112,10 +3153,19 @@ msgstr "Control Centre connection unavailable"
 msgid "Control Centre is not available. You can still create a campaign workspace manually, but live campaign context will not load until the MCP connection works."
 msgstr "Control Centre is not available. You can still create a campaign workspace manually, but live campaign context will not load until the MCP connection works."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Control Centre isn't connected for this project yet."
+msgstr "Control Centre isn't connected for this project yet."
+
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Control Centre MCP Profile"
 msgstr "Control Centre MCP Profile"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Control Centre needs authorization to list decisions."
+msgstr "Control Centre needs authorization to list decisions."
+
+#: src/renderer/services/campaignDecisions/recordCampaignDecision.ts
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
@@ -3126,6 +3176,10 @@ msgstr "Control Centre needs authorization. Reconnect it in MCP settings."
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Control Centre reports the revised plan matches the published plan."
 msgstr "Control Centre reports the revised plan matches the published plan."
+
+#: src/renderer/services/campaignDecisions/recordCampaignDecision.ts
+msgid "Control Centre returned a response that was too large or malformed. Try again."
+msgstr "Control Centre returned a response that was too large or malformed. Try again."
 
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Control plane"
@@ -3688,6 +3742,10 @@ msgstr "Decision docket"
 msgid "Decision record"
 msgstr "Decision record"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Decision statement"
+msgstr "Decision statement"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Decisions & proposals"
 msgstr "Decisions & proposals"
@@ -4245,6 +4303,14 @@ msgstr "Drops incoming hook envelopes on the supervisor so agents fall back to L
 msgid "Duplicate server name in scan"
 msgstr "Duplicate server name in scan"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "e.g. 30"
+msgstr "e.g. 30"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "e.g. Allow TikTok to run up to 30% ahead of pace"
+msgstr "e.g. Allow TikTok to run up to 30% ahead of pace"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "e.g. cg-abc-123"
 msgstr "e.g. cg-abc-123"
@@ -4326,6 +4392,10 @@ msgstr "Edits the paired desktop and syncs back to it."
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Effect & rollback"
 msgstr "Effect & rollback"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Effect on monitoring"
+msgstr "Effect on monitoring"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Effort"
@@ -4442,6 +4512,10 @@ msgstr "Enhanced (Hooks)"
 msgid "Enter a full origin URL like https://code.example.com, with no path."
 msgstr "Enter a full origin URL like https://code.example.com, with no path."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Enter a number."
+msgstr "Enter a number."
+
 #: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
 msgid "Enter a port from 1 to 65535."
 msgstr "Enter a port from 1 to 65535."
@@ -4449,6 +4523,10 @@ msgstr "Enter a port from 1 to 65535."
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "Enter a repository URL."
 msgstr "Enter a repository URL."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Enter a valid date and time."
+msgstr "Enter a valid date and time."
 
 #: src/mobile/routeComponents.tsx
 msgid "Enter a valid desktop endpoint."
@@ -4481,6 +4559,10 @@ msgstr "Enter the SSH password."
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Enter valid JSON."
 msgstr "Enter valid JSON."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Enter what you decided."
+msgstr "Enter what you decided."
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Entity"
@@ -4728,9 +4810,25 @@ msgstr "Experiment judge winner must be between 1 and {candidateCount}"
 msgid "Experiment prompt must not be blank"
 msgstr "Experiment prompt must not be blank"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Expired"
+msgstr "Expired"
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Expires"
 msgstr "Expires"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Expires (optional)"
+msgstr "Expires (optional)"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Expiry date and time"
+msgstr "Expiry date and time"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Explaining the alert:"
+msgstr "Explaining the alert:"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Export MCP servers"
@@ -6085,6 +6183,10 @@ msgstr "Loading campaign context…"
 msgid "Loading campaigns…"
 msgstr "Loading campaigns…"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Loading decisions…"
+msgstr "Loading decisions…"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/parts/SingleFileDiff.tsx
 msgid "Loading diff..."
 msgstr "Loading diff..."
@@ -7106,6 +7208,10 @@ msgstr "No"
 msgid "No active browser tab"
 msgstr "No active browser tab"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "No active decisions."
+msgstr "No active decisions."
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No active session"
 msgstr "No active session"
@@ -7224,6 +7330,7 @@ msgid "No content streams."
 msgstr "No content streams."
 
 #: src/renderer/hooks/useControlCentreTool.ts
+#: src/renderer/hooks/useRecordCampaignDecision.ts
 msgid "No Control Centre MCP server is configured for this project."
 msgstr "No Control Centre MCP server is configured for this project."
 
@@ -8241,6 +8348,10 @@ msgstr "Passphrase (optional)"
 msgid "Password"
 msgstr "Password"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Past decisions"
+msgstr "Past decisions"
+
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/terminal/XTermSurface.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
@@ -8392,6 +8503,7 @@ msgid "Plan, ask, build…"
 msgstr "Plan, ask, build…"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Platform"
 msgstr "Platform"
 
@@ -8939,6 +9051,14 @@ msgstr "Ready. New pairing codes will advertise the Tailscale HTTPS URL when ser
 msgid "Ready. Turn this on to advertise the Tailscale HTTPS URL in new pairing codes."
 msgstr "Ready. Turn this on to advertise the Tailscale HTTPS URL in new pairing codes."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Reason"
+msgstr "Reason"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Reason (optional)"
+msgstr "Reason (optional)"
+
 #: src/renderer/components/common/EffortContextMenu/EffortContextMenu.tsx
 msgid "Reasoning"
 msgstr "Reasoning"
@@ -8983,6 +9103,32 @@ msgstr "Reconnecting to your desktop…"
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
 msgid "Reconstructed from local logs at public API rates — it does not reflect your real bill on subscription plans. Shown only in the usage panel."
 msgstr "Reconstructed from local logs at public API rates — it does not reflect your real bill on subscription plans. Shown only in the usage panel."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Record"
+msgstr "Record"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Record a decision"
+msgstr "Record a decision"
+
+#. placeholder {0}: alert.title
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Record a decision for {0}"
+msgstr "Record a decision for {0}"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Record decision"
+msgstr "Record decision"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Recording…"
+msgstr "Recording…"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Records your intent so Control Centre's monitoring can honour it. Nothing is approved, and no budget or platform changes."
+msgstr "Records your intent so Control Centre's monitoring can honour it. Nothing is approved, and no budget or platform changes."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Redact notification content"
@@ -9627,6 +9773,10 @@ msgstr "Revised value"
 msgid "Revoke {name}"
 msgstr "Revoke {name}"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Revoked"
+msgstr "Revoked"
+
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Right"
 msgstr "Right"
@@ -10054,6 +10204,10 @@ msgstr "Select {serverName} from {providerLabel}"
 msgid "Select a campaign to view its thread"
 msgstr "Select a campaign to view its thread"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Select a channel"
+msgstr "Select a channel"
+
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorModal.tsx
 msgid "Select a file from the tree"
 msgstr "Select a file from the tree"
@@ -10061,6 +10215,10 @@ msgstr "Select a file from the tree"
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 msgid "Select a file to start editing."
 msgstr "Select a file to start editing."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Select a platform"
+msgstr "Select a platform"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #~ msgid "Select a project before importing to Project."
@@ -10837,6 +10995,10 @@ msgstr "Starting voice input"
 msgid "starting…"
 msgstr "starting…"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Starts immediately"
+msgstr "Starts immediately"
+
 #: src/renderer/views/MainView/parts/PullFromSourceDialog.tsx
 msgid "Stash & Pull"
 msgstr "Stash & Pull"
@@ -11012,6 +11174,10 @@ msgstr "Support:"
 #: src/renderer/components/common/ProviderModelMenu/ProviderModelMenu.tsx
 msgid "Supports Fast mode"
 msgstr "Supports Fast mode"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Suppress the alert"
+msgstr "Suppress the alert"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/NotesPanel.tsx
 msgid "Swap notes and to-dos"
@@ -11348,6 +11514,10 @@ msgstr "The experiment candidate worktree is unavailable."
 msgid "The experiment prompt is too long."
 msgstr "The experiment prompt is too long."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "The expiry must be in the future."
+msgstr "The expiry must be in the future."
+
 #. placeholder {0}: createTarget.wslDistro
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "the global {0} WSL scope"
@@ -11456,6 +11626,10 @@ msgstr "The skills marketplace couldn't be loaded."
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "the target provider"
 msgstr "the target provider"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "The whole campaign"
+msgstr "The whole campaign"
 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "the Windows user"
@@ -11705,6 +11879,10 @@ msgstr "Threads"
 msgid "Threads marked done that have not been touched for this many days are archived automatically on app launch. Set to 0 to disable."
 msgstr "Threads marked done that have not been touched for this many days are archived automatically on app launch. Set to 0 to disable."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Threshold value"
+msgstr "Threshold value"
+
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Time"
 msgstr "Time"
@@ -11792,6 +11970,14 @@ msgstr "Tokens"
 #: src/renderer/views/ProfileOverlay/parts/ModelUsage.tsx
 msgid "Tokens from {0}"
 msgstr "Tokens from {0}"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Tolerance %"
+msgstr "Tolerance %"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Tolerance percent"
+msgstr "Tolerance percent"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Tool restrictions cannot be imported"
@@ -12700,6 +12886,10 @@ msgstr "Weekly"
 msgid "Weekly review"
 msgstr "Weekly review"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "What did you decide?"
+msgstr "What did you decide?"
+
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #~ msgid "What should the agent do?"
 #~ msgstr "What should the agent do?"
@@ -12712,6 +12902,10 @@ msgstr "What should the remote agent work on?"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "What the Create PR button does by default: open a dialog to edit the title and description first, or auto-generate them and create the PR in one click. You can also switch this from the button's menu."
 msgstr "What the Create PR button does by default: open a dialog to edit the title and description first, or auto-generate them and create the PR in one click. You can also switch this from the button's menu."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "What this decision applies to"
+msgstr "What this decision applies to"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "What this server provides"
@@ -12793,6 +12987,10 @@ msgstr "Where the terminal panel appears."
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Which campaigns are off pace this week?"
 msgstr "Which campaigns are off pace this week?"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Why is this the right call?"
+msgstr "Why is this the right call?"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Why this is risky"

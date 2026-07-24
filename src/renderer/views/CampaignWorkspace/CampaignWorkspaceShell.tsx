@@ -7,6 +7,8 @@ import { CampaignApprovalsPane } from "./parts/CampaignApprovalsPane";
 import { PlanIntelligencePane, type PlanIntelligenceSession } from "./parts/PlanIntelligencePane";
 import { useProject } from "@/renderer/state/useThread";
 import { useCampaignContext } from "@/renderer/hooks/useCampaignContext";
+import { useCampaignDecisions } from "@/renderer/hooks/useCampaignDecisions";
+import { useRecordCampaignDecision } from "@/renderer/hooks/useRecordCampaignDecision";
 import { useOperationsToday } from "@/renderer/hooks/useOperationsToday";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -74,6 +76,8 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
   const operationsToday = useOperationsToday(props.projectId);
   const activeCampaignId = selectedCampaignId ?? boundCampaignGroupId;
   const campaignContext = useCampaignContext(props.projectId, activeCampaignId);
+  const campaignDecisions = useCampaignDecisions(props.projectId, activeCampaignId);
+  const recordDecision = useRecordCampaignDecision(props.projectId);
 
   useEffect(() => {
     if (
@@ -186,6 +190,19 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
             setSelectedProposalId(proposalId ?? null);
             setWorkspaceView("approvals");
           }}
+          {...(activeCampaignId
+            ? {
+                decisions: {
+                  campaignGroupId: activeCampaignId,
+                  state: campaignDecisions,
+                  record: recordDecision,
+                  onRecorded: () => {
+                    campaignDecisions.refetch();
+                    campaignContext.refetch();
+                  },
+                },
+              }
+            : {})}
         />
       </aside>
     </div>

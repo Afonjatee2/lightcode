@@ -158,8 +158,15 @@ msgstr "{0}({envName})이 v{newVersion}로 업데이트되었습니다."
 msgid "{0} ({envName}) updated."
 msgstr "{0}({envName})이 업데이트되었습니다."
 
+#. placeholder {0}: formatDate(decision.startsAt)
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "{0} → no expiry"
+msgstr "{0} → 만료 없음"
+
+#. placeholder {0}: active.length
 #. placeholder {0}: context.activeDecisions.length
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
 msgid "{0} active decisions"
 msgstr "{0}개의 활성 결정"
 
@@ -693,9 +700,17 @@ msgstr "이 캠페인 그룹 ID로 \"{0}\"에 대한 캠페인 작업 영역이 
 msgid "A candidate is no longer on its experiment branch."
 msgstr "후보가 더 이상 실험 브랜치에 있지 않습니다."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "A channel"
+msgstr "채널"
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "A frozen worktree source requires a full commit hash"
 msgstr "고정된 작업 트리 소스에는 전체 커밋 해시가 필요합니다"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "A platform"
+msgstr "플랫폼"
 
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "A strong root decomposes the task, launches workers in separate Git worktrees, and reviews every diff. Nothing is merged automatically."
@@ -795,6 +810,10 @@ msgstr "{title} 작업"
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Active"
 msgstr "활성"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Active decisions"
+msgstr "활성 결정"
 
 #: src/mobile/views/PortsView.tsx
 msgid "Active forwards"
@@ -980,6 +999,10 @@ msgstr "추가됨"
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Added"
 msgstr "추가됨"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Adjust the threshold"
+msgstr "임계값 조정"
 
 #: src/renderer/views/MainView/parts/CampaignModeGate.tsx
 msgid "Advanced Mode (Code)"
@@ -1185,6 +1208,10 @@ msgstr "충돌하는 관리 스킬 교체 허용"
 msgid "Allow the browser to show notifications while the app is in the background."
 msgstr "앱이 백그라운드에 있을 때 브라우저가 알림을 표시하도록 허용하세요."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Allow the condition"
+msgstr "이 조건 허용"
+
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Already configured"
 msgstr "이미 구성됨"
@@ -1218,6 +1245,10 @@ msgstr "예상 작업 트리 소유자에는 브랜치가 필요합니다"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "An MCP server with this name already exists."
 msgstr "이 이름의 MCP 서버가 이미 있습니다."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Annotate only"
+msgstr "주석만 추가"
 
 #: src/renderer/components/thread/ChatPane/parts/CheckpointRevertControls.tsx
 msgid "Another chat uses this same tree. File restore could overwrite that chat's changes."
@@ -1260,6 +1291,10 @@ msgstr "모양 모드"
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Applied"
 msgstr "적용됨"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Applies to"
+msgstr "적용 대상"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Apply provider preset"
@@ -1971,6 +2006,7 @@ msgstr "포트를 불러올 수 없습니다"
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/ThreadRuntimeRequestPanel.tsx
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
@@ -2106,6 +2142,7 @@ msgid "Changes unavailable"
 msgstr "변경 사항을 확인할 수 없음"
 
 #. About page label: release channel (stable/nightly)
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Channel"
 msgstr "채널"
@@ -2266,6 +2303,10 @@ msgstr "Tee's Cockpit 인터페이스의 표시 언어를 선택하세요."
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "Choose thread to attach to"
 msgstr "첨부할 스레드를 선택하세요."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Choose what this applies to."
+msgstr "적용 대상을 선택하세요."
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -3112,10 +3153,19 @@ msgstr "제어 센터 연결 불가"
 msgid "Control Centre is not available. You can still create a campaign workspace manually, but live campaign context will not load until the MCP connection works."
 msgstr "제어 센터를 사용할 수 없습니다. 수동으로 캠페인 작업 영역을 만들 수 있지만 MCP 연결이 작동할 때까지 라이브 캠페인 컨텍스트가 로드되지 않습니다."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Control Centre isn't connected for this project yet."
+msgstr "이 프로젝트에는 아직 Control Centre가 연결되지 않았습니다."
+
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Control Centre MCP Profile"
 msgstr "Control Centre MCP 프로필"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Control Centre needs authorization to list decisions."
+msgstr "결정을 나열하려면 Control Centre 인증이 필요합니다."
+
+#: src/renderer/services/campaignDecisions/recordCampaignDecision.ts
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
@@ -3126,6 +3176,10 @@ msgstr "제어 센터에 권한이 필요합니다. MCP 설정에서 다시 연�
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Control Centre reports the revised plan matches the published plan."
 msgstr "Control Centre는 수정된 플랜이 게시된 플랜과 일치한다고 보고합니다."
+
+#: src/renderer/services/campaignDecisions/recordCampaignDecision.ts
+msgid "Control Centre returned a response that was too large or malformed. Try again."
+msgstr "Control Centre가 너무 크거나 잘못된 형식의 응답을 반환했습니다. 다시 시도하세요."
 
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Control plane"
@@ -3688,6 +3742,10 @@ msgstr "결정 도켓"
 msgid "Decision record"
 msgstr "결정 기록"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Decision statement"
+msgstr "결정 내용"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Decisions & proposals"
 msgstr "결정 및 제안"
@@ -4245,6 +4303,14 @@ msgstr "에이전트가 설치 또는 iTerm2 알림을 건드리지 않고 L2(OS
 msgid "Duplicate server name in scan"
 msgstr "스캔에 중복된 서버 이름이 있습니다"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "e.g. 30"
+msgstr "예: 30"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "e.g. Allow TikTok to run up to 30% ahead of pace"
+msgstr "예: TikTok이 페이스보다 최대 30% 앞서도록 허용"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "e.g. cg-abc-123"
 msgstr "예: cg-abc-123"
@@ -4326,6 +4392,10 @@ msgstr "페어링된 데스크톱을 편집하고 다시 동기화합니다."
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Effect & rollback"
 msgstr "영향 및 롤백"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Effect on monitoring"
+msgstr "모니터링에 미치는 영향"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Effort"
@@ -4442,6 +4512,10 @@ msgstr "고급(후크)"
 msgid "Enter a full origin URL like https://code.example.com, with no path."
 msgstr "https://code.example.com과(와) 같은 전체 출처(origin) URL을 경로 없이 입력하세요."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Enter a number."
+msgstr "숫자를 입력하세요."
+
 #: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
 msgid "Enter a port from 1 to 65535."
 msgstr "1~65535 사이의 포트를 입력하세요."
@@ -4449,6 +4523,10 @@ msgstr "1~65535 사이의 포트를 입력하세요."
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "Enter a repository URL."
 msgstr "저장소 URL을 입력하세요."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Enter a valid date and time."
+msgstr "유효한 날짜와 시간을 입력하세요."
 
 #: src/mobile/routeComponents.tsx
 msgid "Enter a valid desktop endpoint."
@@ -4481,6 +4559,10 @@ msgstr "SSH 암호를 입력하세요."
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Enter valid JSON."
 msgstr "유효한 JSON을 입력하세요."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Enter what you decided."
+msgstr "결정한 내용을 입력하세요."
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Entity"
@@ -4728,9 +4810,25 @@ msgstr "실험 평가의 우승자는 1에서 {candidateCount} 사이여야 합�
 msgid "Experiment prompt must not be blank"
 msgstr "실험 프롬프트는 비워 둘 수 없습니다"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Expired"
+msgstr "만료됨"
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Expires"
 msgstr "만료"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Expires (optional)"
+msgstr "만료일(선택 사항)"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Expiry date and time"
+msgstr "만료 날짜 및 시간"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Explaining the alert:"
+msgstr "설명할 알림:"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Export MCP servers"
@@ -6085,6 +6183,10 @@ msgstr "캠페인 컨텍스트 로드 중…"
 msgid "Loading campaigns…"
 msgstr "캠페인 로드 중…"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Loading decisions…"
+msgstr "결정을 불러오는 중…"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/parts/SingleFileDiff.tsx
 msgid "Loading diff..."
 msgstr "차이점 로드 중..."
@@ -7106,6 +7208,10 @@ msgstr "아니오"
 msgid "No active browser tab"
 msgstr "활성 브라우저 탭이 없습니다."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "No active decisions."
+msgstr "활성 결정이 없습니다."
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No active session"
 msgstr "활성 세션 없음"
@@ -7224,6 +7330,7 @@ msgid "No content streams."
 msgstr "콘텐츠 스트림이 없습니다."
 
 #: src/renderer/hooks/useControlCentreTool.ts
+#: src/renderer/hooks/useRecordCampaignDecision.ts
 msgid "No Control Centre MCP server is configured for this project."
 msgstr "이 프로젝트에 제어 센터 MCP 서버가 구성되지 않았습니다."
 
@@ -8241,6 +8348,10 @@ msgstr "암호 문구(선택 사항)"
 msgid "Password"
 msgstr "암호"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Past decisions"
+msgstr "지난 결정"
+
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/terminal/XTermSurface.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
@@ -8392,6 +8503,7 @@ msgid "Plan, ask, build…"
 msgstr "계획하고, 묻고, 만들어 보세요…"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Platform"
 msgstr "플랫폼"
 
@@ -8939,6 +9051,14 @@ msgstr "준비됨. serve가 활성화되면 새 페어링 코드가 Tailscale HT
 msgid "Ready. Turn this on to advertise the Tailscale HTTPS URL in new pairing codes."
 msgstr "준비됨. 이 옵션을 켜면 새 페어링 코드에 Tailscale HTTPS URL이 광고됩니다."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Reason"
+msgstr "이유"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Reason (optional)"
+msgstr "이유(선택 사항)"
+
 #: src/renderer/components/common/EffortContextMenu/EffortContextMenu.tsx
 msgid "Reasoning"
 msgstr "추론"
@@ -8983,6 +9103,32 @@ msgstr "데스크톱에 다시 연결 중…"
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
 msgid "Reconstructed from local logs at public API rates — it does not reflect your real bill on subscription plans. Shown only in the usage panel."
 msgstr "공개 API 요금으로 로컬 로그에서 재구성되며 구독 계획에 대한 실제 청구서를 반영하지 않습니다. 사용량 패널에만 표시됩니다."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Record"
+msgstr "기록"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Record a decision"
+msgstr "결정 기록"
+
+#. placeholder {0}: alert.title
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Record a decision for {0}"
+msgstr "{0}에 대한 결정 기록"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Record decision"
+msgstr "결정 기록"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Recording…"
+msgstr "기록 중…"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Records your intent so Control Centre's monitoring can honour it. Nothing is approved, and no budget or platform changes."
+msgstr "의도를 기록하여 Control Centre의 모니터링이 이를 반영할 수 있게 합니다. 아무것도 승인되지 않으며 예산이나 플랫폼도 변경되지 않습니다."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Redact notification content"
@@ -9627,6 +9773,10 @@ msgstr "수정된 값"
 msgid "Revoke {name}"
 msgstr "{name} 해지"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignDecisionsList.tsx
+msgid "Revoked"
+msgstr "취소됨"
+
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Right"
 msgstr "오른쪽"
@@ -10054,6 +10204,10 @@ msgstr "{providerLabel}에서 {serverName} 선택"
 msgid "Select a campaign to view its thread"
 msgstr "스레드를 보려면 캠페인을 선택하세요"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Select a channel"
+msgstr "채널 선택"
+
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorModal.tsx
 msgid "Select a file from the tree"
 msgstr "트리에서 파일을 선택하세요"
@@ -10061,6 +10215,10 @@ msgstr "트리에서 파일을 선택하세요"
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 msgid "Select a file to start editing."
 msgstr "편집을 시작하려면 파일을 선택하세요."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Select a platform"
+msgstr "플랫폼 선택"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #~ msgid "Select a project before importing to Project."
@@ -10837,6 +10995,10 @@ msgstr "음성 입력 시작"
 msgid "starting…"
 msgstr "시작 중…"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Starts immediately"
+msgstr "즉시 시작"
+
 #: src/renderer/views/MainView/parts/PullFromSourceDialog.tsx
 msgid "Stash & Pull"
 msgstr "보관 및 끌어오기"
@@ -11012,6 +11174,10 @@ msgstr "지원:"
 #: src/renderer/components/common/ProviderModelMenu/ProviderModelMenu.tsx
 msgid "Supports Fast mode"
 msgstr "고속 모드 지원"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Suppress the alert"
+msgstr "알림 억제"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/NotesPanel.tsx
 msgid "Swap notes and to-dos"
@@ -11348,6 +11514,10 @@ msgstr "실험 후보의 작업 트리를 사용할 수 없습니다."
 msgid "The experiment prompt is too long."
 msgstr "실험 프롬프트가 너무 깁니다."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "The expiry must be in the future."
+msgstr "만료 시점은 미래여야 합니다."
+
 #. placeholder {0}: createTarget.wslDistro
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "the global {0} WSL scope"
@@ -11456,6 +11626,10 @@ msgstr "스킬 마켓플레이스를 로드할 수 없습니다."
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "the target provider"
 msgstr "대상 공급자"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "The whole campaign"
+msgstr "캠페인 전체"
 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "the Windows user"
@@ -11705,6 +11879,10 @@ msgstr "스레드"
 msgid "Threads marked done that have not been touched for this many days are archived automatically on app launch. Set to 0 to disable."
 msgstr "완료로 표시된 스레드 중 며칠 동안 건드리지 않은 스레드는 앱 실행 시 자동으로 보관됩니다. 비활성화하려면 0으로 설정합니다."
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Threshold value"
+msgstr "임계값"
+
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Time"
 msgstr "시간"
@@ -11792,6 +11970,14 @@ msgstr "토큰"
 #: src/renderer/views/ProfileOverlay/parts/ModelUsage.tsx
 msgid "Tokens from {0}"
 msgstr "{0}의 토큰"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Tolerance %"
+msgstr "허용 오차 %"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Tolerance percent"
+msgstr "허용 오차 백분율"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Tool restrictions cannot be imported"
@@ -12700,6 +12886,10 @@ msgstr "매주"
 msgid "Weekly review"
 msgstr "주간 검토"
 
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "What did you decide?"
+msgstr "무엇을 결정했나요?"
+
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #~ msgid "What should the agent do?"
 #~ msgstr "에이전트가 무엇을 해야 하나요?"
@@ -12712,6 +12902,10 @@ msgstr "원격 에이전트가 어떤 작업을 수행해야 하나요?"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "What the Create PR button does by default: open a dialog to edit the title and description first, or auto-generate them and create the PR in one click. You can also switch this from the button's menu."
 msgstr "PR 만들기 버튼의 기본 기능: 대화 상자를 열어 제목과 설명을 먼저 편집하거나 자동 생성하여 한 번의 클릭으로 PR을 만듭니다. 버튼 메뉴에서 전환할 수도 있습니다."
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "What this decision applies to"
+msgstr "이 결정의 적용 대상"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "What this server provides"
@@ -12793,6 +12987,10 @@ msgstr "터미널 패널이 나타나는 위치."
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Which campaigns are off pace this week?"
 msgstr "이번 주 페이스가 느린 캠페인은?"
+
+#: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
+msgid "Why is this the right call?"
+msgstr "왜 이것이 옳은 결정인가요?"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Why this is risky"

@@ -8,11 +8,29 @@ import {
   ChevronRight,
   RefreshCw,
   ShieldAlert,
+  ShieldCheck,
   WifiOff,
 } from "lucide-react";
 import type { CampaignContextViewModel } from "@/renderer/adapters/campaignViewModels";
 import type { CampaignContextState } from "@/renderer/hooks/useCampaignContext";
+import type { CampaignDecisionsState } from "@/renderer/hooks/useCampaignDecisions";
+import type { RecordCampaignDecision } from "@/renderer/hooks/useRecordCampaignDecision";
 import { CampaignContextStatusStrip } from "./CampaignContextStatusStrip";
+import { CampaignDecisionsList } from "./CampaignDecisionsList";
+import { RecordDecisionModal } from "./RecordDecisionModal";
+import type { DecisionFormSeed } from "./decisionForm";
+
+/**
+ * Everything the decisions surface needs, resolved once in the shell and
+ * threaded through. Optional so the pane still renders standalone in tests
+ * that don't exercise decision recording.
+ */
+export interface CampaignDecisionsBundle {
+  campaignGroupId: string;
+  state: CampaignDecisionsState;
+  record: RecordCampaignDecision;
+  onRecorded: () => void;
+}
 
 function formatMoney(value: number | undefined | null, currency: string): string {
   if (value === undefined || value === null) return "—";
@@ -89,9 +107,23 @@ function channelStatusTone(status: string | null): string {
 function ContextSections(props: {
   context: CampaignContextViewModel;
   onOpenApprovals?: (proposalId?: string) => void;
+  decisions?: CampaignDecisionsBundle;
 }) {
-  const { context } = props;
+  const { context, decisions } = props;
   const { t } = useLingui();
+  const [recordModal, setRecordModal] = useState<{
+    open: boolean;
+    seed?: DecisionFormSeed;
+    alertTitle?: string;
+  }>({ open: false });
+
+  const openRecordModal = (options?: { seed?: DecisionFormSeed; alertTitle?: string }) => {
+    setRecordModal({
+      open: true,
+      ...(options?.seed ? { seed: options.seed } : {}),
+      ...(options?.alertTitle ? { alertTitle: options.alertTitle } : {}),
+    });
+  };
 
   const localizedWarnings = context.missingDataWarnings.map((warning) => {
     const stale = warning.match(/^(\d+) data sources have stale data$/);
@@ -125,13 +157,32 @@ function ContextSections(props: {
                 className="flex items-center justify-between gap-2 border-t border-[var(--hairline)] pt-2 first:border-0 first:pt-0"
               >
                 <span className="truncate text-sm text-foreground">{alert.title}</span>
-                <Chip
-                  size="sm"
-                  variant="soft"
-                  color={priorityChipColors[alert.priority] ?? "default"}
-                >
-                  {alert.priority}
-                </Chip>
+                <div className="flex shrink-0 items-center gap-1">
+                  {decisions ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      isIconOnly
+                      className="h-6 w-6 min-w-6 text-[var(--cockpit-accent)]"
+                      aria-label={t`Record a decision for ${alert.title}`}
+                      onPress={() =>
+                        openRecordModal({
+                          seed: { mode: "suppress" },
+                          alertTitle: alert.title,
+                        })
+                      }
+                    >
+                      <ShieldCheck className="size-3.5" aria-hidden />
+                    </Button>
+                  ) : null}
+                  <Chip
+                    size="sm"
+                    variant="soft"
+                    color={priorityChipColors[alert.priority] ?? "default"}
+                  >
+                    {alert.priority}
+                  </Chip>
+                </div>
               </li>
             ))}
           </ul>
@@ -214,11 +265,19 @@ function ContextSections(props: {
       <CollapsibleSection
         title={<Trans>Decisions & proposals</Trans>}
         count={context.pendingProposals.length}
-        defaultOpen={context.pendingProposals.length > 0}
+        defaultOpen={context.pendingProposals.length > 0 || decisions !== undefined}
       >
-        <p className="text-sm text-foreground">
-          <Trans>{context.activeDecisions.length} active decisions</Trans>
-        </p>
+        {decisions ? (
+          <CampaignDecisionsList
+            decisions={decisions.state}
+            ready={decisions.record.ready}
+            onRecord={() => openRecordModal()}
+          />
+        ) : (
+          <p className="text-sm text-foreground">
+            <Trans>{context.activeDecisions.length} active decisions</Trans>
+          </p>
+        )}
         {context.pendingProposals.length > 0 ? (
           <div className="mt-2 rounded-md border border-[var(--cockpit-accent-line)] bg-[var(--cockpit-accent-soft)] px-3 py-2 text-[11.5px] text-muted">
             <p>
@@ -276,6 +335,20 @@ function ContextSections(props: {
       <p className="px-1 pt-2 text-[10px] text-muted">
         <Trans>Evidence freshness</Trans>: {context.evidenceFreshness}
       </p>
+
+      {decisions ? (
+        <RecordDecisionModal
+          isOpen={recordModal.open}
+          onClose={() => setRecordModal({ open: false })}
+          campaignGroupId={decisions.campaignGroupId}
+          channels={context.channels}
+          ready={decisions.record.ready}
+          submit={decisions.record.submit}
+          onRecorded={decisions.onRecorded}
+          {...(recordModal.seed ? { seed: recordModal.seed } : {})}
+          {...(recordModal.alertTitle ? { alertTitle: recordModal.alertTitle } : {})}
+        />
+      ) : null}
     </div>
   );
 }
@@ -283,6 +356,7 @@ function ContextSections(props: {
 export function CampaignContextPane(props: {
   campaignContext: CampaignContextState & { refetch: () => void };
   onOpenApprovals?: (proposalId?: string) => void;
+  decisions?: CampaignDecisionsBundle;
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
 }) {
@@ -390,6 +464,7 @@ export function CampaignContextPane(props: {
           <ContextSections
             context={campaignContext.data}
             {...(props.onOpenApprovals ? { onOpenApprovals: props.onOpenApprovals } : {})}
+            {...(props.decisions ? { decisions: props.decisions } : {})}
           />
         )}
       </div>
