@@ -64,8 +64,14 @@ export function dbUpsertProject(project: Project, sortOrder: number): void {
       scripts: project.scripts ? JSON.stringify(project.scripts) : null,
       searchSettings: project.searchSettings ? JSON.stringify(project.searchSettings) : null,
       mcpServers: project.mcpServers ? JSON.stringify(project.mcpServers) : null,
-      purpose: project.purpose ?? null,
-      campaignExtension: project.campaignExtension ? JSON.stringify(project.campaignExtension) : null,
+      // Never an explicit NULL: databases stamped by older builds declare
+      // projects.purpose NOT NULL DEFAULT 'code', and SQLite does not apply a
+      // column default to a supplied NULL. dbSyncAll deletes before it
+      // re-inserts, so that write failure empties the projects table.
+      purpose: project.purpose ?? "code",
+      campaignExtension: project.campaignExtension
+        ? JSON.stringify(project.campaignExtension)
+        : null,
       // Legacy compatibility only; campaignExtension is canonical.
       campaignGroupId: project.campaignExtension?.campaignGroupId ?? null,
       disabled: !!project.disabled,
@@ -81,8 +87,10 @@ export function dbUpsertProject(project: Project, sortOrder: number): void {
         scripts: project.scripts ? JSON.stringify(project.scripts) : null,
         searchSettings: project.searchSettings ? JSON.stringify(project.searchSettings) : null,
         mcpServers: project.mcpServers ? JSON.stringify(project.mcpServers) : null,
-        purpose: project.purpose ?? null,
-        campaignExtension: project.campaignExtension ? JSON.stringify(project.campaignExtension) : null,
+        purpose: project.purpose ?? "code",
+        campaignExtension: project.campaignExtension
+          ? JSON.stringify(project.campaignExtension)
+          : null,
         // Legacy compatibility only; campaignExtension is canonical.
         campaignGroupId: project.campaignExtension?.campaignGroupId ?? null,
         disabled: !!project.disabled,
