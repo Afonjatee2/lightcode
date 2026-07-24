@@ -23,6 +23,7 @@ import type {
   RelocateProjectPayload,
   RelocateProjectResult,
   SeedOrchestratorChildrenPayload,
+  RegisterOrchestratorReplacementPayload,
 } from "@/shared/contracts";
 import type { SupervisorEvent } from "@/shared/ipc";
 import { msg } from "@/shared/messages";
@@ -850,6 +851,10 @@ export class SupervisorRuntime {
     void this.consultationCoordinator.reconcileOnStartup().catch((error) => {
       console.warn("[supervisor] Consultation startup reconciliation failed:", error);
     });
+  }
+
+  registerOrchestratorReplacement(payload: RegisterOrchestratorReplacementPayload): void {
+    this.orchestratorThreadManager.registerReplacement(payload.sourceThreadId, payload.replacement);
   }
 
   dispose(): void {

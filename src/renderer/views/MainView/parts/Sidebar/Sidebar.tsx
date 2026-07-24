@@ -6,6 +6,7 @@ import {
   GitPullRequest,
   House,
   Megaphone,
+  Network,
   PanelLeft,
   PanelLeftClose,
   RefreshCw,
@@ -248,6 +249,7 @@ export function Sidebar() {
   const openCampaignToday = useAppStore((s) => s.openCampaignToday);
   const openPullRequests = useAppStore((s) => s.openPullRequests);
   const openSchedules = useAppStore((s) => s.openSchedules);
+  const openSwarm = useAppStore((s) => s.openSwarm);
   const appView = useAppStore((s) => s.view);
   const appNameForHome = getAppName(readBridge().channel, import.meta.env.DEV);
   const [remoteAccessStatus, setRemoteAccessStatus] = useState<RemoteAccessSidebarStatus>("off");
@@ -349,6 +351,13 @@ export function Sidebar() {
             <ProviderUsageRail orientation="column" />
             <UpdateButtons iconOnly />
             <WhatsNewButton iconOnly />
+            <SidebarButton
+              iconOnly
+              icon={<Network className="size-4" />}
+              label={t`Swarm`}
+              isActive={appView.kind === "swarm"}
+              onPress={() => startTransition(() => openSwarm())}
+            />
             {campaignProjectIds.length > 0 ? (
               <SidebarButton
                 iconOnly
@@ -468,6 +477,12 @@ export function Sidebar() {
         <div className={sidebarFooterNavClass}>
           <UpdateButtons />
           <WhatsNewButton />
+          <SidebarButton
+            icon={<Network className="size-4" />}
+            label={t`Swarm`}
+            isActive={appView.kind === "swarm"}
+            onPress={() => startTransition(() => openSwarm())}
+          />
           <SidebarButton
             icon={<GitPullRequest className="size-4" />}
             label={t`Pull requests`}

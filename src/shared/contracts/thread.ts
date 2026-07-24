@@ -87,6 +87,19 @@ export const seedOrchestratorChildrenPayloadSchema = z.object({
 });
 export type SeedOrchestratorChildrenPayload = z.infer<typeof seedOrchestratorChildrenPayloadSchema>;
 
+/**
+ * Registers a renderer-created provider handoff as the live successor of an
+ * existing Crossagents child. The supervisor validates ownership against the
+ * source child instead of trusting renderer-supplied swarm lineage.
+ */
+export const registerOrchestratorReplacementPayloadSchema = z.object({
+  sourceThreadId: z.string().min(1),
+  replacement: orchestratorChildSeedSchema,
+});
+export type RegisterOrchestratorReplacementPayload = z.infer<
+  typeof registerOrchestratorReplacementPayloadSchema
+>;
+
 export interface ThreadRuntimeSnapshot {
   threadId: string;
   status: z.infer<typeof threadStatusSchema>;
