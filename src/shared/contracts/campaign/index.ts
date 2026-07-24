@@ -24,6 +24,7 @@ export * from "./consultationContextPacket";
 export * from "./mcpProfile";
 export * from "./campaignMcpLaunch";
 export * from "./controlCentreCampaignContext";
+export * from "./controlCentreCampaignDecision";
 export * from "./controlCentreOperationsToday";
 export * from "./planIntelligence";
 
