@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist, subscribeWithSelector } from "zustand/middleware";
 import type { Thread } from "@/shared/contracts";
-import { createDbStorage } from "./dbStorage";
+import { APP_STORE_PERSIST_VERSION, createDbStorage } from "./dbStorage";
 import { createDraftSlice } from "./slices/draftSlice";
 import { normalizeStoredThreadStatus } from "./slices/helpers";
 import { createLaunchSlice } from "./slices/launchSlice";
@@ -32,7 +32,7 @@ export const useAppStore = create<AppStoreState>()(
       }),
       {
         name: "poracode-app-v2",
-        version: 5,
+        version: APP_STORE_PERSIST_VERSION,
         storage: createDbStorage(),
         merge: (persistedState, currentState) => {
           const state =

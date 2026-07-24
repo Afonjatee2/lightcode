@@ -93,6 +93,15 @@ export function createDbStorage<S>(): PersistStorage<S> {
   return dbStorageBackend as PersistStorage<S>;
 }
 
+/**
+ * Persisted-payload version for the app store. The store's `persist` config and
+ * the payloads this adapter hands back MUST agree: zustand discards persisted
+ * state stamped older than the store's version when no `migrate` is supplied,
+ * so a drift here silently empties the store — and the next write then syncs
+ * that emptiness back over the database. Import this constant; never inline it.
+ */
+export const APP_STORE_PERSIST_VERSION = 5;
+
 /** Load projects + threads + view from SQLite and assemble into Zustand persist format. */
 async function loadAppStore(): Promise<StorageValue<unknown> | null> {
   const [projects, threads, viewJson] = await Promise.all([
@@ -126,7 +135,7 @@ async function loadAppStore(): Promise<StorageValue<unknown> | null> {
 
   return rememberStorageValue(APP_STORE_NAME, {
     state: { projects, threads, view, groupLayouts },
-    version: 4,
+    version: APP_STORE_PERSIST_VERSION,
   });
 }
 

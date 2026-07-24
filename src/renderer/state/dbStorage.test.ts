@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDbStorage } from "./dbStorage";
 
@@ -166,5 +168,20 @@ describe("dbStorage persistence error reporting", () => {
 
     expect(bridge.dbSetState).toHaveBeenCalledOnce();
     expect(captureRendererException).not.toHaveBeenCalled();
+  });
+});
+
+describe("persisted payload version", () => {
+  it("stamps loaded payloads with the version the app store expects", async () => {
+    // A drift between these two makes zustand discard hydrated state, which then
+    // gets written back as an empty snapshot and deletes every project row.
+    const { APP_STORE_PERSIST_VERSION } = await import("./dbStorage");
+    const appStoreSource = await readFile(
+      join(process.cwd(), "src", "renderer", "state", "appStore.ts"),
+      "utf8",
+    );
+    expect(appStoreSource).toContain("version: APP_STORE_PERSIST_VERSION");
+    expect(appStoreSource).not.toMatch(/version:\s*\d+,/);
+    expect(APP_STORE_PERSIST_VERSION).toBeTypeOf("number");
   });
 });
