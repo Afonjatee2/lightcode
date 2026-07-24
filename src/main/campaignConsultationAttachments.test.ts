@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -62,6 +62,35 @@ describe("copyCampaignConsultationAttachments", () => {
     expect(second.copies[0]?.fileName).toBe("brief (2).pdf");
     const workspaceRoot = join(baseDir, "campaign-workspaces", `${VALID_UUID}--${VALID_UUID}`);
     expect(existsSync(join(workspaceRoot, CAMPAIGN_ATTACHMENT_SUBDIR, "brief (2).pdf"))).toBe(true);
+  });
+
+  it("rejects a traversal-crafted projectId instead of escaping the base dir", async () => {
+    const sourcePath = join(sourceDir, "innocent.txt");
+    writeFileSync(sourcePath, "data");
+
+    await expect(
+      copyCampaignConsultationAttachments(baseDir, {
+        projectId: "../../outside",
+        sourcePaths: [sourcePath],
+      }),
+    ).rejects.toThrow("Invalid projectId");
+    expect(existsSync(join(baseDir, "..", "outside"))).toBe(false);
+  });
+
+  it("confines copies to the attachments dir regardless of source location", async () => {
+    const outsideDir = join(sourceDir, "..", "elsewhere");
+    mkdirSync(outsideDir, { recursive: true });
+    const sourcePath = join(outsideDir, "deep-file.bin");
+    writeFileSync(sourcePath, "bytes");
+
+    const result = await copyCampaignConsultationAttachments(baseDir, {
+      projectId: VALID_UUID,
+      sourcePaths: [sourcePath],
+    });
+
+    const workspaceRoot = join(baseDir, "campaign-workspaces", `${VALID_UUID}--${VALID_UUID}`);
+    expect(result.copies[0]?.relativePath).toBe(`./${CAMPAIGN_ATTACHMENT_SUBDIR}/deep-file.bin`);
+    expect(existsSync(join(workspaceRoot, CAMPAIGN_ATTACHMENT_SUBDIR, "deep-file.bin"))).toBe(true);
   });
 
   it("flags files larger than 100 MB", async () => {
