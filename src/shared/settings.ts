@@ -424,6 +424,25 @@ export const sharedSettingsSchema = z.object({
   /** Provider usage tracking (auto-refresh cadence, per-provider opt-out, cost). */
   usage: usageSettingsSchema,
   /**
+   * Campaign morning brief enabled toggle. Default OFF.
+   */
+  morningBriefEnabled: z.boolean().default(false),
+  /**
+   * Daily time (HH:MM local format) for the campaign morning brief schedule.
+   */
+  morningBriefTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/u)
+    .default("08:00"),
+  /**
+   * Schedule ID of the persisted morning brief task, if created.
+   */
+  morningBriefScheduleId: z.string().nullable().default(null),
+  /**
+   * Set of notified exception item keys for de-duplication.
+   */
+  morningBriefNotifiedKeys: z.array(z.string()).default([]),
+  /**
    * Free-text routing instructions appended to the Crossagents MCP server
    * `instructions`, guiding how an agent picks which connected agent/model to
    * delegate to when spawning subagents (e.g. "Codex GPT-5.5 fast for quick
@@ -562,6 +581,10 @@ export const defaultSharedSettings: SharedSettings = {
     collapsedProviders: [],
     selectedRingGroups: {},
   },
+  morningBriefEnabled: false,
+  morningBriefTime: "08:00",
+  morningBriefScheduleId: null,
+  morningBriefNotifiedKeys: [],
   crossagentRoutingGuide: "",
 };
 

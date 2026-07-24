@@ -154,6 +154,10 @@ describe("sharedSettingsFile", () => {
         collapsedProviders: [],
         selectedRingGroups: {},
       },
+      morningBriefEnabled: false,
+      morningBriefTime: "08:00",
+      morningBriefScheduleId: null,
+      morningBriefNotifiedKeys: [],
       crossagentRoutingGuide: "",
     });
 
@@ -273,6 +277,10 @@ describe("sharedSettingsFile", () => {
         collapsedProviders: [],
         selectedRingGroups: {},
       },
+      morningBriefEnabled: false,
+      morningBriefTime: "08:00",
+      morningBriefScheduleId: null,
+      morningBriefNotifiedKeys: [],
       crossagentRoutingGuide: "",
     });
     expect(readFileSync(settingsPath, "utf8")).toContain('"themeMode": "dark"');

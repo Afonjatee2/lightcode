@@ -149,6 +149,10 @@ interface SharedSettingsState extends SharedSettings {
     fallbackMode: ThreadPresentationMode,
   ) => boolean;
   setCrossagentRoutingGuide: (value: string) => void;
+  setMorningBriefEnabled: (enabled: boolean) => void;
+  setMorningBriefTime: (time: string) => void;
+  setMorningBriefScheduleId: (id: string | null) => void;
+  setMorningBriefNotifiedKeys: (keys: string[]) => void;
   pushRecentModel: (
     agentKind: string,
     modelId: string,
@@ -157,6 +161,8 @@ interface SharedSettingsState extends SharedSettings {
 }
 
 const RECENT_MODELS_LIMIT = 16;
+/** Hard ceiling on persisted morning-brief notification keys. */
+const MORNING_BRIEF_NOTIFIED_KEYS_MAX = 200;
 
 function hasBridge(): boolean {
   return typeof window !== "undefined" && window.poracode !== undefined;
@@ -701,6 +707,30 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ crossagentRoutingGuide });
     persistSettings(selectSharedSettings(get()));
   },
+  setMorningBriefEnabled: (morningBriefEnabled) => {
+    if (get().morningBriefEnabled === morningBriefEnabled) return;
+    set({ morningBriefEnabled });
+    persistSettings(selectSharedSettings(get()));
+  },
+  setMorningBriefTime: (morningBriefTime) => {
+    if (get().morningBriefTime === morningBriefTime) return;
+    set({ morningBriefTime });
+    persistSettings(selectSharedSettings(get()));
+  },
+  setMorningBriefScheduleId: (morningBriefScheduleId) => {
+    if (get().morningBriefScheduleId === morningBriefScheduleId) return;
+    set({ morningBriefScheduleId });
+    persistSettings(selectSharedSettings(get()));
+  },
+  setMorningBriefNotifiedKeys: (keys) => {
+    const current = get().morningBriefNotifiedKeys;
+    // Bounded: callers prune to the live exception set, and this is the hard
+    // ceiling so a pathological payload can never bloat the settings file.
+    const next = Array.from(new Set(keys)).slice(-MORNING_BRIEF_NOTIFIED_KEYS_MAX);
+    if (next.length === current.length && next.every((key, i) => key === current[i])) return;
+    set({ morningBriefNotifiedKeys: next });
+    persistSettings(selectSharedSettings(get()));
+  },
   pushRecentModel: (agentKind, modelId, presentationMode) => {
     const current = get().recentModels;
     const samePresentation = current.filter((m) => m.presentationMode === presentationMode);
@@ -823,6 +853,10 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     browser: state.browser,
     audio: state.audio,
     usage: state.usage,
+    morningBriefEnabled: state.morningBriefEnabled,
+    morningBriefTime: state.morningBriefTime,
+    morningBriefScheduleId: state.morningBriefScheduleId,
+    morningBriefNotifiedKeys: state.morningBriefNotifiedKeys,
     crossagentRoutingGuide: state.crossagentRoutingGuide,
   };
 }

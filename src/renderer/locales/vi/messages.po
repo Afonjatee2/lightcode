@@ -34,6 +34,11 @@ msgstr "(không có nhánh)"
 msgid "(no message)"
 msgstr "(không có tin nhắn)"
 
+#. placeholder {0}: brief.counts.waitingForApproval
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "{0, plural, one {# awaiting approval} other {# awaiting approval}}"
+msgstr "{0} đang chờ phê duyệt"
+
 #. placeholder {0}: candidates.length
 #. placeholder {0}: props.candidates.length
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
@@ -96,6 +101,11 @@ msgstr "{0, plural, one {# nhà cung cấp đã sẵn sàng} other {# nhà cung 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "{0, plural, one {# skill} other {# skills}}"
 msgstr "{0, plural, one {# skill} other {# skill}}"
+
+#. placeholder {0}: brief.counts.needsAttention
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "{0, plural, one {# thing needs attention} other {# things need attention}}"
+msgstr "{0} mục cần chú ý"
 
 #. placeholder {0}: props.count
 #. placeholder {0}: toolList.tools.length
@@ -421,6 +431,10 @@ msgstr "{days} ngày trước"
 msgid "{envOrAgentLabel} needs authentication."
 msgstr "{envOrAgentLabel} cần xác thực."
 
+#: src/renderer/campaign/morningBrief/briefGenerator.ts
+msgid "{failed} failed"
+msgstr "{failed} lỗi"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #~ msgid "{failedCount} data sources have failed to sync"
 #~ msgstr "{failedCount} nguồn dữ liệu không đồng bộ được"
@@ -440,6 +454,10 @@ msgstr "{head}, hoặc {tail}"
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "{heading} mode"
 msgstr "Chế độ {heading}"
+
+#: src/renderer/campaign/morningBrief/briefGenerator.ts
+msgid "{healthy} healthy"
+msgstr "{healthy} bình thường"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "{hook} hook failed"
@@ -571,6 +589,10 @@ msgstr "{seconds} giây trước"
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "{serverName} from {providerLabel}: {disabledLabel}"
 msgstr "{serverName} từ {providerLabel}: {disabledLabel}"
+
+#: src/renderer/campaign/morningBrief/briefGenerator.ts
+msgid "{stale} stale"
+msgstr "{stale} cũ"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #~ msgid "{staleCount} data sources have stale data"
@@ -1883,6 +1905,12 @@ msgstr "Ngữ cảnh chiến dịch"
 msgid "Campaign event"
 msgstr "Sự kiện chiến dịch"
 
+#. placeholder {0}: item.clientName
+#. placeholder {1}: item.campaignName
+#: src/renderer/campaign/morningBrief/morningBriefSync.ts
+msgid "Campaign Exception: {0} · {1}"
+msgstr "Ngoại lệ chiến dịch: {0} · {1}"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Campaign group ID"
 msgstr "ID nhóm chiến dịch"
@@ -1890,6 +1918,15 @@ msgstr "ID nhóm chiến dịch"
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Campaign Group ID"
 msgstr "ID nhóm chiến dịch"
+
+#: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
+msgid "Campaign morning brief"
+msgstr "Tóm tắt buổi sáng của chiến dịch"
+
+#: src/renderer/campaign/morningBrief/morningBriefSync.ts
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "Campaign Morning Brief"
+msgstr "Tóm tắt buổi sáng của chiến dịch"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Campaign name"
@@ -3485,6 +3522,7 @@ msgid "Credits"
 msgstr "Số dư tín dụng"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
 msgid "Critical"
 msgstr "Nghiêm trọng"
 
@@ -4097,6 +4135,10 @@ msgstr "Đang khám phá các tác nhân lập trình…"
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Dismiss"
 msgstr "Loại bỏ"
+
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "Dismiss brief"
+msgstr "Bỏ qua tóm tắt"
 
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Dismiss error"
@@ -5197,6 +5239,10 @@ msgstr "chung"
 msgid "Generate commit message"
 msgstr "Tạo thông điệp commit"
 
+#: src/renderer/campaign/morningBrief/morningBriefSync.ts
+msgid "Generate daily campaign morning brief and exception notifications."
+msgstr "Tạo tóm tắt buổi sáng hàng ngày cho chiến dịch và thông báo ngoại lệ."
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CreatePrModal.tsx
 msgid "Generate PR summary"
 msgstr "Tạo bản tóm tắt PR"
@@ -5207,6 +5253,7 @@ msgstr "Tạo bằng AI"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
 msgid "Generated"
 msgstr "Đã tạo"
 
@@ -5398,6 +5445,10 @@ msgstr "Có bản nháp chưa gửi"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Headers"
 msgstr "Header"
+
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
+msgid "Health:"
+msgstr "Trạng thái:"
 
 #: src/renderer/campaign/cockpit/cockpitGreeting.ts
 msgid "Hello"
@@ -6134,6 +6185,10 @@ msgstr "Cục bộ"
 msgid "Local changes need to be stashed before pulling from {branch}"
 msgstr "Các thay đổi cục bộ cần được lưu tạm trước khi kéo từ {branch}"
 
+#: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
+msgid "Local time for daily brief generation."
+msgstr "Giờ địa phương để tạo tóm tắt hàng ngày."
+
 #. placeholder {0}: forward.targetPort
 #: src/mobile/views/PortsView.tsx
 msgid "localhost:{0} on desktop"
@@ -6734,6 +6789,10 @@ msgstr "Thêm tùy chọn lịch"
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "More sync options"
 msgstr "Nhiều tùy chọn đồng bộ hơn"
+
+#: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
+msgid "Morning brief time"
+msgstr "Giờ tóm tắt buổi sáng"
 
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Most active hour"
@@ -9488,6 +9547,7 @@ msgid "Revert to this checkpoint"
 msgstr "Quay lại điểm kiểm tra này"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Review"
 msgstr "Xem xét"
@@ -9793,6 +9853,10 @@ msgstr "Quét Windows và WSL để tìm CLI đã cài đặt. Việc này thư�
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "Scanning your system for installed CLIs. This usually takes a couple of seconds."
 msgstr "Đang quét hệ thống của bạn để tìm CLI đã cài đặt. Việc này thường mất vài giây."
+
+#: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
+msgid "Schedule a daily morning brief and receive restrained notifications for genuine campaign exceptions."
+msgstr "Lên lịch tóm tắt buổi sáng hàng ngày và nhận thông báo vừa phải cho các ngoại lệ thực sự của chiến dịch."
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Schedule name"
@@ -12592,6 +12656,7 @@ msgid "Warming up WSL shell environment…"
 msgstr "Đang khởi động môi trường shell WSL…"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignTodayView/parts/MorningBriefCard.tsx
 msgid "Warning"
 msgstr "Cảnh báo"
 
