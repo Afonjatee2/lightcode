@@ -65,6 +65,11 @@ msgstr "{0, plural, other {실행 중 캠페인 #개}}"
 msgid "{0, plural, one {# MCP server} other {# MCP servers}}"
 msgstr "{0, plural, one {#개의 MCP 서버} other {#개의 MCP 서버}}"
 
+#. placeholder {0}: selectedWorkers.length
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "{0, plural, one {# model ready} other {# models ready}}"
+msgstr "{0, plural, one {# model ready} other {# models ready}}"
+
 #. placeholder {0}: props.desktops.length
 #: src/mobile/views/DesktopsView.tsx
 msgid "{0, plural, one {# paired connection} other {# paired connections}}"
@@ -592,6 +597,10 @@ msgstr "{usedLabel} 토큰"
 msgid "{visibleCount} of {totalCount} visible"
 msgstr "{totalCount}개 중 {visibleCount}개 표시"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "{workerCount, plural, one {# implementation worker} other {# implementation workers}}"
+msgstr "{workerCount, plural, one {# implementation worker} other {# implementation workers}}"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "@codex check budget pacing, or type a message…"
 msgstr "@codex 예산 진행 속도 확인 또는 메시지 입력…"
@@ -665,6 +674,10 @@ msgstr "후보가 더 이상 실험 브랜치에 있지 않습니다."
 #: src/renderer/i18n/sharedMessages.ts
 msgid "A frozen worktree source requires a full commit hash"
 msgstr "고정된 작업 트리 소스에는 전체 커밋 해시가 필요합니다"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "A strong root decomposes the task, launches workers in separate Git worktrees, and reviews every diff. Nothing is merged automatically."
+msgstr "강력한 루트 에이전트가 작업을 분해하고 별도의 Git 워크트리에서 워커를 실행한 뒤 모든 diff를 검토합니다. 자동으로 병합되는 변경 사항은 없습니다."
 
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "a supported coding agent"
@@ -816,6 +829,10 @@ msgstr "풀 리퀘스트를 보려면 프로젝트를 추가하세요."
 #: src/renderer/views/QuickComposerOverlay/QuickComposerOverlay.tsx
 msgid "Add a project to start"
 msgstr "시작하려면 프로젝트를 추가하세요."
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Add a project to use Swarm"
+msgstr "Swarm을 사용하려면 프로젝트 추가"
 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
@@ -1372,6 +1389,8 @@ msgid "Attach"
 msgstr "첨부"
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
+#: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Attach files"
 msgstr "파일 첨부"
 
@@ -1762,6 +1781,10 @@ msgstr "예산 한도 도달"
 msgid "Budget used"
 msgstr "사용 예산"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Build with a coordinated agent team"
+msgstr "조율된 에이전트 팀으로 개발"
+
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Building"
 msgstr "구성 중"
@@ -1879,7 +1902,7 @@ msgstr "캠페인 작업 영역 \"{0}\"이(가) 생성되었습니다."
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarCampaignsSection.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 msgid "Campaigns"
-msgstr "캠페인"
+msgstr "Campaigns"
 
 #: src/mobile/views/PortsView.tsx
 msgid "Can't load ports"
@@ -2113,6 +2136,10 @@ msgstr "검사 통과"
 msgid "Checks pending"
 msgstr "검사 대기 중"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Choose a different model for each worker."
+msgstr "Choose a different model for each worker."
+
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Choose a folder"
 msgstr "폴더 선택"
@@ -2127,6 +2154,10 @@ msgstr "폴더를 선택하세요…"
 msgid "Choose a local base branch for the experiment."
 msgstr "실험에 사용할 로컬 기준 브랜치를 선택하세요."
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Choose a model for every worker."
+msgstr "Choose a model for every worker."
+
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Choose a parent folder"
 msgstr "상위 폴더 선택"
@@ -2134,6 +2165,10 @@ msgstr "상위 폴더 선택"
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "Choose an MCP server configuration file"
 #~ msgstr "MCP 서버 구성 파일 선택"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Choose an orchestrator and reviewer."
+msgstr "오케스트레이터와 리뷰어를 선택하세요."
 
 #: src/renderer/actions/experimentActions.ts
 msgid "Choose at least two candidates and enter a prompt."
@@ -2522,6 +2557,7 @@ msgstr "코드가 복사되었습니다."
 msgid "Codex"
 msgstr "Codex"
 
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Collapse"
@@ -3015,6 +3051,10 @@ msgstr "Control Centre MCP 프로필"
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
 msgstr "제어 센터에 권한이 필요합니다. MCP 설정에서 다시 연결하세요."
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Control plane"
+msgstr "제어 영역"
+
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control the desktop."
 msgstr "데스크톱을 제어합니다."
@@ -3142,6 +3182,10 @@ msgstr "URL 복사"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not abort the merge: {detail}"
 msgstr "병합을 중단할 수 없습니다: {detail}"
+
+#: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
+msgid "Could not attach the replacement worker to this swarm."
+msgstr "교체 작업자를 이 스웜에 연결할 수 없습니다."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not complete the merge"
@@ -3448,6 +3492,10 @@ msgstr "Crossagents"
 msgid "Crossagents enabled for this thread"
 msgstr "이 스레드에 Crossagents가 활성화되었습니다."
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Crossagents is disabled in Settings. Swarm needs it to launch workers."
+msgstr "설정에서 Crossagents가 비활성화되어 있습니다. Swarm이 워커를 실행하려면 활성화해야 합니다."
+
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Crown"
 msgstr "우승자로 선택"
@@ -3566,6 +3614,10 @@ msgstr "결정 및 제안"
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 msgid "Decline"
 msgstr "거절"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Dedicated reviewer"
+msgstr "Dedicated reviewer"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
 msgid "DeepSeek"
@@ -3754,6 +3806,14 @@ msgstr "거부하고 에이전트에게 다르게 해야 할 일을 알려주세
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Deployment"
 msgstr "배포"
+
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
+msgid "Describe the outcome, constraints, and checks that define done…"
+msgstr "완료를 정의하는 결과, 제약 조건 및 검사를 설명하세요…"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Describe the task before starting the swarm."
+msgstr "Swarm을 시작하기 전에 작업을 설명하세요."
 
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
@@ -4224,6 +4284,14 @@ msgstr "{tierLabel} 추론 강도 활성화"
 msgid "Enable {tool}"
 msgstr "{tool} 활성화"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Enable Crossagents"
+msgstr "Crossagents 활성화"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Enable Crossagents before starting the swarm."
+msgstr "Swarm을 시작하기 전에 Crossagents를 활성화하세요."
+
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Enable language server support for type checking, completions, and diagnostics. Requires a language server installed."
@@ -4450,6 +4518,7 @@ msgstr "종료됨 ({0})"
 msgid "Exited with code {0}. Close to retry."
 msgstr "코드 {0}(으)로 종료되었습니다. 다시 시도하려면 닫으세요."
 
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Expand"
@@ -4614,6 +4683,7 @@ msgstr "실패"
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/components/campaignDeployment/parts/OutcomeSection.tsx
 #: src/renderer/components/consultations/ConsultationCard.tsx
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
@@ -4790,6 +4860,7 @@ msgid "Finish your review"
 msgstr "리뷰를 마무리하세요"
 
 #: src/mobile/presentation.ts
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Finished"
 msgstr "완료"
@@ -6156,6 +6227,10 @@ msgstr "제공자가 관리함"
 #~ msgid "Managed skills"
 #~ msgstr "관리 스킬"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Manual only"
+msgstr "수동만"
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/sortMode.ts
 msgid "Manual order"
 msgstr "수동 정렬"
@@ -6358,6 +6433,10 @@ msgstr "병합 방법"
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "Merge options"
 msgstr "병합 옵션"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Merge policy"
+msgstr "병합 정책"
 
 #: src/mobile/views/pr/PrOverviewPage.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
@@ -6705,6 +6784,10 @@ msgstr "주의 필요 · 승인 필요"
 #: src/renderer/notifications.ts
 msgid "Needs Attention · Reply required"
 msgstr "주의 필요 · 답변 필요"
+
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
+msgid "Needs input"
+msgstr "입력 필요"
 
 #: src/mobile/presentation.ts
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
@@ -7532,6 +7615,7 @@ msgstr "열린 알림"
 #~ msgid "Open Alerts"
 #~ msgstr "열린 알림"
 
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ExperimentGroupHeader.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
@@ -7833,6 +7917,18 @@ msgstr "또는 제어 센터에서 선택"
 msgid "Or write a custom answer"
 msgstr "또는 맞춤 답변을 작성하세요."
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Orchestrator"
+msgstr "오케스트레이터"
+
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
+msgid "Orchestrator only"
+msgstr "오케스트레이터만"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Orchestrator reviews"
+msgstr "Orchestrator reviews"
+
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Other"
 msgstr "기타"
@@ -8127,6 +8223,10 @@ msgstr "고정됨"
 msgid "Plan"
 msgstr "계획"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Plan · Fan out · Review"
+msgstr "계획 · 분산 · 검토"
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Plan fact"
 msgstr "계획 사실"
@@ -8266,6 +8366,10 @@ msgstr "사전 커밋 후크 실패"
 msgid "Preparing remote environment…"
 msgstr "원격 환경 준비 중…"
 
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
+msgid "Preparing worker assignments…"
+msgstr "작업자 할당 준비 중…"
+
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Presentation"
 msgstr "표시 방식"
@@ -8349,6 +8453,7 @@ msgstr "프로필"
 #: src/renderer/components/thread/ThreadCommandPanel.tsx
 #: src/renderer/views/ProjectSettingsOverlay/ProjectSettingsOverlay.tsx
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
+#: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Project"
 msgstr "프로젝트"
 
@@ -8874,6 +8979,7 @@ msgid "Remote URL"
 msgstr "원격 URL"
 
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
+#: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Remove"
 msgstr "제거"
 
@@ -9296,6 +9402,10 @@ msgstr "리뷰 코멘트"
 msgid "Review decision"
 msgstr "결정 검토"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Review mode"
+msgstr "Review mode"
+
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Review my recent work and summarize today's priorities and next steps."
 msgstr "최근 작업을 검토하고 오늘의 우선순위와 다음 단계를 요약해 주세요."
@@ -9316,6 +9426,10 @@ msgstr "{0}에 대한 PR #{prNumber} 검토"
 #: src/mobile/settingsSections.ts
 msgid "Review presentation"
 msgstr "리뷰 표시"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Reviewer"
+msgstr "리뷰어"
 
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Reviewing"
@@ -10458,6 +10572,10 @@ msgstr "최소화하여 시작"
 msgid "Start remote thread"
 msgstr "원격 스레드 시작"
 
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
+msgid "Start swarm"
+msgstr "Swarm 시작"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Start Tailscale"
 msgstr "Tailscale 시작"
@@ -10495,6 +10613,7 @@ msgstr "{targetLabel} 스레드를 시작했습니다."
 
 #. Button label while the microphone test is starting
 #: src/mobile/useRemoteDesktop.ts
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -10702,6 +10821,20 @@ msgstr "고속 모드 지원"
 msgid "Swap notes and to-dos"
 msgstr "메모와 할 일 바꾸기"
 
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
+#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Swarm"
+msgstr "Swarm"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Swarm creates isolated worktrees, so it needs a Git project first."
+msgstr "Swarm은 격리된 워크트리를 만들기 때문에 먼저 Git 프로젝트가 필요합니다."
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Swarm started"
+msgstr "Swarm이 시작됨"
+
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
@@ -10843,8 +10976,13 @@ msgid "Target provider"
 msgstr "대상 공급자"
 
 #: src/renderer/components/providers/qwen/index.tsx
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
 msgid "Task"
 msgstr "작업"
+
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
+msgid "Task for the swarm"
+msgstr "Swarm 작업"
 
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Task output"
@@ -11039,6 +11177,10 @@ msgstr "MCP 서버가 올바르지 않습니다."
 msgid "The normal app shell could not render. The diagnostics below are shown before reload so the failure can be investigated."
 msgstr "일반 앱 셸을 렌더링할 수 없습니다. 아래 진단은 다시 로드하기 전에 표시되므로 오류를 조사할 수 있습니다."
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "The orchestrator performs the final review."
+msgstr "The orchestrator performs the final review."
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "The phrase does not match."
 msgstr "문구가 일치하지 않습니다."
@@ -11058,6 +11200,10 @@ msgstr "원격 서버에서 페어링 자격 증명을 반환하지 않았습니
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 msgid "The repository location on disk. Update it if you moved the folder."
 msgstr "디스크에 있는 저장소 위치입니다. 폴더를 옮겼다면 업데이트하세요."
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "The root and reviewer use the strongest available reasoning tier."
+msgstr "루트 에이전트와 리뷰어는 사용 가능한 가장 강력한 추론 단계를 사용합니다."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "The selected file does not contain valid MCP server configurations."
@@ -12036,9 +12182,17 @@ msgstr "사용 설정"
 msgid "Usage unknown"
 msgstr "사용량을 알 수 없음"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Use {count} workers"
+msgstr "Use {count} workers"
+
 #: src/mobile/views/DesktopsView.tsx
 msgid "Use + to pair directly or connect to a remote machine over SSH."
 msgstr "+를 사용해 직접 페어링하거나 SSH를 통해 원격 컴퓨터에 연결하세요."
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Use 1 worker"
+msgstr "Use 1 worker"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectMenu.tsx
 msgid "Use an existing folder"
@@ -12469,6 +12623,31 @@ msgstr "현재 체크아웃에서 작업"
 msgid "Worked for {elapsed}"
 msgstr "{elapsed} 동안 작업함"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Worker"
+msgstr "워커"
+
+#. placeholder {0}: index + 1
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Worker {0}"
+msgstr "워커 {0}"
+
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
+msgid "Worker branches remain available for inspection. You choose what to merge after the reviewer reports."
+msgstr "워커 브랜치는 검사를 위해 그대로 유지됩니다. 리뷰어의 보고 후 병합할 항목을 선택하세요."
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Worker count"
+msgstr "Worker count"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Worker pool"
+msgstr "워커 풀"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Workers"
+msgstr "워커"
+
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Workflow"
 msgstr "워크플로"
@@ -12503,6 +12682,7 @@ msgid "Workflows"
 msgstr "워크플로"
 
 #: src/mobile/presentation.ts
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Working"
 msgstr "작업 중"
@@ -12639,6 +12819,10 @@ msgstr "예"
 #: src/renderer/campaign/cockpit/cockpitGreeting.ts
 msgid "You're all caught up."
 msgstr "모두 처리되었습니다."
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Your existing checkout stays untouched by worker threads."
+msgstr "기존 체크아웃은 워커 스레드의 영향을 받지 않습니다."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Your local changes are stashed and will be re-applied when you commit or abort this merge."

@@ -5,6 +5,7 @@ export type AppView =
   | { kind: "campaignToday" }
   | { kind: "pullRequests" }
   | { kind: "schedules" }
+  | { kind: "swarm" }
   | { kind: "draft"; projectId: string }
   | { kind: "experiment"; experimentId: string; projectId: string }
   | {

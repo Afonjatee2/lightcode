@@ -49,6 +49,9 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     seedOrchestratorChildren: async (payload) => {
       runtime.seedOrchestratorChildren(payload);
     },
+    registerOrchestratorReplacement: async (payload) => {
+      runtime.registerOrchestratorReplacement(payload);
+    },
     interruptThread: (payload) => threads.interruptThread(payload),
     rollbackThreadConversation: (payload) => threads.rollbackThreadConversation(payload),
     setPendingSteer: (payload) => threads.setPendingSteer(payload),
@@ -285,7 +288,8 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     listSkillMarketplace: (payload) => skills.listMarketplace(payload),
     installMarketplaceSkill: (payload) => skills.installMarketplace(payload),
     consultationSubmit: (payload) => runtime.consultationSubmissionHandler.submit(payload),
-    consultationSubmitPanel: (payload) => runtime.consultationSubmissionHandler.submitPanel(payload),
+    consultationSubmitPanel: (payload) =>
+      runtime.consultationSubmissionHandler.submitPanel(payload),
     consultationFinalise: (payload) => runtime.consultationSubmissionHandler.finalise(payload),
     consultationCancel: async (payload) => ({
       consultation: await runtime.consultationCoordinator.cancel(payload.id),

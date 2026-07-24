@@ -26,6 +26,7 @@ import { ContinueInProviderDialog } from "./ContinueInProviderDialog";
 import { GuiThreadContent } from "./ThreadContent";
 import { TerminalThreadContent } from "./TerminalThreadContent";
 import { ThreadHeaderStatusButton } from "./ThreadHeaderStatus";
+import { SwarmActivityPanel } from "./SwarmActivityPanel";
 
 /**
  * Strip Electron's `Error invoking remote method '<channel>': Error: ` prefix
@@ -440,6 +441,9 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
           )}
 
           <div className={contentBodyClass}>
+            {thread.config.crossagentMcp === true && !thread.parentThreadId ? (
+              <SwarmActivityPanel parentThread={thread} />
+            ) : null}
             {usesTerminalPresentation ? (
               <TerminalThreadContent
                 threadId={thread.id}

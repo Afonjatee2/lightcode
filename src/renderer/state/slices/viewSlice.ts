@@ -65,6 +65,7 @@ export interface ViewSlice {
   openCampaignToday: () => void;
   openPullRequests: () => void;
   openSchedules: () => void;
+  openSwarm: () => void;
   openExperiment: (experimentId: string, projectId: string) => void;
   openThread: (threadId: string) => void;
   openThreadStandalone: (threadId: string) => void;
@@ -180,6 +181,7 @@ export const createViewSlice: SliceCreator<ViewSlice> = (set) => ({
   openCampaignToday: () => set({ view: { kind: "campaignToday" } }),
   openPullRequests: () => set({ view: { kind: "pullRequests" } }),
   openSchedules: () => set({ view: { kind: "schedules" } }),
+  openSwarm: () => set({ view: { kind: "swarm" } }),
   openExperiment: (experimentId, projectId) =>
     set((state) => ({
       ...(state.view.kind === "thread" && state.view.activeGroupId

@@ -65,6 +65,11 @@ msgstr "{0, plural, one {# активная кампания} few {# актив�
 msgid "{0, plural, one {# MCP server} other {# MCP servers}}"
 msgstr "{0, plural, one {# MCP-сервер} few {# MCP-сервера} many {# MCP-серверов} other {# MCP-сервера}}"
 
+#. placeholder {0}: selectedWorkers.length
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "{0, plural, one {# model ready} other {# models ready}}"
+msgstr "{0, plural, one {# model ready} other {# models ready}}"
+
 #. placeholder {0}: props.desktops.length
 #: src/mobile/views/DesktopsView.tsx
 msgid "{0, plural, one {# paired connection} other {# paired connections}}"
@@ -592,6 +597,10 @@ msgstr "{usedLabel} токенов"
 msgid "{visibleCount} of {totalCount} visible"
 msgstr "{visibleCount} из {totalCount} видимых"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "{workerCount, plural, one {# implementation worker} other {# implementation workers}}"
+msgstr "{workerCount, plural, one {# implementation worker} other {# implementation workers}}"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "@codex check budget pacing, or type a message…"
 msgstr "@codex проверить темп бюджета или введите сообщение…"
@@ -665,6 +674,10 @@ msgstr "Один из кандидатов больше не находится 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "A frozen worktree source requires a full commit hash"
 msgstr "Для замороженного источника worktree требуется полный хеш коммита"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "A strong root decomposes the task, launches workers in separate Git worktrees, and reviews every diff. Nothing is merged automatically."
+msgstr "Мощный корневой агент разбивает задачу, запускает исполнителей в отдельных рабочих деревьях Git и проверяет каждый diff. Ничего не объединяется автоматически."
 
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "a supported coding agent"
@@ -816,6 +829,10 @@ msgstr "Добавьте проект, чтобы увидеть pull request."
 #: src/renderer/views/QuickComposerOverlay/QuickComposerOverlay.tsx
 msgid "Add a project to start"
 msgstr "Добавьте проект, чтобы начать"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Add a project to use Swarm"
+msgstr "Добавьте проект для использования Swarm"
 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
@@ -1372,6 +1389,8 @@ msgid "Attach"
 msgstr "Прикрепить"
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
+#: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Attach files"
 msgstr "Прикрепить файлы"
 
@@ -1762,6 +1781,10 @@ msgstr "Достигнут лимит бюджета"
 msgid "Budget used"
 msgstr "Использовано бюджета"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Build with a coordinated agent team"
+msgstr "Работайте с координируемой командой агентов"
+
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Building"
 msgstr "Подготовка"
@@ -1879,7 +1902,7 @@ msgstr "Рабочая область кампании «{0}» создана."
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarCampaignsSection.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 msgid "Campaigns"
-msgstr "Кампании"
+msgstr "Campaigns"
 
 #: src/mobile/views/PortsView.tsx
 msgid "Can't load ports"
@@ -2113,6 +2136,10 @@ msgstr "Проверки пройдены"
 msgid "Checks pending"
 msgstr "Проверки ожидают выполнения"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Choose a different model for each worker."
+msgstr "Choose a different model for each worker."
+
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Choose a folder"
 msgstr "Выберите папку"
@@ -2127,6 +2154,10 @@ msgstr "Выберите папку…"
 msgid "Choose a local base branch for the experiment."
 msgstr "Выберите локальную базовую ветку для эксперимента."
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Choose a model for every worker."
+msgstr "Choose a model for every worker."
+
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Choose a parent folder"
 msgstr "Выберите родительскую папку"
@@ -2134,6 +2165,10 @@ msgstr "Выберите родительскую папку"
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "Choose an MCP server configuration file"
 #~ msgstr "Выбрать файл конфигурации сервера MCP"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Choose an orchestrator and reviewer."
+msgstr "Выберите оркестратор и рецензента."
 
 #: src/renderer/actions/experimentActions.ts
 msgid "Choose at least two candidates and enter a prompt."
@@ -2522,6 +2557,7 @@ msgstr "Код скопирован. "
 msgid "Codex"
 msgstr "Codex"
 
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Collapse"
@@ -3015,6 +3051,10 @@ msgstr "Профиль MCP Control Centre"
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
 msgstr "Центру управления требуется авторизация. Переподключите его в настройках MCP."
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Control plane"
+msgstr "Панель управления"
+
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control the desktop."
 msgstr "Управляет рабочим столом."
@@ -3142,6 +3182,10 @@ msgstr "Скопировать URL"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not abort the merge: {detail}"
 msgstr "Не удалось прервать слияние: {detail}"
+
+#: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
+msgid "Could not attach the replacement worker to this swarm."
+msgstr "Не удалось подключить заменяющего агента к этому рою."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not complete the merge"
@@ -3448,6 +3492,10 @@ msgstr "Crossagents"
 msgid "Crossagents enabled for this thread"
 msgstr "Crossagents включены для этого треда"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Crossagents is disabled in Settings. Swarm needs it to launch workers."
+msgstr "Crossagents отключён в настройках. Он необходим Swarm для запуска исполнителей."
+
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Crown"
 msgstr "Назначить победителем"
@@ -3566,6 +3614,10 @@ msgstr "Решения и предложения"
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 msgid "Decline"
 msgstr "Отклонить"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Dedicated reviewer"
+msgstr "Dedicated reviewer"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
 msgid "DeepSeek"
@@ -3754,6 +3806,14 @@ msgstr "Запретить и сказать агенту, что сделать
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Deployment"
 msgstr "Развёртывание"
+
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
+msgid "Describe the outcome, constraints, and checks that define done…"
+msgstr "Опишите результат, ограничения и проверки, определяющие готовность…"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Describe the task before starting the swarm."
+msgstr "Опишите задачу перед запуском swarm."
 
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
@@ -4224,6 +4284,14 @@ msgstr "Включить уровень рассуждений {tierLabel}"
 msgid "Enable {tool}"
 msgstr "Включить {tool}"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Enable Crossagents"
+msgstr "Включить Crossagents"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Enable Crossagents before starting the swarm."
+msgstr "Включите Crossagents перед запуском swarm."
+
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Enable language server support for type checking, completions, and diagnostics. Requires a language server installed."
@@ -4450,6 +4518,7 @@ msgstr "завершено ({0})"
 msgid "Exited with code {0}. Close to retry."
 msgstr "Завершился с кодом {0}. Закройте, чтобы повторить."
 
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Expand"
@@ -4614,6 +4683,7 @@ msgstr "не удалось"
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/components/campaignDeployment/parts/OutcomeSection.tsx
 #: src/renderer/components/consultations/ConsultationCard.tsx
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
@@ -4790,6 +4860,7 @@ msgid "Finish your review"
 msgstr "Завершите проверку"
 
 #: src/mobile/presentation.ts
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Finished"
 msgstr "Завершено"
@@ -6156,6 +6227,10 @@ msgstr "Управляется провайдером"
 #~ msgid "Managed skills"
 #~ msgstr "Управляемые навыки"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Manual only"
+msgstr "Только вручную"
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/sortMode.ts
 msgid "Manual order"
 msgstr "Ручной порядок"
@@ -6358,6 +6433,10 @@ msgstr "Метод слияния"
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "Merge options"
 msgstr "Параметры слияния"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Merge policy"
+msgstr "Политика объединения"
 
 #: src/mobile/views/pr/PrOverviewPage.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
@@ -6705,6 +6784,10 @@ msgstr "Требует внимания · Нужно одобрение"
 #: src/renderer/notifications.ts
 msgid "Needs Attention · Reply required"
 msgstr "Требует внимания · Нужен ответ"
+
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
+msgid "Needs input"
+msgstr "Требуется ввод"
 
 #: src/mobile/presentation.ts
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
@@ -7532,6 +7615,7 @@ msgstr "Открытые оповещения"
 #~ msgid "Open Alerts"
 #~ msgstr "Открытые оповещения"
 
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ExperimentGroupHeader.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
@@ -7833,6 +7917,18 @@ msgstr "Или выберите из Центра управления"
 msgid "Or write a custom answer"
 msgstr "Или напишите свой ответ"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Orchestrator"
+msgstr "Оркестратор"
+
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
+msgid "Orchestrator only"
+msgstr "Только оркестратор"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Orchestrator reviews"
+msgstr "Orchestrator reviews"
+
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Other"
 msgstr "Прочие"
@@ -8127,6 +8223,10 @@ msgstr "Закреплено"
 msgid "Plan"
 msgstr "План"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Plan · Fan out · Review"
+msgstr "План · Распределение · Проверка"
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Plan fact"
 msgstr "Факт плана"
@@ -8266,6 +8366,10 @@ msgstr "Сбой хука pre-commit"
 msgid "Preparing remote environment…"
 msgstr "Подготовка удалённой среды…"
 
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
+msgid "Preparing worker assignments…"
+msgstr "Подготовка заданий для агентов…"
+
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Presentation"
 msgstr "Представление"
@@ -8349,6 +8453,7 @@ msgstr "Профили"
 #: src/renderer/components/thread/ThreadCommandPanel.tsx
 #: src/renderer/views/ProjectSettingsOverlay/ProjectSettingsOverlay.tsx
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
+#: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Project"
 msgstr "Проект"
 
@@ -8874,6 +8979,7 @@ msgid "Remote URL"
 msgstr "URL удалённого репозитория"
 
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
+#: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Remove"
 msgstr "Удалить"
 
@@ -9296,6 +9402,10 @@ msgstr "Комментарий к ревью"
 msgid "Review decision"
 msgstr "Решение по ревью"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Review mode"
+msgstr "Review mode"
+
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Review my recent work and summarize today's priorities and next steps."
 msgstr "Просмотри мою недавнюю работу и обобщи сегодняшние приоритеты и следующие шаги."
@@ -9316,6 +9426,10 @@ msgstr "Просмотреть PR #{prNumber} для {0}"
 #: src/mobile/settingsSections.ts
 msgid "Review presentation"
 msgstr "Отображение ревью"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Reviewer"
+msgstr "Рецензент"
 
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Reviewing"
@@ -10458,6 +10572,10 @@ msgstr "Запускать свёрнутым"
 msgid "Start remote thread"
 msgstr "Запустить удалённый поток"
 
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
+msgid "Start swarm"
+msgstr "Запустить swarm"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Start Tailscale"
 msgstr "Запустить Tailscale"
@@ -10495,6 +10613,7 @@ msgstr "Тред {targetLabel} запущен"
 
 #. Button label while the microphone test is starting
 #: src/mobile/useRemoteDesktop.ts
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -10702,6 +10821,20 @@ msgstr "Поддерживает быстрый режим"
 msgid "Swap notes and to-dos"
 msgstr "Поменять местами заметки и задачи"
 
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
+#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Swarm"
+msgstr "Swarm"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Swarm creates isolated worktrees, so it needs a Git project first."
+msgstr "Swarm создаёт изолированные рабочие деревья, поэтому сначала нужен проект Git."
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Swarm started"
+msgstr "Swarm запущен"
+
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
@@ -10843,8 +10976,13 @@ msgid "Target provider"
 msgstr "Целевой провайдер"
 
 #: src/renderer/components/providers/qwen/index.tsx
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
 msgid "Task"
 msgstr "Задача"
+
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
+msgid "Task for the swarm"
+msgstr "Задача для swarm"
 
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Task output"
@@ -11039,6 +11177,10 @@ msgstr "Сервер MCP недопустим."
 msgid "The normal app shell could not render. The diagnostics below are shown before reload so the failure can be investigated."
 msgstr "Обычная оболочка приложения не смогла отрендериться. Диагностика ниже показана перед перезагрузкой, чтобы проблему можно было исследовать."
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "The orchestrator performs the final review."
+msgstr "The orchestrator performs the final review."
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "The phrase does not match."
 msgstr "Фраза не совпадает."
@@ -11058,6 +11200,10 @@ msgstr "Удалённый сервер не вернул учётные дан�
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 msgid "The repository location on disk. Update it if you moved the folder."
 msgstr "Расположение репозитория на диске. Обновите его, если вы переместили папку."
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "The root and reviewer use the strongest available reasoning tier."
+msgstr "Корневой агент и рецензент используют самый мощный доступный уровень рассуждений."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "The selected file does not contain valid MCP server configurations."
@@ -12036,9 +12182,17 @@ msgstr "Настройки использования"
 msgid "Usage unknown"
 msgstr "Использование неизвестно"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Use {count} workers"
+msgstr "Use {count} workers"
+
 #: src/mobile/views/DesktopsView.tsx
 msgid "Use + to pair directly or connect to a remote machine over SSH."
 msgstr "Используйте + для прямого сопряжения или подключения к удалённому компьютеру по SSH."
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Use 1 worker"
+msgstr "Use 1 worker"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectMenu.tsx
 msgid "Use an existing folder"
@@ -12469,6 +12623,31 @@ msgstr "Работать в текущем checkout"
 msgid "Worked for {elapsed}"
 msgstr "Работал {elapsed}"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Worker"
+msgstr "Исполнитель"
+
+#. placeholder {0}: index + 1
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Worker {0}"
+msgstr "Исполнитель {0}"
+
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
+msgid "Worker branches remain available for inspection. You choose what to merge after the reviewer reports."
+msgstr "Ветки исполнителей остаются доступными для проверки. После отчёта рецензента вы выбираете, что объединить."
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Worker count"
+msgstr "Worker count"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Worker pool"
+msgstr "Пул исполнителей"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Workers"
+msgstr "Исполнители"
+
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Workflow"
 msgstr "Рабочий процесс"
@@ -12503,6 +12682,7 @@ msgid "Workflows"
 msgstr "Рабочие процессы"
 
 #: src/mobile/presentation.ts
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Working"
 msgstr "Работает"
@@ -12639,6 +12819,10 @@ msgstr "Да"
 #: src/renderer/campaign/cockpit/cockpitGreeting.ts
 msgid "You're all caught up."
 msgstr "Всё сделано."
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Your existing checkout stays untouched by worker threads."
+msgstr "Потоки исполнителей не изменяют существующую рабочую копию."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Your local changes are stashed and will be re-applied when you commit or abort this merge."

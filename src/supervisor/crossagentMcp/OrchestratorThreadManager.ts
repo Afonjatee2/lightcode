@@ -224,11 +224,11 @@ export class OrchestratorThreadManager {
 
   constructor(private readonly deps: OrchestratorThreadManagerDeps) {}
 
-  /** Agent kinds eligible for `create_thread` (full structured/GUI sessions). */
-  private structuredAgentKinds(): string[] {
+  /** Agent kinds eligible for `create_thread` through either app presentation lane. */
+  private threadAgentKinds(): string[] {
     const kinds: string[] = [];
     for (const [kind, adapter] of this.deps.adapters) {
-      if (resolveSubagentExecution(adapter) === "structured") kinds.push(kind);
+      if (resolveSubagentExecution(adapter)) kinds.push(kind);
     }
     return kinds;
   }
@@ -250,10 +250,11 @@ export class OrchestratorThreadManager {
         `Unknown provider: ${request.agent}. Call list_agents for the available providers.`,
       );
     }
-    if (resolveSubagentExecution(adapter) !== "structured") {
+    const execution = resolveSubagentExecution(adapter);
+    if (!execution) {
       throw new OrchestratorThreadError(
-        `Provider ${request.agent} only supports one-shot subagent runs and cannot host a full thread. ` +
-          `Providers eligible for create_thread: ${this.structuredAgentKinds().join(", ") || "none"}.`,
+        `Provider ${request.agent} cannot host a child thread. ` +
+          `Providers eligible for create_thread: ${this.threadAgentKinds().join(", ") || "none"}.`,
       );
     }
     const parent = this.deps.host.getParentContext(parentThreadId);
@@ -268,9 +269,14 @@ export class OrchestratorThreadManager {
       );
     }
 
+    // Structured providers use their native chat surface. CLI-only providers
+    // still have a first-class terminal runtime, so create_thread can give
+    // them the same durable row + isolated worktree instead of falling back to
+    // an ephemeral child that writes into the parent's working directory.
+    const presentationMode = execution === "structured" ? "gui" : "terminal";
     const capabilities = capabilitiesForPresentation(
       this.deps.getStatusCapabilities?.(adapter.kind) ?? adapter.capabilities,
-      "gui",
+      presentationMode,
     );
     const model = request.model ?? capabilities.models[0]?.id;
     if (!model) {
@@ -334,8 +340,8 @@ export class OrchestratorThreadManager {
       archived: false,
       done: false,
       starred: false,
-      presentationMode: "gui",
-      threadStatusSource: "server",
+      presentationMode,
+      ...(presentationMode === "gui" ? { threadStatusSource: "server" as const } : {}),
       ...(worktreePath ? { worktreePath } : {}),
       ...(branch ? { worktreeBranch: branch } : {}),
       parentThreadId,
@@ -350,7 +356,7 @@ export class OrchestratorThreadManager {
       config: childConfig,
       prompt,
       initialSize: DEFAULT_TERMINAL_SIZE,
-      presentationMode: "gui",
+      presentationMode,
       ...parent.mcpLaunchSnapshot,
     };
 
@@ -434,22 +440,51 @@ export class OrchestratorThreadManager {
   rehydrateChildren(children: ReadonlyArray<OrchestratorChildSeed>): void {
     for (const child of children) {
       if (this.children.has(child.threadId)) continue;
-      this.children.set(child.threadId, {
-        threadId: child.threadId,
-        parentThreadId: child.parentThreadId,
-        agent: child.agentKind,
-        title: child.title,
-        ...(child.worktreePath ? { worktreePath: child.worktreePath } : {}),
-        ...(child.worktreeBranch ? { branch: child.worktreeBranch } : {}),
-        lastStatus: "inactive",
-        lastAttention: "none",
-        lastError: undefined,
-        finalResult: undefined,
-        createdAt: child.createdAt,
-        turnStartedAt: undefined,
-        transcript: new ChildTranscriptBuffer(),
-      });
+      this.children.set(child.threadId, this.recordFromSeed(child));
     }
+  }
+
+  /**
+   * Register a renderer-created provider handoff as a successor worker. Unlike
+   * restart rehydration, this validates ownership through an already-owned
+   * source child and rejects collisions instead of silently accepting them.
+   */
+  registerReplacement(sourceThreadId: string, replacement: OrchestratorChildSeed): void {
+    const source = this.children.get(sourceThreadId);
+    if (!source) {
+      throw new OrchestratorThreadError(
+        `Cannot register replacement for unknown source thread ${sourceThreadId}.`,
+      );
+    }
+    if (replacement.parentThreadId !== source.parentThreadId) {
+      throw new OrchestratorThreadError(
+        `Replacement parent ${replacement.parentThreadId} does not own source thread ${sourceThreadId}.`,
+      );
+    }
+    if (replacement.threadId === sourceThreadId || this.children.has(replacement.threadId)) {
+      throw new OrchestratorThreadError(
+        `Replacement thread id ${replacement.threadId} is already registered.`,
+      );
+    }
+    this.children.set(replacement.threadId, this.recordFromSeed(replacement));
+  }
+
+  private recordFromSeed(child: OrchestratorChildSeed): ChildThreadRecord {
+    return {
+      threadId: child.threadId,
+      parentThreadId: child.parentThreadId,
+      agent: child.agentKind,
+      title: child.title,
+      ...(child.worktreePath ? { worktreePath: child.worktreePath } : {}),
+      ...(child.worktreeBranch ? { branch: child.worktreeBranch } : {}),
+      lastStatus: "inactive",
+      lastAttention: "none",
+      lastError: undefined,
+      finalResult: undefined,
+      createdAt: child.createdAt,
+      turnStartedAt: undefined,
+      transcript: new ChildTranscriptBuffer(),
+    };
   }
 
   /** Forget a failed child and roll back the worktree this call created (best effort). */

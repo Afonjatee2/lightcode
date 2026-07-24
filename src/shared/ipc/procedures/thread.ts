@@ -14,6 +14,7 @@ import {
   resolveThreadServerRequestPayloadSchema,
   rollbackThreadConversationPayloadSchema,
   seedOrchestratorChildrenPayloadSchema,
+  registerOrchestratorReplacementPayloadSchema,
   sendThreadInputPayloadSchema,
   setAcpRegistryAgentAuthPayloadSchema,
   setPendingSteerPayloadSchema,
@@ -48,6 +49,7 @@ import type {
   ResizeTerminalPayload,
   ResolveThreadServerRequestPayload,
   RollbackThreadConversationPayload,
+  RegisterOrchestratorReplacementPayload,
   SeedOrchestratorChildrenPayload,
   SendThreadInputPayload,
   SetAcpRegistryAgentAuthPayload,
@@ -184,6 +186,11 @@ export const threadProcedures = {
     void,
     "supervisor"
   >("seedOrchestratorChildren", "supervisor", seedOrchestratorChildrenPayloadSchema),
+  registerOrchestratorReplacement: definePayloadProcedure<
+    RegisterOrchestratorReplacementPayload,
+    void,
+    "supervisor"
+  >("registerOrchestratorReplacement", "supervisor", registerOrchestratorReplacementPayloadSchema),
   interruptThread: definePayloadProcedure<InterruptThreadPayload, void, "supervisor">(
     "interruptThread",
     "supervisor",

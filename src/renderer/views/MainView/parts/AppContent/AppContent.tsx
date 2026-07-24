@@ -36,6 +36,10 @@ import {
 } from "@/renderer/state/useThread";
 import { worktreePlacementPayload } from "@/renderer/actions/worktreePlacement";
 import {
+  buildOrchestratorChildSeed,
+  resolveContinuationLineage,
+} from "@/renderer/actions/threadContinuationLineage";
+import {
   primeWorktreeGitState,
   runWorktreeSetupScript,
 } from "@/renderer/actions/worktreeLaunchActions";
@@ -53,6 +57,7 @@ import { CampaignTodayView } from "@/renderer/views/CampaignTodayView/CampaignTo
 import { ExperimentView } from "@/renderer/views/ExperimentView/ExperimentView";
 import { PullRequestsView } from "@/renderer/views/PullRequestsView/PullRequestsView";
 import { SchedulesView } from "@/renderer/views/SchedulesView/SchedulesView";
+import { SwarmView } from "@/renderer/views/SwarmView/SwarmView";
 import { buildProjectDraftConfig } from "./draftConfig";
 import { ThreadPane } from "./parts/ThreadPane";
 import { DraftPane } from "./parts/DraftPane";
@@ -196,20 +201,21 @@ export function AppContent() {
     const project = storeProjects.find((p) => p.id === sourceThread.projectId);
     if (!project) return;
 
-    let groupId: string | undefined;
-    let groupName: string | undefined;
-    if (!closeOriginal) {
-      groupId = sourceThread.groupId ?? crypto.randomUUID();
-      groupName = sourceThread.groupName ?? sourceThread.title;
-      if (!sourceThread.groupId) {
-        useAppStore.setState((state) => ({
-          threads: state.threads.map((thread) =>
-            thread.id === sourceThread.id ? { ...thread, groupId, groupName } : thread,
-          ),
-        }));
-      }
+    const lineage = resolveContinuationLineage(
+      sourceThread,
+      closeOriginal,
+      useAppStore.getState().threads,
+    );
+    if (lineage.sourceGroupPatch) {
+      const sourceGroupPatch = lineage.sourceGroupPatch;
+      useAppStore.setState((state) => ({
+        threads: state.threads.map((thread) =>
+          thread.id === sourceThread.id ? { ...thread, ...sourceGroupPatch } : thread,
+        ),
+      }));
     }
 
+    const viewBeforeCreate = useAppStore.getState().view;
     const thread = createThread({
       projectId: project.id,
       agentKind: targetAgentKind,
@@ -218,9 +224,24 @@ export function AppContent() {
       presentationMode: targetPresentationMode,
       ...(sourceThread.worktreePath ? { worktreePath: sourceThread.worktreePath } : {}),
       ...(sourceThread.worktreeBranch ? { worktreeBranch: sourceThread.worktreeBranch } : {}),
-      ...(groupId ? { groupId } : {}),
-      ...(groupName ? { groupName } : {}),
+      ...lineage.threadMetadata,
     });
+
+    const orchestratorSeed = buildOrchestratorChildSeed(thread);
+    if (orchestratorSeed) {
+      try {
+        await readBridge().registerOrchestratorReplacement({
+          sourceThreadId: sourceThread.id,
+          replacement: orchestratorSeed,
+        });
+      } catch (error) {
+        console.warn("[renderer] failed to register replacement Swarm worker:", error);
+        useAppStore.getState().deleteThread(thread.id);
+        useAppStore.setState({ view: viewBeforeCreate });
+        toast.danger(t`Could not attach the replacement worker to this swarm.`);
+        return;
+      }
+    }
 
     if (extractedContext) {
       try {
@@ -290,6 +311,10 @@ export function AppContent() {
         <CampaignTodayView />
       </div>
     );
+  }
+
+  if (view.kind === "swarm") {
+    return <SwarmView />;
   }
 
   if (view.kind === "schedules") {

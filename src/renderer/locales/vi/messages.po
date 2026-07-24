@@ -65,6 +65,11 @@ msgstr "{0, plural, other {# chiến dịch đang chạy}}"
 msgid "{0, plural, one {# MCP server} other {# MCP servers}}"
 msgstr "{0, plural, one {# máy chủ MCP} other {# máy chủ MCP}}"
 
+#. placeholder {0}: selectedWorkers.length
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "{0, plural, one {# model ready} other {# models ready}}"
+msgstr "{0, plural, one {# model ready} other {# models ready}}"
+
 #. placeholder {0}: props.desktops.length
 #: src/mobile/views/DesktopsView.tsx
 msgid "{0, plural, one {# paired connection} other {# paired connections}}"
@@ -592,6 +597,10 @@ msgstr "{usedLabel} mã thông báo"
 msgid "{visibleCount} of {totalCount} visible"
 msgstr "{visibleCount} trong số {totalCount} hiển thị"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "{workerCount, plural, one {# implementation worker} other {# implementation workers}}"
+msgstr "{workerCount, plural, one {# implementation worker} other {# implementation workers}}"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "@codex check budget pacing, or type a message…"
 msgstr "@codex kiểm tra tiến độ ngân sách hoặc nhập tin nhắn…"
@@ -665,6 +674,10 @@ msgstr "Một ứng viên không còn ở nhánh thử nghiệm của mình."
 #: src/renderer/i18n/sharedMessages.ts
 msgid "A frozen worktree source requires a full commit hash"
 msgstr "Nguồn cây làm việc đã đóng băng yêu cầu hàm băm đầy đủ của commit"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "A strong root decomposes the task, launches workers in separate Git worktrees, and reviews every diff. Nothing is merged automatically."
+msgstr "Một tác nhân gốc mạnh sẽ chia nhỏ tác vụ, khởi chạy các worker trong những Git worktree riêng và xem xét mọi diff. Không có gì được tự động hợp nhất."
 
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "a supported coding agent"
@@ -816,6 +829,10 @@ msgstr "Thêm một dự án để xem các pull request."
 #: src/renderer/views/QuickComposerOverlay/QuickComposerOverlay.tsx
 msgid "Add a project to start"
 msgstr "Thêm một dự án để bắt đầu"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Add a project to use Swarm"
+msgstr "Thêm dự án để dùng Swarm"
 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
@@ -1372,6 +1389,8 @@ msgid "Attach"
 msgstr "Đính kèm"
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
+#: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Attach files"
 msgstr "Đính kèm tập tin"
 
@@ -1762,6 +1781,10 @@ msgstr "Đã đạt đến giới hạn ngân sách"
 msgid "Budget used"
 msgstr "Ngân sách đã dùng"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Build with a coordinated agent team"
+msgstr "Phát triển với đội tác nhân được điều phối"
+
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Building"
 msgstr "Đang dựng"
@@ -1879,7 +1902,7 @@ msgstr "Không gian làm việc chiến dịch \"{0}\" đã được tạo."
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarCampaignsSection.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 msgid "Campaigns"
-msgstr "Chiến dịch"
+msgstr "Campaigns"
 
 #: src/mobile/views/PortsView.tsx
 msgid "Can't load ports"
@@ -2113,6 +2136,10 @@ msgstr "Kiểm tra thành công"
 msgid "Checks pending"
 msgstr "Kiểm tra đang chờ"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Choose a different model for each worker."
+msgstr "Choose a different model for each worker."
+
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Choose a folder"
 msgstr "Chọn một thư mục"
@@ -2127,6 +2154,10 @@ msgstr "Chọn một thư mục…"
 msgid "Choose a local base branch for the experiment."
 msgstr "Chọn một nhánh cơ sở cục bộ cho thử nghiệm."
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Choose a model for every worker."
+msgstr "Choose a model for every worker."
+
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Choose a parent folder"
 msgstr "Chọn một thư mục cha"
@@ -2134,6 +2165,10 @@ msgstr "Chọn một thư mục cha"
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "Choose an MCP server configuration file"
 #~ msgstr "Chọn tệp cấu hình máy chủ MCP"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Choose an orchestrator and reviewer."
+msgstr "Chọn bộ điều phối và người đánh giá."
 
 #: src/renderer/actions/experimentActions.ts
 msgid "Choose at least two candidates and enter a prompt."
@@ -2522,6 +2557,7 @@ msgstr "Đã sao chép mã."
 msgid "Codex"
 msgstr "Codex"
 
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Collapse"
@@ -3015,6 +3051,10 @@ msgstr "Hồ sơ MCP Control Centre"
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
 msgstr "Trung tâm điều khiển cần được ủy quyền. Kết nối lại trong cài đặt MCP."
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Control plane"
+msgstr "Mặt phẳng điều khiển"
+
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control the desktop."
 msgstr "Điều khiển máy tính."
@@ -3142,6 +3182,10 @@ msgstr "Sao chép URL"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not abort the merge: {detail}"
 msgstr "Không thể hủy việc hợp nhất: {detail}"
+
+#: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
+msgid "Could not attach the replacement worker to this swarm."
+msgstr "Không thể gắn tác nhân thay thế vào nhóm này."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not complete the merge"
@@ -3448,6 +3492,10 @@ msgstr "Crossagents"
 msgid "Crossagents enabled for this thread"
 msgstr "Đã bật Crossagents cho chủ đề này"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Crossagents is disabled in Settings. Swarm needs it to launch workers."
+msgstr "Crossagents đang bị tắt trong Cài đặt. Swarm cần tính năng này để khởi chạy worker."
+
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Crown"
 msgstr "Chọn làm ứng viên thắng"
@@ -3566,6 +3614,10 @@ msgstr "Quyết định & đề xuất"
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 msgid "Decline"
 msgstr "Từ chối"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Dedicated reviewer"
+msgstr "Dedicated reviewer"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
 msgid "DeepSeek"
@@ -3754,6 +3806,14 @@ msgstr "Từ chối và cho tác nhân biết cần làm gì khác đi…"
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Deployment"
 msgstr "Triển khai"
+
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
+msgid "Describe the outcome, constraints, and checks that define done…"
+msgstr "Mô tả kết quả, ràng buộc và các bước kiểm tra xác định trạng thái hoàn tất…"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Describe the task before starting the swarm."
+msgstr "Mô tả tác vụ trước khi khởi chạy swarm."
 
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
@@ -4224,6 +4284,14 @@ msgstr "Bật mức nỗ lực {tierLabel}"
 msgid "Enable {tool}"
 msgstr "Bật {tool}"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Enable Crossagents"
+msgstr "Bật Crossagents"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Enable Crossagents before starting the swarm."
+msgstr "Bật Crossagents trước khi khởi chạy swarm."
+
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Enable language server support for type checking, completions, and diagnostics. Requires a language server installed."
@@ -4450,6 +4518,7 @@ msgstr "đã thoát ({0})"
 msgid "Exited with code {0}. Close to retry."
 msgstr "Đã thoát với mã {0}. Đóng để thử lại."
 
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Expand"
@@ -4614,6 +4683,7 @@ msgstr "thất bại"
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/components/campaignDeployment/parts/OutcomeSection.tsx
 #: src/renderer/components/consultations/ConsultationCard.tsx
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
@@ -4790,6 +4860,7 @@ msgid "Finish your review"
 msgstr "Kết thúc bài đánh giá của bạn"
 
 #: src/mobile/presentation.ts
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Finished"
 msgstr "Đã hoàn thành"
@@ -6156,6 +6227,10 @@ msgstr "Do nhà cung cấp quản lý"
 #~ msgid "Managed skills"
 #~ msgstr "Skill được quản lý"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Manual only"
+msgstr "Chỉ thủ công"
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/sortMode.ts
 msgid "Manual order"
 msgstr "Sắp xếp thủ công"
@@ -6358,6 +6433,10 @@ msgstr "Phương pháp hợp nhất"
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "Merge options"
 msgstr "Tùy chọn hợp nhất"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Merge policy"
+msgstr "Chính sách hợp nhất"
 
 #: src/mobile/views/pr/PrOverviewPage.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
@@ -6705,6 +6784,10 @@ msgstr "Cần chú ý · Cần có sự phê duyệt"
 #: src/renderer/notifications.ts
 msgid "Needs Attention · Reply required"
 msgstr "Cần chú ý · Cần trả lời"
+
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
+msgid "Needs input"
+msgstr "Cần dữ liệu đầu vào"
 
 #: src/mobile/presentation.ts
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
@@ -7532,6 +7615,7 @@ msgstr "Cảnh báo mở"
 #~ msgid "Open Alerts"
 #~ msgstr "Cảnh báo đang mở"
 
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ExperimentGroupHeader.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
@@ -7833,6 +7917,18 @@ msgstr "Hoặc chọn từ Trung tâm điều khiển"
 msgid "Or write a custom answer"
 msgstr "Hoặc viết một câu trả lời tùy chỉnh"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Orchestrator"
+msgstr "Bộ điều phối"
+
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
+msgid "Orchestrator only"
+msgstr "Chỉ trình điều phối"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Orchestrator reviews"
+msgstr "Orchestrator reviews"
+
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Other"
 msgstr "Khác"
@@ -8127,6 +8223,10 @@ msgstr "Đã ghim"
 msgid "Plan"
 msgstr "kế hoạch"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Plan · Fan out · Review"
+msgstr "Lập kế hoạch · Phân phối · Đánh giá"
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Plan fact"
 msgstr "Sự kiện kế hoạch"
@@ -8266,6 +8366,10 @@ msgstr "Hook pre-commit không thành công"
 msgid "Preparing remote environment…"
 msgstr "Đang chuẩn bị môi trường từ xa…"
 
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
+msgid "Preparing worker assignments…"
+msgstr "Đang chuẩn bị phân công cho các tác nhân…"
+
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Presentation"
 msgstr "Cách trình bày"
@@ -8349,6 +8453,7 @@ msgstr "Hồ sơ"
 #: src/renderer/components/thread/ThreadCommandPanel.tsx
 #: src/renderer/views/ProjectSettingsOverlay/ProjectSettingsOverlay.tsx
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
+#: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Project"
 msgstr "dự án"
 
@@ -8874,6 +8979,7 @@ msgid "Remote URL"
 msgstr "URL từ xa"
 
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
+#: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Remove"
 msgstr "Xóa"
 
@@ -9296,6 +9402,10 @@ msgstr "Xem lại nhận xét"
 msgid "Review decision"
 msgstr "Xem xét lại quyết định"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Review mode"
+msgstr "Review mode"
+
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Review my recent work and summarize today's priorities and next steps."
 msgstr "Xem lại công việc gần đây của tôi và tóm tắt các ưu tiên cùng bước tiếp theo của hôm nay."
@@ -9316,6 +9426,10 @@ msgstr "Xem lại PR #{prNumber} cho {0}"
 #: src/mobile/settingsSections.ts
 msgid "Review presentation"
 msgstr "Hiển thị đánh giá"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Reviewer"
+msgstr "Người đánh giá"
 
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Reviewing"
@@ -10458,6 +10572,10 @@ msgstr "Khởi động thu nhỏ"
 msgid "Start remote thread"
 msgstr "Bắt đầu luồng từ xa"
 
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
+msgid "Start swarm"
+msgstr "Khởi chạy swarm"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Start Tailscale"
 msgstr "Khởi động Tailscale"
@@ -10495,6 +10613,7 @@ msgstr "Đã bắt đầu chủ đề {targetLabel}"
 
 #. Button label while the microphone test is starting
 #: src/mobile/useRemoteDesktop.ts
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -10702,6 +10821,20 @@ msgstr "Hỗ trợ chế độ nhanh"
 msgid "Swap notes and to-dos"
 msgstr "Hoán đổi ghi chú và việc cần làm"
 
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
+#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Swarm"
+msgstr "Swarm"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Swarm creates isolated worktrees, so it needs a Git project first."
+msgstr "Swarm tạo các worktree tách biệt nên trước tiên cần một dự án Git."
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Swarm started"
+msgstr "Đã khởi chạy Swarm"
+
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
@@ -10843,8 +10976,13 @@ msgid "Target provider"
 msgstr "Nhà cung cấp mục tiêu"
 
 #: src/renderer/components/providers/qwen/index.tsx
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
 msgid "Task"
 msgstr "Tác vụ"
+
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
+msgid "Task for the swarm"
+msgstr "Tác vụ cho swarm"
 
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Task output"
@@ -11039,6 +11177,10 @@ msgstr "Máy chủ MCP không hợp lệ."
 msgid "The normal app shell could not render. The diagnostics below are shown before reload so the failure can be investigated."
 msgstr "Shell ứng dụng bình thường không thể hiển thị. Chẩn đoán bên dưới được hiển thị trước khi tải lại để có thể điều tra lỗi."
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "The orchestrator performs the final review."
+msgstr "The orchestrator performs the final review."
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "The phrase does not match."
 msgstr "Cụm không khớp."
@@ -11058,6 +11200,10 @@ msgstr "Máy chủ từ xa không trả về thông tin xác thực ghép nối.
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 msgid "The repository location on disk. Update it if you moved the folder."
 msgstr "Vị trí của kho lưu trữ trên đĩa. Hãy cập nhật nếu bạn đã di chuyển thư mục."
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "The root and reviewer use the strongest available reasoning tier."
+msgstr "Tác nhân gốc và người đánh giá dùng mức suy luận mạnh nhất hiện có."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "The selected file does not contain valid MCP server configurations."
@@ -12036,9 +12182,17 @@ msgstr "Cài đặt sử dụng"
 msgid "Usage unknown"
 msgstr "Không rõ mức sử dụng"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Use {count} workers"
+msgstr "Use {count} workers"
+
 #: src/mobile/views/DesktopsView.tsx
 msgid "Use + to pair directly or connect to a remote machine over SSH."
 msgstr "Dùng + để ghép nối trực tiếp hoặc kết nối với máy từ xa qua SSH."
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Use 1 worker"
+msgstr "Use 1 worker"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectMenu.tsx
 msgid "Use an existing folder"
@@ -12469,6 +12623,31 @@ msgstr "Làm việc trong checkout hiện tại"
 msgid "Worked for {elapsed}"
 msgstr "Đã làm việc trong {elapsed}"
 
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Worker"
+msgstr "Worker"
+
+#. placeholder {0}: index + 1
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Worker {0}"
+msgstr "Worker {0}"
+
+#: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
+msgid "Worker branches remain available for inspection. You choose what to merge after the reviewer reports."
+msgstr "Các nhánh worker vẫn được giữ để kiểm tra. Bạn chọn nội dung cần hợp nhất sau khi có báo cáo đánh giá."
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Worker count"
+msgstr "Worker count"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Worker pool"
+msgstr "Nhóm worker"
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Workers"
+msgstr "Worker"
+
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Workflow"
 msgstr "Quy trình làm việc"
@@ -12503,6 +12682,7 @@ msgid "Workflows"
 msgstr "Quy trình làm việc"
 
 #: src/mobile/presentation.ts
+#: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Working"
 msgstr "Đang làm việc"
@@ -12639,6 +12819,10 @@ msgstr "Có"
 #: src/renderer/campaign/cockpit/cockpitGreeting.ts
 msgid "You're all caught up."
 msgstr "Bạn đã xử lý xong."
+
+#: src/renderer/views/SwarmView/SwarmView.tsx
+msgid "Your existing checkout stays untouched by worker threads."
+msgstr "Các luồng worker không thay đổi checkout hiện có của bạn."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Your local changes are stashed and will be re-applied when you commit or abort this merge."
