@@ -62,7 +62,7 @@ function EmptyDocket() {
   const { t } = useLingui();
   return (
     <div
-      className="flex max-w-4xl flex-col items-center gap-2 border border-dashed border-divider px-6 py-12 text-center"
+      className="mx-auto flex max-w-md flex-col items-center gap-2 rounded-medium border border-dashed border-divider px-6 py-12 text-center"
       data-testid="docket-empty"
     >
       <FileQuestion aria-hidden className="size-6 text-default-400" />

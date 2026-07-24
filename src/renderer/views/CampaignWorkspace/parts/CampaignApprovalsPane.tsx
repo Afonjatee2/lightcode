@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Spinner } from "@heroui/react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Inbox } from "lucide-react";
 import { ApprovalDocket } from "@/renderer/components/campaignDeployment";
 import type { CampaignContextIdentityViewModel } from "@/renderer/adapters/campaignViewModels";
 import { mapProposalToViewModel } from "@/renderer/adapters/mapProposalToViewModel";
@@ -113,9 +113,12 @@ export function CampaignApprovalsPane(props: {
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <aside className="w-56 shrink-0 overflow-y-auto border-r border-divider p-2">
           {props.pendingProposals.length === 0 ? (
-            <p className="px-2 py-3 text-tiny text-default-400">
-              <Trans>No pending proposals.</Trans>
-            </p>
+            <div className="flex flex-col items-center justify-center gap-2 px-3 py-10 text-center">
+              <Inbox className="size-5 text-default-400" aria-hidden />
+              <p className="text-tiny text-default-400">
+                <Trans>No pending proposals.</Trans>
+              </p>
+            </div>
           ) : (
             <ul className="space-y-1">
               {props.pendingProposals.map((proposal) => {

@@ -3,6 +3,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Chip, Disclosure, Spinner } from "@heroui/react";
 import {
   AlertTriangle,
+  ArrowUp,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
@@ -147,6 +148,11 @@ function ContextSections(props: {
             {context.kpis.map((kpi) => {
               const pct = kpi.pctAchieved ?? 0;
               const onTrack = kpi.status === "on_track" || kpi.status === "healthy";
+              // `pctAchieved` is direction-normalized by Control Centre (100% =
+              // exactly on target for both min and max KPIs), so anything past
+              // 100% is genuine over-attainment. Tone follows the on-track flag
+              // the data carries — we never re-derive good/bad from the numbers.
+              const over = kpi.pctAchieved !== null && pct > 100;
               return (
                 <li
                   key={kpi.id}
@@ -155,14 +161,15 @@ function ContextSections(props: {
                   <div className="mb-1 flex justify-between text-xs">
                     <span className="font-semibold text-foreground">{kpi.label}</span>
                     <span
-                      className={`tabular-nums font-semibold ${onTrack ? "text-success" : "text-warning"}`}
+                      className={`inline-flex items-center gap-0.5 tabular-nums font-semibold ${onTrack ? "text-success" : "text-warning"}`}
                     >
+                      {over ? <ArrowUp className="size-3" aria-hidden /> : null}
                       {kpi.pctAchieved !== null ? `${Math.round(kpi.pctAchieved)}%` : "—"}
                     </span>
                   </div>
                   <div className="h-1.5 overflow-hidden rounded-full bg-[var(--hairline-strong)]">
                     <div
-                      className={`h-full rounded-full ${onTrack ? "bg-success" : "bg-warning"}`}
+                      className={`h-full rounded-full ${onTrack ? "bg-success" : "bg-warning"} ${over ? "cockpit-kpi-bar--over" : ""}`}
                       style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
                     />
                   </div>
