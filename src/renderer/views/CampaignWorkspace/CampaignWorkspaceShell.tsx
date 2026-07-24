@@ -1,12 +1,14 @@
-import { useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { CampaignNavPane } from "./parts/CampaignNavPane";
 import { CampaignThreadPane } from "./parts/CampaignThreadPane";
 import { CampaignContextPane } from "./parts/CampaignContextPane";
+import { CampaignApprovalsPane } from "./parts/CampaignApprovalsPane";
 import { useProject } from "@/renderer/state/useThread";
 import { useCampaignContext } from "@/renderer/hooks/useCampaignContext";
 import { useOperationsToday } from "@/renderer/hooks/useOperationsToday";
 import { usePanelStore } from "@/renderer/state/panelStore";
+import { useAppStore } from "@/renderer/state/appStore";
 
 const SIDEBAR_MIN_WIDTH = 240;
 const PANEL_MIN_WIDTH = 320;
@@ -56,13 +58,33 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
   const { t } = useLingui();
   const [leftWidth, setLeftWidth] = useState(240);
   const [rightWidth, setRightWidth] = useState(360);
+  const [workspaceView, setWorkspaceView] = useState<"thread" | "approvals">("thread");
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const project = useProject(props.projectId);
   const boundCampaignGroupId = project?.campaignExtension?.campaignGroupId ?? null;
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(boundCampaignGroupId);
+  const pendingApprovalsFocus = useAppStore((state) => state.pendingCampaignApprovalsFocus);
+  const setPendingCampaignApprovalsFocus = useAppStore(
+    (state) => state.setPendingCampaignApprovalsFocus,
+  );
 
   const operationsToday = useOperationsToday(props.projectId);
   const activeCampaignId = selectedCampaignId ?? boundCampaignGroupId;
   const campaignContext = useCampaignContext(props.projectId, activeCampaignId);
+
+  useEffect(() => {
+    if (
+      !pendingApprovalsFocus ||
+      pendingApprovalsFocus.projectId !== props.projectId ||
+      !activeCampaignId ||
+      pendingApprovalsFocus.campaignGroupId !== activeCampaignId
+    ) {
+      return;
+    }
+    setWorkspaceView("approvals");
+    setSelectedProposalId(pendingApprovalsFocus.proposalId ?? null);
+    setPendingCampaignApprovalsFocus(null);
+  }, [pendingApprovalsFocus, props.projectId, activeCampaignId, setPendingCampaignApprovalsFocus]);
 
   const clampLeft = (val: number) =>
     Math.min(Math.max(val, SIDEBAR_MIN_WIDTH), window.innerWidth - PANEL_MIN_WIDTH - 200);
@@ -91,10 +113,24 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
       />
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <CampaignThreadPane
-          projectId={props.projectId}
-          identity={campaignContext.status === "ready" ? campaignContext.data.identity : null}
-        />
+        {workspaceView === "approvals" && campaignContext.status === "ready" && activeCampaignId ? (
+          <CampaignApprovalsPane
+            projectId={props.projectId}
+            campaignGroupId={activeCampaignId}
+            identity={campaignContext.data.identity}
+            pendingProposals={campaignContext.data.pendingProposals}
+            selectedProposalId={
+              selectedProposalId ?? campaignContext.data.pendingProposals[0]?.id ?? null
+            }
+            onSelectProposal={setSelectedProposalId}
+            onBack={() => setWorkspaceView("thread")}
+          />
+        ) : (
+          <CampaignThreadPane
+            projectId={props.projectId}
+            identity={campaignContext.status === "ready" ? campaignContext.data.identity : null}
+          />
+        )}
       </main>
 
       <ResizeBar
@@ -106,7 +142,13 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
         className="shrink-0 overflow-hidden border-l border-divider"
         style={{ width: rightWidth }}
       >
-        <CampaignContextPane campaignContext={campaignContext} />
+        <CampaignContextPane
+          campaignContext={campaignContext}
+          onOpenApprovals={(proposalId) => {
+            setSelectedProposalId(proposalId ?? null);
+            setWorkspaceView("approvals");
+          }}
+        />
       </aside>
     </div>
   );
