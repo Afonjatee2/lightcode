@@ -710,6 +710,10 @@ msgstr "사이드바 스레드의 빠른 제거 버튼에 대한 작업입니다
 msgid "Action name"
 msgstr "액션 이름"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Action type"
+msgstr "작업 유형"
+
 #: src/mobile/views/pr/PrOverviewPage.tsx
 #: src/renderer/components/common/BranchSelector/parts/BranchFooterActions.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/ActionsSection.tsx
@@ -914,6 +918,10 @@ msgstr "고급 모드 (코드)"
 msgid "Advertise a custom base URL, e.g. a reverse proxy or tunnel. Leave empty for automatic."
 msgstr "사용자 정의 기본 URL을 게시합니다(예: 리버스 프록시 또는 터널). 자동으로 설정하려면 비워 두세요."
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "After"
+msgstr "이후"
+
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
@@ -1016,6 +1024,10 @@ msgstr "AI 공급자"
 #: src/mobile/views/MoreView.tsx
 #~ msgid "AI, agents, and archived threads on the paired desktop"
 #~ msgstr "페어링된 데스크톱의 AI, 에이전트 및 보관된 스레드"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Alert"
+msgstr "알림"
 
 #: src/mobile/settingsSections.ts
 msgid "Alerts when threads need you"
@@ -1169,26 +1181,52 @@ msgstr "화면 표시"
 msgid "Appearance mode"
 msgstr "모양 모드"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Applied"
+msgstr "적용됨"
+
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Apply provider preset"
 msgstr "제공자 프리셋 적용"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Apply result"
+msgstr "적용 결과"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Applying…"
+msgstr "적용 중…"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Approval note"
+msgstr "승인 메모"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Approval or reply required from you."
 msgstr "사용자의 승인 또는 응답이 필요합니다."
 
+#: src/renderer/components/campaignDeployment/parts/DecisionActions.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Approve"
 msgstr "승인"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Approve with confirmation…"
+msgstr "확인 후 승인…"
 
 #: src/renderer/views/PrReviewOverlay/parts/PrConversationTab.tsx
 msgid "approved"
 msgstr "승인됨"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Approved"
 msgstr "승인됨"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Approving requires strong confirmation."
+msgstr "승인하려면 강한 확인이 필요합니다."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -1323,6 +1361,10 @@ msgstr "첨부 파일: {0}"
 msgid "Audio"
 msgstr "오디오"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Audit reference"
+msgstr "감사 참조"
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Authenticate"
 msgstr "인증"
@@ -1412,6 +1454,10 @@ msgstr "아바타 색상"
 msgid "Avatar color {color}"
 msgstr "아바타 색상 {color}"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Awaiting approval"
+msgstr "승인 대기"
+
 #: src/mobile/views/BrowserView.tsx
 #: src/mobile/views/NotesView.tsx
 #: src/mobile/views/pr/PrPageHeader.tsx
@@ -1439,6 +1485,10 @@ msgstr "파일로 돌아가기"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #~ msgid "Back to MCP servers"
 #~ msgstr "MCP 서버로 돌아가기"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+msgid "Back to monitoring"
+msgstr "모니터링으로 돌아가기"
 
 #: src/mobile/views/pr/PrSubPage.tsx
 msgid "Back to overview"
@@ -1492,6 +1542,10 @@ msgstr "Bash 출력"
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Basic (CLI)"
 msgstr "기본(CLI)"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Before"
+msgstr "이전"
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 msgid "Better (Whisper base)"
@@ -1707,13 +1761,29 @@ msgstr "브랜치 보호 규칙 우회(관리자 병합)"
 msgid "Cached only"
 msgstr "캐시만 있음"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Calculation details"
+msgstr "계산 세부정보"
+
 #: src/mobile/QrScanner.tsx
 msgid "Camera access blocked"
 msgstr "카메라 접근이 차단됨"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Campaign"
+msgstr "캠페인"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Campaign & client"
+msgstr "캠페인 및 클라이언트"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Campaign Context"
 msgstr "캠페인 컨텍스트"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Campaign event"
+msgstr "캠페인 이벤트"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Campaign group ID"
@@ -1755,6 +1825,8 @@ msgstr "포트를 불러올 수 없습니다"
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/GitActionSheet.tsx
+#: src/renderer/components/campaignDeployment/parts/DecisionActions.tsx
+#: src/renderer/components/campaignDeployment/parts/StrongConfirmationDialog.tsx
 #: src/renderer/components/common/ConfirmDialog.tsx
 #: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
@@ -1810,6 +1882,7 @@ msgstr "프로젝트 제거 취소"
 msgid "cancelled"
 msgstr "취소됨"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 msgid "Cancelled"
@@ -2108,6 +2181,10 @@ msgstr "CLI 후크"
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Click a shortcut to record a new key, or ＋ to add another."
 msgstr "단축키를 클릭하여 새 키를 기록하거나 ＋를 눌러 추가하세요."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Client"
+msgstr "클라이언트"
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Client Comms"
@@ -2618,6 +2695,18 @@ msgstr "지원되는 에이전트가 시작될 때 Poracode에서 추가할 서�
 msgid "Configured MCP servers"
 msgstr "구성된 MCP 서버"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Confirm approval"
+msgstr "승인 확인"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Confirm high-risk approval"
+msgstr "고위험 승인 확인"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Confirmation phrase"
+msgstr "확인 문구"
+
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Conflict Resolver"
@@ -2819,6 +2908,7 @@ msgid "Control Centre MCP Profile"
 msgstr "Control Centre MCP 프로필"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
@@ -3171,6 +3261,10 @@ msgstr "에이전트로 만들기"
 #~ msgid "Create:"
 #~ msgstr "생성:"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Created"
+msgstr "생성됨"
+
 #. placeholder {0}: createdAt.toLocaleTimeString()
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Created {0}"
@@ -3193,6 +3287,10 @@ msgstr "자격 증명이 구성되었습니다."
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
 msgid "Credits"
 msgstr "크레딧"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Critical risk"
+msgstr "치명적 위험"
 
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
@@ -3259,6 +3357,7 @@ msgstr "선택됨"
 #~ msgstr "MCP Market에서 관리하는 엄선된 무료 및 프리미엄 스킬입니다."
 
 #: src/mobile/views/ThreadsView.tsx
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Current"
 msgstr "최근"
 
@@ -3326,6 +3425,26 @@ msgstr "날짜"
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #~ msgid "Days"
 #~ msgstr "요일"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Decided at"
+msgstr "결정 시각"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Decided by"
+msgstr "결정자"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Decision"
+msgstr "결정"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Decision docket"
+msgstr "결정 도켓"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Decision record"
+msgstr "결정 기록"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Decisions & Proposals"
@@ -3814,6 +3933,7 @@ msgstr "음성 모델 다운로드 중{0}%"
 msgid "Downloading voice model..."
 msgstr "음성 모델 다운로드 중..."
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/PrReviewOverlay/parts/PrMetaRow.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Draft"
@@ -3923,6 +4043,10 @@ msgstr "편집기 탭"
 #: src/mobile/views/SettingsView.tsx
 msgid "Edits the paired desktop and syncs back to it."
 msgstr "페어링된 데스크톱을 편집하고 다시 동기화합니다."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Effect & rollback"
+msgstr "영향 및 롤백"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Effort"
@@ -4067,6 +4191,10 @@ msgstr "SSH 암호를 입력하세요."
 msgid "Enter valid JSON."
 msgstr "유효한 JSON을 입력하세요."
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Entity"
+msgstr "엔티티"
+
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "Environment"
 msgstr "환경"
@@ -4117,6 +4245,10 @@ msgstr "오류"
 msgid "Error · Agent encountered an error"
 msgstr "오류 · 에이전트에 오류가 발생했습니다."
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Error details"
+msgstr "오류 세부정보"
+
 #: src/mobile/ComposerInfoChips.tsx
 msgid "Errors"
 msgstr "오류"
@@ -4138,6 +4270,10 @@ msgstr "매시간"
 msgid "Every hour at {0} minutes past"
 msgstr "매시 {0}분"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Evidence"
+msgstr "근거"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Evidence freshness"
 msgstr "증거 최신성"
@@ -4151,6 +4287,10 @@ msgstr "증거 최신 상태 알 수 없음"
 #: src/renderer/components/consultations/ContextWarnings.tsx
 msgid "Evidence from {0} to {1}"
 msgstr "{0}부터 {1}까지의 증거"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Evidence packet"
+msgstr "근거 패킷"
 
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4213,6 +4353,10 @@ msgstr "할 일 도크 확장"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Expected branch {branch} at {expected}, but found {actual}"
 msgstr "브랜치 {branch}이(가) {expected}을(를) 가리켜야 하지만 실제로는 {actual}을(를) 가리킵니다"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Expected platform effect"
+msgstr "예상 플랫폼 영향"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Expected source worktree branch {expected}, but found {actual}"
@@ -4288,10 +4432,15 @@ msgstr "실험 평가의 우승자는 1에서 {candidateCount} 사이여야 합�
 msgid "Experiment prompt must not be blank"
 msgstr "실험 프롬프트는 비워 둘 수 없습니다"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Expires"
+msgstr "만료"
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Export MCP servers"
 msgstr "MCP 서버 내보내기"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "External"
 msgstr "외부"
@@ -4324,6 +4473,8 @@ msgstr "Factory Droid"
 msgid "failed"
 msgstr "실패"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+#: src/renderer/components/campaignDeployment/parts/OutcomeSection.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
@@ -4396,6 +4547,10 @@ msgstr "즐겨찾기"
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Fetch"
 msgstr "가져오기"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Field"
+msgstr "필드"
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "File"
@@ -4740,6 +4895,7 @@ msgstr "PR 요약 생성"
 msgid "Generate with AI"
 msgstr "AI로 생성"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Generated"
 msgstr "생성됨"
@@ -4993,6 +5149,10 @@ msgstr "{0}의 스킬 숨기기"
 #: src/renderer/views/MainView/parts/RightPanel/parts/DevTerminalPanel/parts/RightTerminalLayout.tsx
 msgid "Hide terminal"
 msgstr "터미널 숨기기"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "High risk"
+msgstr "높은 위험"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "History"
@@ -5313,6 +5473,10 @@ msgstr "중단됨: 에이전트 세션이 완료되기 전에 종료되었습니
 msgid "Italic"
 msgstr "이탤릭체"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Job no."
+msgstr "작업 번호"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Job number"
 msgstr "작업 번호"
@@ -5551,6 +5715,10 @@ msgstr "PR 로드 중…"
 msgid "Loading previous runs"
 msgstr "이전 실행 로드 중"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+msgid "Loading proposal…"
+msgstr "제안 로딩 중…"
+
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Loading pull requests"
 msgstr "풀 리퀘스트 불러오는 중"
@@ -5588,6 +5756,8 @@ msgstr "스레드 로드 중"
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/HostFolderPicker.tsx
 #: src/renderer/app.tsx
+#: src/renderer/components/campaignDeployment/ApprovalDocket.tsx
+#: src/renderer/components/campaignDeployment/parts/StrongConfirmationDialog.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/ProjectTreeView.tsx
@@ -5681,6 +5851,10 @@ msgstr "개발 서버를 찾는 중…"
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 msgid "Losing worktrees and branches will be removed. Their session history will remain."
 msgstr "선정되지 않은 작업 트리와 브랜치는 제거됩니다. 세션 기록은 유지됩니다."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Low risk"
+msgstr "낮은 위험"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 msgid "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
@@ -5894,6 +6068,10 @@ msgstr "MCP 도구 호출"
 msgid "MCP transport type"
 msgstr "MCP 전송 유형"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Medium risk"
+msgstr "중간 위험"
+
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 msgid "Merge {crownedLabel}'s changes into {mergeTarget}?"
 msgstr "{crownedLabel}의 변경 사항을 {mergeTarget}에 병합할까요?"
@@ -6009,6 +6187,10 @@ msgstr "원격 에이전트에 메시지 보내기…"
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Messages sent"
 msgstr "보낸 메시지"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Metric"
+msgstr "지표"
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -6472,6 +6654,10 @@ msgstr "다음 실행: {0}"
 msgid "Next tab"
 msgstr "다음 탭"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "No"
+msgstr "아니오"
+
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
 msgid "No active browser tab"
 msgstr "활성 브라우저 탭이 없습니다."
@@ -6610,6 +6796,10 @@ msgstr "아직 데이터가 없습니다."
 msgid "No default one-shot model configured for {provider}"
 msgstr "{provider}의 기본 원샷 모델이 구성되지 않았습니다"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+msgid "No deployment client available."
+msgstr "배포 클라이언트를 사용할 수 없습니다."
+
 #: src/renderer/components/skills/SkillsManager.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "No description"
@@ -6631,6 +6821,10 @@ msgstr "{0}에 대한 차이점이 없습니다."
 #: src/renderer/components/diff/DiffCardList.tsx
 msgid "No diff for {visiblePath}"
 msgstr "{visiblePath}에는 차이가 없습니다."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "No evidence attached"
+msgstr "첨부된 근거 없음"
 
 #: src/renderer/components/skills/SkillImportModal.tsx
 msgid "No external skills were found in this scope."
@@ -6758,6 +6952,10 @@ msgstr "아직 페어링된 기기가 없습니다."
 msgid "No patterns."
 msgstr "패턴이 없습니다."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+msgid "No pending proposals."
+msgstr "대기 중인 제안이 없습니다."
+
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "No phases yet."
 msgstr "아직 단계가 없습니다."
@@ -6778,6 +6976,10 @@ msgstr "아직 프로젝트가 없습니다"
 #: src/renderer/components/providers/codex/index.tsx
 msgid "No prompts"
 msgstr "프롬프트 없음"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "No proposal selected"
+msgstr "선택된 제안 없음"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/UsagePanel.tsx
 msgid "No providers are being tracked."
@@ -7332,9 +7534,18 @@ msgstr "후보의 풀 리퀘스트 #{0}을(를) 열었습니다."
 msgid "OpenSSH private key"
 msgstr "OpenSSH 개인 키"
 
+#: src/renderer/components/campaignDeployment/parts/DecisionActions.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Optional"
 msgstr "선택 사항"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Optional note recorded with the approval"
+msgstr "승인 시 기록할 선택 메모"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Optional reason recorded with the rejection"
+msgstr "거부 시 기록할 선택 사유"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Optional reference number"
@@ -7367,6 +7578,7 @@ msgstr "또는 맞춤 답변을 작성하세요."
 msgid "Other"
 msgstr "기타"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "Outcome"
 msgstr "결과"
@@ -7647,6 +7859,10 @@ msgstr "고정됨"
 msgid "Plan"
 msgstr "계획"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Plan fact"
+msgstr "계획 사실"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Plan Revision"
@@ -7655,6 +7871,14 @@ msgstr "계획 개정"
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
 msgid "Plan, ask, build…"
 msgstr "계획하고, 묻고, 만들어 보세요…"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Platform"
+msgstr "플랫폼"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Platform response"
+msgstr "플랫폼 응답"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -7912,9 +8136,25 @@ msgstr "프롬프트"
 msgid "Prompts"
 msgstr "프롬프트"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+msgid "Proposals & Approvals"
+msgstr "제안 및 승인"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Proposed"
+msgstr "제안"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Proposed by"
+msgstr "제안자"
+
 #: src/renderer/components/thread/ChatPane/parts/items/PlanProposal.tsx
 msgid "Proposed plan"
 msgstr "제안된 계획"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Provenance"
+msgstr "출처"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Provided and managed by Poracode for supported agents."
@@ -8230,6 +8470,10 @@ msgstr "감지된 에이전트 새로 고침"
 msgid "Refresh MCP server sources"
 msgstr "MCP 서버 소스 새로 고침"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Refresh proposal"
+msgstr "제안 새로고침"
+
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "Refresh registry"
 msgstr "레지스트리 새로 고침"
@@ -8247,6 +8491,18 @@ msgstr "{0} 인증 상태를 새로 고치는 중입니다."
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "Refreshing {env} {0} authentication status."
 msgstr "{env} {0} 인증 상태를 새로 고치는 중입니다."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Reject"
+msgstr "거부"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Rejected"
+msgstr "거부됨"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Rejection reason"
+msgstr "거부 사유"
 
 #: src/mobile/TerminalAccessory.tsx
 #: src/mobile/views/BrowserView.tsx
@@ -8525,6 +8781,10 @@ msgstr "변경 요청"
 msgid "Request details"
 msgstr "요청 세부정보"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Requested change"
+msgstr "요청된 변경"
+
 #: src/renderer/views/PrReviewOverlay/parts/PrConversationTab.tsx
 msgid "requested changes"
 msgstr "변경을 요청했습니다"
@@ -8637,6 +8897,7 @@ msgstr "재개"
 #: src/mobile/views/BrowserView.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/mobile/views/TerminalView.tsx
+#: src/renderer/components/campaignDeployment/ApprovalDocket.tsx
 #: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
@@ -8718,6 +8979,10 @@ msgstr "체크포인트로 되돌리시겠습니까?"
 msgid "Revert to this checkpoint"
 msgstr "이 체크포인트로 되돌리기"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Review"
+msgstr "검토"
+
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Review and track work across your GitHub accounts."
 msgstr "여러 GitHub 계정의 작업을 검토하고 추적하세요."
@@ -8785,9 +9050,17 @@ msgstr "오른쪽 패널"
 msgid "Right-click to switch ring"
 msgstr "마우스 오른쪽 버튼을 클릭해 링 전환"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Risk"
+msgstr "위험"
+
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "Role:"
 msgstr "역할:"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Rollback guidance"
+msgstr "롤백 안내"
 
 #: src/mobile/views/threadActionSurfaces.tsx
 #: src/mobile/views/threadContextMenus.tsx
@@ -9700,6 +9973,7 @@ msgstr "소스 상태"
 msgid "Source health:"
 msgstr "소스 상태:"
 
+#: src/renderer/components/campaignDeployment/parts/EvidenceSection.tsx
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Sources"
 msgstr "소스"
@@ -10339,6 +10613,10 @@ msgstr "에이전트"
 msgid "the app"
 msgstr "앱"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "The approved change is being applied to the platform."
+msgstr "승인된 변경이 플랫폼에 적용 중입니다."
+
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #~ msgid "the base branch"
 #~ msgstr "기준 브랜치"
@@ -10358,6 +10636,10 @@ msgstr "선택한 폴더"
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "The Control Centre campaign group this workspace binds to."
 msgstr "이 작업 영역이 바인딩되는 제어 센터 캠페인 그룹입니다."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "The decision could not be submitted"
+msgstr "결정을 제출할 수 없습니다"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
@@ -10403,6 +10685,14 @@ msgstr "MCP 서버가 올바르지 않습니다."
 #: src/renderer/RendererCrashScreen.tsx
 msgid "The normal app shell could not render. The diagnostics below are shown before reload so the failure can be investigated."
 msgstr "일반 앱 셸을 렌더링할 수 없습니다. 아래 진단은 다시 로드하기 전에 표시되므로 오류를 조사할 수 있습니다."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "The phrase does not match."
+msgstr "문구가 일치하지 않습니다."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "The proposal could not be loaded"
+msgstr "제안을 불러올 수 없습니다"
 
 #: src/mobile/useRemoteDesktop.ts
 msgid "The remote Poracode server returned no pairing credential."
@@ -10567,6 +10857,14 @@ msgstr "이 프로젝트"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "This project isn't linked to a Control Centre campaign yet."
 msgstr "이 프로젝트는 아직 제어 센터 캠페인에 연결되지 않았습니다."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "This proposal has expired. The server will refuse further decisions."
+msgstr "이 제안은 만료되었습니다. 서버가 추가 결정을 거부합니다."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "This proposal is high risk. Type the confirmation phrase to approve it."
+msgstr "이 제안은 고위험입니다. 승인하려면 확인 문구를 입력하세요."
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "This remote project is unavailable. Reconnect the environment and try again."
@@ -11161,6 +11459,7 @@ msgstr "통합 보기"
 msgid "Uninstall"
 msgstr "제거"
 
+#: src/renderer/components/campaignDeployment/parts/DocketHeader.tsx
 #: src/renderer/components/thread/threadContextUsage.ts
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
@@ -11731,6 +12030,10 @@ msgstr "실행의 대화가 생성되는 위치입니다."
 msgid "Where the terminal panel appears."
 msgstr "터미널 패널이 나타나는 위치."
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Why this is risky"
+msgstr "위험한 이유"
+
 #. placeholder {0}: env || t`this environment`
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
 msgid "Will run in {0}:"
@@ -11927,6 +12230,10 @@ msgstr "WSL 기본 폴더"
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "WSL user"
 #~ msgstr "WSL 사용자"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Yes"
+msgstr "예"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Your local changes are stashed and will be re-applied when you commit or abort this merge."

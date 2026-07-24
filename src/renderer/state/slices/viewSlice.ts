@@ -35,6 +35,12 @@ export interface ViewSlice {
   pendingComposerFocusThreadId: string | null;
   /** Prefill text for a campaign workspace composer after navigating from Today home. */
   pendingCampaignComposerPrefill: { projectId: string; text: string } | null;
+  /** Open the campaign workspace approvals surface after navigating from Today. */
+  pendingCampaignApprovalsFocus: {
+    projectId: string;
+    campaignGroupId: string;
+    proposalId?: string;
+  } | null;
   chatScrollToBottomTokens: Record<string, number>;
   /**
    * Optimistic, urgent active-thread id used only for instant sidebar-row
@@ -48,6 +54,9 @@ export interface ViewSlice {
   requestComposerFocus: (threadId: string) => void;
   clearComposerFocusRequest: (threadId: string) => void;
   setPendingCampaignComposerPrefill: (prefill: { projectId: string; text: string } | null) => void;
+  setPendingCampaignApprovalsFocus: (
+    focus: { projectId: string; campaignGroupId: string; proposalId?: string } | null,
+  ) => void;
   requestChatScrollToBottom: (threadId: string) => void;
   setPendingActiveThread: (threadId: string | null) => void;
   openDraft: (projectId: string) => void;
@@ -97,6 +106,7 @@ export const createViewSlice: SliceCreator<ViewSlice> = (set) => ({
   focusedPaneId: null,
   pendingComposerFocusThreadId: null,
   pendingCampaignComposerPrefill: null,
+  pendingCampaignApprovalsFocus: null,
   chatScrollToBottomTokens: {},
   pendingActiveThreadId: null,
   groupLayouts: {},
@@ -107,6 +117,7 @@ export const createViewSlice: SliceCreator<ViewSlice> = (set) => ({
       state.pendingComposerFocusThreadId === threadId ? { pendingComposerFocusThreadId: null } : {},
     ),
   setPendingCampaignComposerPrefill: (prefill) => set({ pendingCampaignComposerPrefill: prefill }),
+  setPendingCampaignApprovalsFocus: (focus) => set({ pendingCampaignApprovalsFocus: focus }),
   requestChatScrollToBottom: (threadId) =>
     set((state) => ({
       chatScrollToBottomTokens: {

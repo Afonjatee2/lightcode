@@ -76,6 +76,9 @@ export function CampaignTodayView() {
   const setPendingCampaignComposerPrefill = useAppStore(
     (state) => state.setPendingCampaignComposerPrefill,
   );
+  const setPendingCampaignApprovalsFocus = useAppStore(
+    (state) => state.setPendingCampaignApprovalsFocus,
+  );
   const showSetupState = !projectId;
 
   function sourceHealthLabel(summary: { healthy: number; stale: number; failed: number }) {
@@ -86,9 +89,15 @@ export function CampaignTodayView() {
     return parts.length > 0 ? parts.join(", ") : "—";
   }
 
-  function openCampaignWorkspace(campaignGroupId: string) {
+  function openCampaignWorkspace(campaignGroupId: string, options?: { openApprovals?: boolean }) {
     const project = findCampaignProjectByGroupId(projects, campaignGroupId);
     if (!project) return;
+    if (options?.openApprovals) {
+      setPendingCampaignApprovalsFocus({
+        projectId: project.id,
+        campaignGroupId,
+      });
+    }
     openDraft(project.id);
   }
 
@@ -204,7 +213,9 @@ export function CampaignTodayView() {
                   <CampaignRow
                     key={campaign.campaignGroupId}
                     campaign={campaign}
-                    onOpen={openCampaignWorkspace}
+                    onOpen={(campaignGroupId) =>
+                      openCampaignWorkspace(campaignGroupId, { openApprovals: true })
+                    }
                   />
                 ))}
               </BucketSection>

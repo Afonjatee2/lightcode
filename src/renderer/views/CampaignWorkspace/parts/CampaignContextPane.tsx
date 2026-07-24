@@ -1,7 +1,14 @@
 import type { ReactNode } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Card, Chip, Spinner } from "@heroui/react";
-import { AlertTriangle, CheckCircle2, RefreshCw, ShieldAlert, WifiOff, XCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  RefreshCw,
+  ShieldAlert,
+  WifiOff,
+  XCircle,
+} from "lucide-react";
 import type { CampaignContextViewModel } from "@/renderer/adapters/campaignViewModels";
 import type { CampaignContextState } from "@/renderer/hooks/useCampaignContext";
 
@@ -33,11 +40,7 @@ function CenteredMessage(props: { icon?: ReactNode; children: ReactNode }) {
   );
 }
 
-function SectionCard(props: {
-  title: ReactNode;
-  children: ReactNode;
-  className?: string;
-}) {
+function SectionCard(props: { title: ReactNode; children: ReactNode; className?: string }) {
   return (
     <Card className={`border border-divider ${props.className ?? ""}`}>
       <Card.Header className="px-3 py-2">
@@ -62,12 +65,8 @@ function IdentityHeader(props: { context: CampaignContextViewModel; onRefresh: (
   return (
     <header className="flex shrink-0 items-start justify-between gap-2 border-b border-divider p-3">
       <div className="min-w-0">
-        <h2 className="truncate text-small font-semibold text-foreground">
-          {clientDisplay}
-        </h2>
-        <p className="truncate text-tiny text-default-500">
-          {identity.campaignName}
-        </p>
+        <h2 className="truncate text-small font-semibold text-foreground">{clientDisplay}</h2>
+        <p className="truncate text-tiny text-default-500">{identity.campaignName}</p>
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <Chip size="sm" variant="soft">
             {identity.lifecycleStatus}
@@ -92,7 +91,10 @@ function IdentityHeader(props: { context: CampaignContextViewModel; onRefresh: (
   );
 }
 
-function ContextSections(props: { context: CampaignContextViewModel }) {
+function ContextSections(props: {
+  context: CampaignContextViewModel;
+  onOpenApprovals?: (proposalId?: string) => void;
+}) {
   const { context } = props;
   const { t } = useLingui();
   const budget = context.budget;
@@ -128,7 +130,8 @@ function ContextSections(props: { context: CampaignContextViewModel }) {
 
       <SectionCard title={<Trans>Spend vs Budget</Trans>}>
         <p>
-          {formatMoney(budget.spentToDate, budget.currency)} / {formatMoney(budget.totalBudget, budget.currency)}
+          {formatMoney(budget.spentToDate, budget.currency)} /{" "}
+          {formatMoney(budget.totalBudget, budget.currency)}
           {budget.pctUsed !== null && ` (${Math.round(budget.pctUsed)}%)`}
         </p>
         {budget.remaining !== null && (
@@ -138,7 +141,10 @@ function ContextSections(props: { context: CampaignContextViewModel }) {
         )}
         {typeof context.pacing.variancePct === "number" && (
           <p className="text-default-400">
-            <Trans>{`${context.pacing.variancePct > 0 ? "+" : ""}${context.pacing.variancePct}%`} vs expected</Trans>
+            <Trans>
+              {`${context.pacing.variancePct > 0 ? "+" : ""}${context.pacing.variancePct}%`} vs
+              expected
+            </Trans>
           </p>
         )}
         {context.pacing.status !== "unknown" && (
@@ -156,7 +162,10 @@ function ContextSections(props: { context: CampaignContextViewModel }) {
         ) : (
           <ul className="space-y-1">
             {context.kpis.map((kpi) => (
-              <li key={kpi.id} className="flex flex-col gap-0.5 border-b border-divider py-1.5 last:border-0 last:pb-0 first:pt-0">
+              <li
+                key={kpi.id}
+                className="flex flex-col gap-0.5 border-b border-divider py-1.5 last:border-0 last:pb-0 first:pt-0"
+              >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold truncate">{kpi.label}</span>
                   {kpi.status && (
@@ -186,7 +195,10 @@ function ContextSections(props: { context: CampaignContextViewModel }) {
         ) : (
           <ul className="space-y-1">
             {context.channels.map((ch) => (
-              <li key={ch.id} className="flex flex-col gap-0.5 border-b border-divider py-1.5 last:border-0 last:pb-0 first:pt-0">
+              <li
+                key={ch.id}
+                className="flex flex-col gap-0.5 border-b border-divider py-1.5 last:border-0 last:pb-0 first:pt-0"
+              >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold truncate">{ch.channelLabel}</span>
                   {ch.status && (
@@ -215,7 +227,10 @@ function ContextSections(props: { context: CampaignContextViewModel }) {
         ) : (
           <ul className="space-y-1.5">
             {context.sourceHealth.map((src) => (
-              <li key={src.sourceId} className="flex flex-col gap-0.5 py-1.5 border-b border-divider last:border-0 last:pb-0 first:pt-0">
+              <li
+                key={src.sourceId}
+                className="flex flex-col gap-0.5 py-1.5 border-b border-divider last:border-0 last:pb-0 first:pt-0"
+              >
                 <div className="flex items-center gap-1.5">
                   {src.status === "healthy" ? (
                     <CheckCircle2 className="size-3 shrink-0 text-success" />
@@ -230,9 +245,7 @@ function ContextSections(props: { context: CampaignContextViewModel }) {
                   </span>
                 </div>
                 {src.reason && src.status !== "healthy" && (
-                  <span className="text-xs text-danger/80 pl-5 break-words">
-                    {src.reason}
-                  </span>
+                  <span className="text-xs text-danger/80 pl-5 break-words">{src.reason}</span>
                 )}
               </li>
             ))}
@@ -250,7 +263,11 @@ function ContextSections(props: { context: CampaignContextViewModel }) {
             {context.openAlerts.map((alert) => (
               <li key={alert.id} className="flex items-center justify-between gap-2">
                 <span className="truncate">{alert.title}</span>
-                <Chip size="sm" variant="soft" color={priorityChipColors[alert.priority] ?? "default"}>
+                <Chip
+                  size="sm"
+                  variant="soft"
+                  color={priorityChipColors[alert.priority] ?? "default"}
+                >
                   {alert.priority}
                 </Chip>
               </li>
@@ -270,14 +287,34 @@ function ContextSections(props: { context: CampaignContextViewModel }) {
             </li>
           ))}
         </ul>
-        <p className="mt-1.5">
-          <Trans>{context.pendingProposals.length} pending proposals</Trans>
-        </p>
+        <div className="mt-1.5 flex items-center justify-between gap-2">
+          <p>
+            <Trans>{context.pendingProposals.length} pending proposals</Trans>
+          </p>
+          {context.pendingProposals.length > 0 && props.onOpenApprovals ? (
+            <Button size="sm" variant="ghost" onPress={() => props.onOpenApprovals?.()}>
+              <Trans>Review</Trans>
+            </Button>
+          ) : null}
+        </div>
         <ul className="mt-1 space-y-0.5">
           {context.pendingProposals.map((prop) => (
-            <li key={prop.id} className="truncate text-default-400">
-              {prop.title} — {prop.status}
-              {prop.riskLevel && ` (${prop.riskLevel})`}
+            <li key={prop.id}>
+              {props.onOpenApprovals ? (
+                <button
+                  type="button"
+                  className="w-full truncate text-left text-default-400 hover:text-foreground"
+                  onClick={() => props.onOpenApprovals?.(prop.id)}
+                >
+                  {prop.title} — {prop.status}
+                  {prop.riskLevel && ` (${prop.riskLevel})`}
+                </button>
+              ) : (
+                <span className="truncate text-default-400">
+                  {prop.title} — {prop.status}
+                  {prop.riskLevel && ` (${prop.riskLevel})`}
+                </span>
+              )}
             </li>
           ))}
         </ul>
@@ -339,6 +376,7 @@ function ContextSections(props: { context: CampaignContextViewModel }) {
 
 export function CampaignContextPane(props: {
   campaignContext: CampaignContextState & { refetch: () => void };
+  onOpenApprovals?: (proposalId?: string) => void;
 }) {
   const { campaignContext } = props;
 
@@ -380,7 +418,12 @@ export function CampaignContextPane(props: {
             {campaignContext.message}
           </CenteredMessage>
         )}
-        {campaignContext.status === "ready" && <ContextSections context={campaignContext.data} />}
+        {campaignContext.status === "ready" && (
+          <ContextSections
+            context={campaignContext.data}
+            {...(props.onOpenApprovals ? { onOpenApprovals: props.onOpenApprovals } : {})}
+          />
+        )}
       </div>
     </div>
   );

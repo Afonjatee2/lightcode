@@ -710,6 +710,10 @@ msgstr "Action pour le bouton de suppression rapide sur les fils de discussion d
 msgid "Action name"
 msgstr "Nom de l'action"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Action type"
+msgstr "Type d'action"
+
 #: src/mobile/views/pr/PrOverviewPage.tsx
 #: src/renderer/components/common/BranchSelector/parts/BranchFooterActions.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/ActionsSection.tsx
@@ -914,6 +918,10 @@ msgstr "Mode avancé (Code)"
 msgid "Advertise a custom base URL, e.g. a reverse proxy or tunnel. Leave empty for automatic."
 msgstr "Annoncez une URL de base personnalisée, par ex. un proxy inverse ou un tunnel. Laissez vide pour un choix automatique."
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "After"
+msgstr "Après"
+
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
@@ -1016,6 +1024,10 @@ msgstr "Fournisseurs d'IA"
 #: src/mobile/views/MoreView.tsx
 #~ msgid "AI, agents, and archived threads on the paired desktop"
 #~ msgstr "IA, agents et fils de discussion archivés sur le bureau appairé"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Alert"
+msgstr "Alerte"
 
 #: src/mobile/settingsSections.ts
 msgid "Alerts when threads need you"
@@ -1169,26 +1181,52 @@ msgstr "Apparence"
 msgid "Appearance mode"
 msgstr "Mode d'apparence"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Applied"
+msgstr "Appliqué"
+
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Apply provider preset"
 msgstr "Appliquer le préréglage de fournisseur"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Apply result"
+msgstr "Résultat d'application"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Applying…"
+msgstr "Application…"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Approval note"
+msgstr "Note d'approbation"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Approval or reply required from you."
 msgstr "Approbation ou réponse requise de votre part."
 
+#: src/renderer/components/campaignDeployment/parts/DecisionActions.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Approve"
 msgstr "Approuver"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Approve with confirmation…"
+msgstr "Approuver avec confirmation…"
 
 #: src/renderer/views/PrReviewOverlay/parts/PrConversationTab.tsx
 msgid "approved"
 msgstr "approuvé"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Approved"
 msgstr "Approuvé"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Approving requires strong confirmation."
+msgstr "L'approbation nécessite une confirmation forte."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -1323,6 +1361,10 @@ msgstr "Fichiers joints : {0}"
 msgid "Audio"
 msgstr "Audio"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Audit reference"
+msgstr "Référence d'audit"
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Authenticate"
 msgstr "S'authentifier"
@@ -1412,6 +1454,10 @@ msgstr "Couleur de l'avatar"
 msgid "Avatar color {color}"
 msgstr "Couleur de l'avatar {color}"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Awaiting approval"
+msgstr "En attente d'approbation"
+
 #: src/mobile/views/BrowserView.tsx
 #: src/mobile/views/NotesView.tsx
 #: src/mobile/views/pr/PrPageHeader.tsx
@@ -1439,6 +1485,10 @@ msgstr "Retour aux fichiers"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #~ msgid "Back to MCP servers"
 #~ msgstr "Retour aux serveurs MCP"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+msgid "Back to monitoring"
+msgstr "Retour au suivi"
 
 #: src/mobile/views/pr/PrSubPage.tsx
 msgid "Back to overview"
@@ -1492,6 +1542,10 @@ msgstr "Sortie Bash"
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Basic (CLI)"
 msgstr "De base (CLI)"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Before"
+msgstr "Avant"
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 msgid "Better (Whisper base)"
@@ -1707,13 +1761,29 @@ msgstr "Contourner les règles de protection des branches (fusion des administra
 msgid "Cached only"
 msgstr "Cache uniquement"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Calculation details"
+msgstr "Détails du calcul"
+
 #: src/mobile/QrScanner.tsx
 msgid "Camera access blocked"
 msgstr "Accès à la caméra bloqué"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Campaign"
+msgstr "Campagne"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Campaign & client"
+msgstr "Campagne et client"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Campaign Context"
 msgstr "Contexte de campagne"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Campaign event"
+msgstr "Événement de campagne"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Campaign group ID"
@@ -1755,6 +1825,8 @@ msgstr "Impossible de charger les ports"
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/GitActionSheet.tsx
+#: src/renderer/components/campaignDeployment/parts/DecisionActions.tsx
+#: src/renderer/components/campaignDeployment/parts/StrongConfirmationDialog.tsx
 #: src/renderer/components/common/ConfirmDialog.tsx
 #: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
@@ -1810,6 +1882,7 @@ msgstr "Annuler la suppression du projet"
 msgid "cancelled"
 msgstr "annulé"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 msgid "Cancelled"
@@ -2108,6 +2181,10 @@ msgstr "Hooks CLI"
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Click a shortcut to record a new key, or ＋ to add another."
 msgstr "Cliquez sur un raccourci pour enregistrer une nouvelle touche, ou sur ＋ pour en ajouter un autre."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Client"
+msgstr "Client"
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Client Comms"
@@ -2618,6 +2695,18 @@ msgstr "Configurez le serveur que Poracode ajoutera au démarrage des agents com
 msgid "Configured MCP servers"
 msgstr "Serveurs MCP configurés"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Confirm approval"
+msgstr "Confirmer l'approbation"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Confirm high-risk approval"
+msgstr "Confirmer l'approbation à haut risque"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Confirmation phrase"
+msgstr "Phrase de confirmation"
+
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Conflict Resolver"
@@ -2819,6 +2908,7 @@ msgid "Control Centre MCP Profile"
 msgstr "Profil MCP Control Centre"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Control Centre needs authorization. Reconnect it in MCP settings."
@@ -3171,6 +3261,10 @@ msgstr "Créer avec un agent"
 #~ msgid "Create:"
 #~ msgstr "Créer :"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Created"
+msgstr "Créé"
+
 #. placeholder {0}: createdAt.toLocaleTimeString()
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Created {0}"
@@ -3193,6 +3287,10 @@ msgstr "Les informations d'identification sont configurées."
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
 msgid "Credits"
 msgstr "Crédits"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Critical risk"
+msgstr "Risque critique"
 
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
@@ -3259,6 +3357,7 @@ msgstr "Couronné"
 #~ msgstr "Skills gratuites et premium sélectionnées et gérées par MCP Market."
 
 #: src/mobile/views/ThreadsView.tsx
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Current"
 msgstr "Récent"
 
@@ -3326,6 +3425,26 @@ msgstr "Dates"
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #~ msgid "Days"
 #~ msgstr "Jours"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Decided at"
+msgstr "Décidé le"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Decided by"
+msgstr "Décidé par"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Decision"
+msgstr "Décision"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Decision docket"
+msgstr "Dossier de décision"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Decision record"
+msgstr "Enregistrement de décision"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Decisions & Proposals"
@@ -3814,6 +3933,7 @@ msgstr "Téléchargement du modèle vocal {0}%"
 msgid "Downloading voice model..."
 msgstr "Téléchargement du modèle vocal..."
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/PrReviewOverlay/parts/PrMetaRow.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Draft"
@@ -3923,6 +4043,10 @@ msgstr "Onglets de l'éditeur"
 #: src/mobile/views/SettingsView.tsx
 msgid "Edits the paired desktop and syncs back to it."
 msgstr "Modifie l'ordinateur associé et resynchronise avec lui."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Effect & rollback"
+msgstr "Effet et retour arrière"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Effort"
@@ -4067,6 +4191,10 @@ msgstr "Saisissez le mot de passe SSH."
 msgid "Enter valid JSON."
 msgstr "Saisissez un JSON valide."
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Entity"
+msgstr "Entité"
+
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "Environment"
 msgstr "Environnement"
@@ -4117,6 +4245,10 @@ msgstr "Erreur"
 msgid "Error · Agent encountered an error"
 msgstr "Erreur · L'agent a rencontré une erreur"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Error details"
+msgstr "Détails de l'erreur"
+
 #: src/mobile/ComposerInfoChips.tsx
 msgid "Errors"
 msgstr "Erreurs"
@@ -4138,6 +4270,10 @@ msgstr "Toutes les heures"
 msgid "Every hour at {0} minutes past"
 msgstr "Toutes les heures, à {0} minutes"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Evidence"
+msgstr "Preuve"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Evidence freshness"
 msgstr "Fraîcheur des données"
@@ -4151,6 +4287,10 @@ msgstr "Fraîcheur des preuves inconnue"
 #: src/renderer/components/consultations/ContextWarnings.tsx
 msgid "Evidence from {0} to {1}"
 msgstr "Preuves du {0} au {1}"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Evidence packet"
+msgstr "Paquet de preuves"
 
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4213,6 +4353,10 @@ msgstr "Développer le dock de tâches"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Expected branch {branch} at {expected}, but found {actual}"
 msgstr "La branche {branch} était attendue à {expected}, mais {actual} a été trouvé"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Expected platform effect"
+msgstr "Effet attendu sur la plateforme"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Expected source worktree branch {expected}, but found {actual}"
@@ -4288,10 +4432,15 @@ msgstr "Le gagnant désigné par le juge de l'expérience doit être compris ent
 msgid "Experiment prompt must not be blank"
 msgstr "L'invite de l'expérience ne doit pas être vide"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Expires"
+msgstr "Expire"
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Export MCP servers"
 msgstr "Exporter les serveurs MCP"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "External"
 msgstr "Externe"
@@ -4324,6 +4473,8 @@ msgstr "Factory Droid"
 msgid "failed"
 msgstr "échoué"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+#: src/renderer/components/campaignDeployment/parts/OutcomeSection.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
@@ -4396,6 +4547,10 @@ msgstr "Favoris"
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Fetch"
 msgstr "Récupérer"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Field"
+msgstr "Champ"
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "File"
@@ -4740,6 +4895,7 @@ msgstr "Générer un résumé de la PR"
 msgid "Generate with AI"
 msgstr "Générer avec l'IA"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Generated"
 msgstr "Généré"
@@ -4993,6 +5149,10 @@ msgstr "Masquer les compétences de {0}"
 #: src/renderer/views/MainView/parts/RightPanel/parts/DevTerminalPanel/parts/RightTerminalLayout.tsx
 msgid "Hide terminal"
 msgstr "Masquer le terminal"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "High risk"
+msgstr "Risque élevé"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "History"
@@ -5313,6 +5473,10 @@ msgstr "Interrompu : la session de l'agent s'est terminée avant la fin."
 msgid "Italic"
 msgstr "Italique"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Job no."
+msgstr "N° de mission"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Job number"
 msgstr "Numéro de dossier"
@@ -5551,6 +5715,10 @@ msgstr "Chargement de la PR…"
 msgid "Loading previous runs"
 msgstr "Chargement des exécutions précédentes"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+msgid "Loading proposal…"
+msgstr "Chargement de la proposition…"
+
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Loading pull requests"
 msgstr "Chargement des pull requests"
@@ -5588,6 +5756,8 @@ msgstr "Chargement des fils"
 #: src/mobile/views/FilesView.tsx
 #: src/mobile/views/HostFolderPicker.tsx
 #: src/renderer/app.tsx
+#: src/renderer/components/campaignDeployment/ApprovalDocket.tsx
+#: src/renderer/components/campaignDeployment/parts/StrongConfirmationDialog.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/ProjectTreeView.tsx
@@ -5681,6 +5851,10 @@ msgstr "Recherche de serveurs de développement…"
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 msgid "Losing worktrees and branches will be removed. Their session history will remain."
 msgstr "Les arbres de travail et les branches des candidats non retenus seront supprimés. L’historique de leurs sessions sera conservé."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Low risk"
+msgstr "Risque faible"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 msgid "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
@@ -5894,6 +6068,10 @@ msgstr "Appels d’outils MCP"
 msgid "MCP transport type"
 msgstr "Type de transport MCP"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Medium risk"
+msgstr "Risque moyen"
+
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 msgid "Merge {crownedLabel}'s changes into {mergeTarget}?"
 msgstr "Fusionner les modifications de {crownedLabel} dans {mergeTarget} ?"
@@ -6008,6 +6186,10 @@ msgstr "Message à l’agent distant…"
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Messages sent"
 msgstr "Messages envoyés"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Metric"
+msgstr "Métrique"
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -6471,6 +6653,10 @@ msgstr "Prochaine exécution : {0}"
 msgid "Next tab"
 msgstr "Onglet suivant"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "No"
+msgstr "Non"
+
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
 msgid "No active browser tab"
 msgstr "Aucun onglet de navigateur actif"
@@ -6609,6 +6795,10 @@ msgstr "Aucune donnée pour l'instant."
 msgid "No default one-shot model configured for {provider}"
 msgstr "Aucun modèle ponctuel par défaut n'est configuré pour {provider}"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+msgid "No deployment client available."
+msgstr "Client de déploiement indisponible."
+
 #: src/renderer/components/skills/SkillsManager.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "No description"
@@ -6630,6 +6820,10 @@ msgstr "Aucune différence disponible pour {0}"
 #: src/renderer/components/diff/DiffCardList.tsx
 msgid "No diff for {visiblePath}"
 msgstr "Aucune différence pour {visiblePath}"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "No evidence attached"
+msgstr "Aucune preuve jointe"
 
 #: src/renderer/components/skills/SkillImportModal.tsx
 msgid "No external skills were found in this scope."
@@ -6757,6 +6951,10 @@ msgstr "Aucun appareil associé pour le moment."
 msgid "No patterns."
 msgstr "Aucun motif."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+msgid "No pending proposals."
+msgstr "Aucune proposition en attente."
+
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "No phases yet."
 msgstr "Aucune phase pour l'instant."
@@ -6777,6 +6975,10 @@ msgstr "Aucun projet pour l'instant"
 #: src/renderer/components/providers/codex/index.tsx
 msgid "No prompts"
 msgstr "Aucune invite"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "No proposal selected"
+msgstr "Aucune proposition sélectionnée"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/UsagePanel.tsx
 msgid "No providers are being tracked."
@@ -7331,9 +7533,18 @@ msgstr "Pull request #{0} ouverte pour le candidat."
 msgid "OpenSSH private key"
 msgstr "Clé privée OpenSSH"
 
+#: src/renderer/components/campaignDeployment/parts/DecisionActions.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Optional"
 msgstr "Facultatif"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Optional note recorded with the approval"
+msgstr "Note facultative enregistrée avec l'approbation"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Optional reason recorded with the rejection"
+msgstr "Motif facultatif enregistré avec le rejet"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Optional reference number"
@@ -7366,6 +7577,7 @@ msgstr "Ou écrivez une réponse personnalisée"
 msgid "Other"
 msgstr "Autres"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "Outcome"
 msgstr "Résultat"
@@ -7646,6 +7858,10 @@ msgstr "Épinglé"
 msgid "Plan"
 msgstr "Plan"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Plan fact"
+msgstr "Fait du plan"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Plan Revision"
@@ -7654,6 +7870,14 @@ msgstr "Révision du plan"
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
 msgid "Plan, ask, build…"
 msgstr "Planifier, demander, créer…"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Platform"
+msgstr "Plateforme"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Platform response"
+msgstr "Réponse de la plateforme"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -7911,9 +8135,25 @@ msgstr "Invite"
 msgid "Prompts"
 msgstr "Prompts"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+msgid "Proposals & Approvals"
+msgstr "Propositions et approbations"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Proposed"
+msgstr "Proposé"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Proposed by"
+msgstr "Proposé par"
+
 #: src/renderer/components/thread/ChatPane/parts/items/PlanProposal.tsx
 msgid "Proposed plan"
 msgstr "Plan proposé"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Provenance"
+msgstr "Provenance"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Provided and managed by Poracode for supported agents."
@@ -8229,6 +8469,10 @@ msgstr "Actualiser les agents détectés"
 msgid "Refresh MCP server sources"
 msgstr "Actualiser les sources des serveurs MCP"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Refresh proposal"
+msgstr "Actualiser la proposition"
+
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "Refresh registry"
 msgstr "Actualiser le registre"
@@ -8246,6 +8490,18 @@ msgstr "Actualisation du statut d'authentification {0}."
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "Refreshing {env} {0} authentication status."
 msgstr "Actualisation du statut d'authentification {env} {0}."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Reject"
+msgstr "Rejeter"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Rejected"
+msgstr "Rejeté"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Rejection reason"
+msgstr "Motif de rejet"
 
 #: src/mobile/TerminalAccessory.tsx
 #: src/mobile/views/BrowserView.tsx
@@ -8524,6 +8780,10 @@ msgstr "Demander des modifications"
 msgid "Request details"
 msgstr "Détails de la requête"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Requested change"
+msgstr "Modification demandée"
+
 #: src/renderer/views/PrReviewOverlay/parts/PrConversationTab.tsx
 msgid "requested changes"
 msgstr "modifications demandées"
@@ -8636,6 +8896,7 @@ msgstr "Reprendre"
 #: src/mobile/views/BrowserView.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/mobile/views/TerminalView.tsx
+#: src/renderer/components/campaignDeployment/ApprovalDocket.tsx
 #: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
@@ -8717,6 +8978,10 @@ msgstr "Revenir au point de contrôle ?"
 msgid "Revert to this checkpoint"
 msgstr "Revenir à ce point de contrôle"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Review"
+msgstr "Examiner"
+
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Review and track work across your GitHub accounts."
 msgstr "Examinez et suivez le travail sur vos comptes GitHub."
@@ -8784,9 +9049,17 @@ msgstr "Panneau droit"
 msgid "Right-click to switch ring"
 msgstr "Clic droit pour changer d'anneau"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Risk"
+msgstr "Risque"
+
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "Role:"
 msgstr "Rôle :"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Rollback guidance"
+msgstr "Guide de retour arrière"
 
 #: src/mobile/views/threadActionSurfaces.tsx
 #: src/mobile/views/threadContextMenus.tsx
@@ -9699,6 +9972,7 @@ msgstr "État des sources"
 msgid "Source health:"
 msgstr "État des sources :"
 
+#: src/renderer/components/campaignDeployment/parts/EvidenceSection.tsx
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Sources"
 msgstr "Sources"
@@ -10338,6 +10612,10 @@ msgstr "L'agent"
 msgid "the app"
 msgstr "l'application"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "The approved change is being applied to the platform."
+msgstr "La modification approuvée est appliquée sur la plateforme."
+
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #~ msgid "the base branch"
 #~ msgstr "la branche de base"
@@ -10357,6 +10635,10 @@ msgstr "le dossier choisi"
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "The Control Centre campaign group this workspace binds to."
 msgstr "Le groupe de campagne du Centre de contrôle auquel cet espace de travail est lié."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "The decision could not be submitted"
+msgstr "Impossible d'envoyer la décision"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
@@ -10402,6 +10684,14 @@ msgstr "Le serveur MCP n’est pas valide."
 #: src/renderer/RendererCrashScreen.tsx
 msgid "The normal app shell could not render. The diagnostics below are shown before reload so the failure can be investigated."
 msgstr "Le shell d'application normal n'a pas pu être rendu. Les diagnostics ci-dessous sont affichés avant le rechargement afin que la panne puisse être étudiée."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "The phrase does not match."
+msgstr "La phrase ne correspond pas."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "The proposal could not be loaded"
+msgstr "Impossible de charger la proposition"
 
 #: src/mobile/useRemoteDesktop.ts
 msgid "The remote Poracode server returned no pairing credential."
@@ -10566,6 +10856,14 @@ msgstr "ce projet"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "This project isn't linked to a Control Centre campaign yet."
 msgstr "Ce projet n'est pas encore lié à une campagne du Centre de contrôle."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "This proposal has expired. The server will refuse further decisions."
+msgstr "Cette proposition a expiré. Le serveur refusera toute nouvelle décision."
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "This proposal is high risk. Type the confirmation phrase to approve it."
+msgstr "Cette proposition est à haut risque. Saisissez la phrase de confirmation pour l'approuver."
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "This remote project is unavailable. Reconnect the environment and try again."
@@ -11160,6 +11458,7 @@ msgstr "Vue unifiée"
 msgid "Uninstall"
 msgstr "Désinstaller"
 
+#: src/renderer/components/campaignDeployment/parts/DocketHeader.tsx
 #: src/renderer/components/thread/threadContextUsage.ts
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
@@ -11730,6 +12029,10 @@ msgstr "Où la conversation de l’exécution est créée."
 msgid "Where the terminal panel appears."
 msgstr "Où le panneau du terminal apparaît."
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Why this is risky"
+msgstr "Pourquoi c'est risqué"
+
 #. placeholder {0}: env || t`this environment`
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
 msgid "Will run in {0}:"
@@ -11926,6 +12229,10 @@ msgstr "Dossier de base WSL"
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "WSL user"
 #~ msgstr "Utilisateur WSL"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Yes"
+msgstr "Oui"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Your local changes are stashed and will be re-applied when you commit or abort this merge."
