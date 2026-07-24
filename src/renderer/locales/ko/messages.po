@@ -18,8 +18,8 @@ msgid "-y @modelcontextprotocol/server-memory"
 msgstr "-y @modelcontextprotocol/server-memory"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "(coming in Phase 4)"
-msgstr "(4단계에서 제공 예정)"
+#~ msgid "(coming in Phase 4)"
+#~ msgstr "(4단계에서 제공 예정)"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "(Draft)"
@@ -542,6 +542,10 @@ msgstr "{usedLabel} 토큰"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/ModelVisibilityDropdown.tsx
 msgid "{visibleCount} of {totalCount} visible"
 msgstr "{totalCount}개 중 {visibleCount}개 표시"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+msgid "@codex check budget pacing, or type a message…"
+msgstr "@codex 예산 진행 속도 확인 또는 메시지 입력…"
 
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "@codex check the budget pacing"
@@ -2658,6 +2662,10 @@ msgstr "상담 완료"
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Consultation failed"
 msgstr "상담 실패"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
+msgstr "상담 결과가 여기에 표시됩니다. 아래 작성기에서 @codex, @verify, @panel 및 기타 멘션을 사용하세요."
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Consultation was cancelled"
@@ -5887,7 +5895,7 @@ msgstr "병합이 차단되었습니다."
 msgid "Message actions"
 msgstr "메시지 작업"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "Message composer"
 msgstr "메시지 작성기"
 
@@ -9122,7 +9130,7 @@ msgstr "대화 제목 대신 일반 텍스트를 Apple 푸시 서비스로 전�
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/thread/ThreadComposerSection.tsx
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "Send message"
 msgstr "메시지 보내기"
 
@@ -10490,8 +10498,8 @@ msgid "Thread is already unloaded."
 msgstr "스레드가 이미 언로드되었습니다."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "Thread messages will appear here"
-msgstr "스레드 메시지가 여기에 표시됩니다"
+#~ msgid "Thread messages will appear here"
+#~ msgstr "스레드 메시지가 여기에 표시됩니다"
 
 #: src/renderer/components/thread/PresentationModeTabs.tsx
 msgid "Thread mode"
@@ -10687,8 +10695,8 @@ msgid "Type a command"
 msgstr "명령을 입력하세요"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "Type a message…"
-msgstr "메시지를 입력하세요…"
+#~ msgid "Type a message…"
+#~ msgstr "메시지를 입력하세요…"
 
 #: src/mobile/views/BrowserView.tsx
 msgid "Type into the page"

@@ -1,16 +1,26 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button, Tabs } from "@heroui/react";
-import { Send } from "lucide-react";
+import { Tabs } from "@heroui/react";
 import type { CampaignContextIdentityViewModel } from "@/renderer/adapters/campaignViewModels";
+import { openThread } from "@/renderer/actions/threadActions";
+import { ConsultationDock } from "@/renderer/components/consultations";
+import { useConsultationStore } from "@/renderer/components/consultations/consultationStore";
+import { useProjectThreads } from "@/renderer/hooks/uiSelectors";
+import { CampaignThreadComposer } from "./CampaignThreadComposer";
+import { resolvePrimaryCampaignThread } from "./campaignThreadComposerRouting";
 
-/**
- * Thread pane header/tabs are wired to the real campaign identity. The
- * conversation body itself (agent messages, `@mention` consultation
- * routing) is Phase 4 scope, owned by a separate workstream — this stays a
- * placeholder on purpose, not because the data isn't available.
- */
-export function CampaignThreadPane(props: { identity: CampaignContextIdentityViewModel | null }) {
+export function CampaignThreadPane(props: {
+  projectId: string;
+  identity: CampaignContextIdentityViewModel | null;
+}) {
   const { t } = useLingui();
+  const projectThreads = useProjectThreads(props.projectId);
+  const primaryThread = resolvePrimaryCampaignThread(projectThreads);
+  const threadId = primaryThread?.id;
+  const hasConsultations = useConsultationStore((state) =>
+    threadId
+      ? [...state.records.values()].some((record) => record.parentThreadId === threadId)
+      : false,
+  );
 
   const tabs = [
     { id: "monitoring", label: t`Monitoring` },
@@ -33,6 +43,7 @@ export function CampaignThreadPane(props: { identity: CampaignContextIdentityVie
 
   const clientDisplay = props.identity.clientName ?? "—";
   const campaignDisplay = props.identity.campaignName;
+  const defaultProvider = primaryThread?.agentKind ?? "claude";
 
   return (
     <div className="flex h-full flex-col">
@@ -59,28 +70,32 @@ export function CampaignThreadPane(props: { identity: CampaignContextIdentityVie
         </Tabs.ListContainer>
       </Tabs>
 
-      {/* Thread messages — Phase 4 scope (multi-agent consultation UI). */}
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto text-default-400">
-        <p className="text-small">
-          <Trans>Thread messages will appear here</Trans>
-        </p>
-        <p className="text-tiny">
-          <Trans>(coming in Phase 4)</Trans>
-        </p>
-      </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          {threadId ? (
+            <ConsultationDock
+              threadId={threadId}
+              onOpenThread={(childThreadId) => openThread(childThreadId)}
+            />
+          ) : null}
+          {!hasConsultations ? (
+            <div className="flex flex-1 flex-col items-center justify-center px-4 text-default-400">
+              <p className="text-center text-small">
+                <Trans>
+                  Consultation results appear here. Use @codex, @verify, @panel, and other mentions
+                  in the composer below.
+                </Trans>
+              </p>
+            </div>
+          ) : null}
+        </div>
 
-      {/* Composer placeholder — Phase 4 scope. */}
-      <div className="flex shrink-0 items-end gap-2 border-t border-divider p-3">
-        <textarea
-          aria-label={t`Message composer`}
-          placeholder={t`Type a message…`}
-          rows={2}
-          disabled
-          className="flex-1 resize-none rounded-medium border border-divider bg-content1 px-3 py-2 text-small text-foreground placeholder:text-default-400 disabled:opacity-50"
+        <CampaignThreadComposer
+          projectId={props.projectId}
+          parentThreadId={threadId}
+          campaignGroupId={props.identity.campaignGroupId}
+          defaultProvider={defaultProvider}
         />
-        <Button isIconOnly size="sm" variant="primary" isDisabled aria-label={t`Send message`}>
-          <Send className="size-4" />
-        </Button>
       </div>
     </div>
   );

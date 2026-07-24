@@ -58,9 +58,7 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
   const [rightWidth, setRightWidth] = useState(360);
   const project = useProject(props.projectId);
   const boundCampaignGroupId = project?.campaignExtension?.campaignGroupId ?? null;
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(
-    boundCampaignGroupId,
-  );
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(boundCampaignGroupId);
 
   const operationsToday = useOperationsToday(props.projectId);
   const activeCampaignId = selectedCampaignId ?? boundCampaignGroupId;
@@ -94,6 +92,7 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <CampaignThreadPane
+          projectId={props.projectId}
           identity={campaignContext.status === "ready" ? campaignContext.data.identity : null}
         />
       </main>

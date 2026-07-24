@@ -18,8 +18,8 @@ msgid "-y @modelcontextprotocol/server-memory"
 msgstr "-y @modelcontextprotocol/server-memory"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "(coming in Phase 4)"
-msgstr "(очікується у Фазі 4)"
+#~ msgid "(coming in Phase 4)"
+#~ msgstr "(очікується у Фазі 4)"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "(Draft)"
@@ -542,6 +542,10 @@ msgstr "{usedLabel} токенів"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/ModelVisibilityDropdown.tsx
 msgid "{visibleCount} of {totalCount} visible"
 msgstr "{visibleCount} із {totalCount} видимих"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+msgid "@codex check budget pacing, or type a message…"
+msgstr "@codex перевірити темп бюджету або введіть повідомлення…"
 
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "@codex check the budget pacing"
@@ -2658,6 +2662,10 @@ msgstr "Консультацію завершено"
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Consultation failed"
 msgstr "Консультація не вдалася"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
+msgstr "Результати консультацій з'являються тут. Використовуйте @codex, @verify, @panel та інші згадки в композиторі нижче."
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Consultation was cancelled"
@@ -5887,7 +5895,7 @@ msgstr "Злиття заблоковано"
 msgid "Message actions"
 msgstr "Дії з повідомленням"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "Message composer"
 msgstr "Редактор повідомлень"
 
@@ -9122,7 +9130,7 @@ msgstr "Надсилати загальний текст замість назв
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/thread/ThreadComposerSection.tsx
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "Send message"
 msgstr "Надіслати повідомлення"
 
@@ -10490,8 +10498,8 @@ msgid "Thread is already unloaded."
 msgstr "Тред уже вивантажено."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "Thread messages will appear here"
-msgstr "Повідомлення треду з'являться тут"
+#~ msgid "Thread messages will appear here"
+#~ msgstr "Повідомлення треду з'являться тут"
 
 #: src/renderer/components/thread/PresentationModeTabs.tsx
 msgid "Thread mode"
@@ -10687,8 +10695,8 @@ msgid "Type a command"
 msgstr "Введіть команду"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "Type a message…"
-msgstr "Введіть повідомлення…"
+#~ msgid "Type a message…"
+#~ msgstr "Введіть повідомлення…"
 
 #: src/mobile/views/BrowserView.tsx
 msgid "Type into the page"

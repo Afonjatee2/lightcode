@@ -18,8 +18,8 @@ msgid "-y @modelcontextprotocol/server-memory"
 msgstr "-y @modelcontextprotocol/server-memory"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "(coming in Phase 4)"
-msgstr "(à venir dans la Phase 4)"
+#~ msgid "(coming in Phase 4)"
+#~ msgstr "(à venir dans la Phase 4)"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "(Draft)"
@@ -542,6 +542,10 @@ msgstr "{usedLabel} jetons"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/ModelVisibilityDropdown.tsx
 msgid "{visibleCount} of {totalCount} visible"
 msgstr "{visibleCount} sur {totalCount} visibles"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+msgid "@codex check budget pacing, or type a message…"
+msgstr "@codex vérifier le rythme du budget ou saisissez un message…"
 
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "@codex check the budget pacing"
@@ -2658,6 +2662,10 @@ msgstr "Consultation terminée"
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Consultation failed"
 msgstr "La consultation a échoué"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
+msgstr "Les résultats des consultations s'affichent ici. Utilisez @codex, @verify, @panel et d'autres mentions dans le composeur ci-dessous."
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Consultation was cancelled"
@@ -5886,7 +5894,7 @@ msgstr "La fusion est bloquée"
 msgid "Message actions"
 msgstr "Actions du message"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "Message composer"
 msgstr "Compositeur de messages"
 
@@ -9121,7 +9129,7 @@ msgstr "Envoyez un texte générique au lieu des titres de conversation via le s
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/thread/ThreadComposerSection.tsx
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "Send message"
 msgstr "Envoyer un message"
 
@@ -10489,8 +10497,8 @@ msgid "Thread is already unloaded."
 msgstr "Le fil est déjà déchargé."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "Thread messages will appear here"
-msgstr "Les messages du fil de discussion apparaîtront ici"
+#~ msgid "Thread messages will appear here"
+#~ msgstr "Les messages du fil de discussion apparaîtront ici"
 
 #: src/renderer/components/thread/PresentationModeTabs.tsx
 msgid "Thread mode"
@@ -10686,8 +10694,8 @@ msgid "Type a command"
 msgstr "Tapez une commande"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "Type a message…"
-msgstr "Saisissez un message…"
+#~ msgid "Type a message…"
+#~ msgstr "Saisissez un message…"
 
 #: src/mobile/views/BrowserView.tsx
 msgid "Type into the page"

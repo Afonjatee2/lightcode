@@ -18,8 +18,8 @@ msgid "-y @modelcontextprotocol/server-memory"
 msgstr "-y @modelcontextprotocol/server-memory"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "(coming in Phase 4)"
-msgstr "(sắp có trong Giai đoạn 4)"
+#~ msgid "(coming in Phase 4)"
+#~ msgstr "(sắp có trong Giai đoạn 4)"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "(Draft)"
@@ -542,6 +542,10 @@ msgstr "{usedLabel} mã thông báo"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/ModelVisibilityDropdown.tsx
 msgid "{visibleCount} of {totalCount} visible"
 msgstr "{visibleCount} trong số {totalCount} hiển thị"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+msgid "@codex check budget pacing, or type a message…"
+msgstr "@codex kiểm tra tiến độ ngân sách hoặc nhập tin nhắn…"
 
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "@codex check the budget pacing"
@@ -2658,6 +2662,10 @@ msgstr "Tư vấn hoàn tất"
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Consultation failed"
 msgstr "Tư vấn thất bại"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
+msgstr "Kết quả tư vấn sẽ hiển thị tại đây. Dùng @codex, @verify, @panel và các đề cập khác trong ô soạn thảo bên dưới."
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Consultation was cancelled"
@@ -5887,7 +5895,7 @@ msgstr "Việc hợp nhất bị chặn"
 msgid "Message actions"
 msgstr "Thao tác tin nhắn"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "Message composer"
 msgstr "Trình soạn tin nhắn"
 
@@ -9122,7 +9130,7 @@ msgstr "Gửi văn bản chung chung thay vì tiêu đề cuộc trò chuyện q
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/thread/ThreadComposerSection.tsx
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "Send message"
 msgstr "Gửi tin nhắn"
 
@@ -10490,8 +10498,8 @@ msgid "Thread is already unloaded."
 msgstr "Luồng đã được dỡ bỏ."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "Thread messages will appear here"
-msgstr "Tin nhắn luồng sẽ xuất hiện ở đây"
+#~ msgid "Thread messages will appear here"
+#~ msgstr "Tin nhắn luồng sẽ xuất hiện ở đây"
 
 #: src/renderer/components/thread/PresentationModeTabs.tsx
 msgid "Thread mode"
@@ -10687,8 +10695,8 @@ msgid "Type a command"
 msgstr "Nhập lệnh"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "Type a message…"
-msgstr "Nhập tin nhắn…"
+#~ msgid "Type a message…"
+#~ msgstr "Nhập tin nhắn…"
 
 #: src/mobile/views/BrowserView.tsx
 msgid "Type into the page"
