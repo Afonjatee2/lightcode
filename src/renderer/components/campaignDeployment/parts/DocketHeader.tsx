@@ -1,6 +1,6 @@
 import { Alert, Button, Chip } from "@heroui/react";
 import { useLingui } from "@lingui/react/macro";
-import { RefreshCw } from "lucide-react";
+import { FileText, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 
 import {
@@ -39,9 +39,9 @@ const RISK_CHIP_COLOR: Record<ProposalRiskLevel, "success" | "warning" | "danger
 function MetaItem(props: { label: string; value: ReactNode; mono?: boolean }) {
   return (
     <div className="min-w-0">
-      <dt className="text-tiny uppercase tracking-wide text-default-500">{props.label}</dt>
+      <dt className="cockpit-klabel">{props.label}</dt>
       <dd
-        className={`mt-0.5 truncate text-small text-foreground ${props.mono ? "font-mono text-tiny" : ""}`}
+        className={`mt-0.5 truncate text-sm text-foreground ${props.mono ? "font-mono text-xs" : ""}`}
         title={typeof props.value === "string" ? props.value : undefined}
       >
         {props.value}
@@ -65,22 +65,23 @@ export function DocketHeader(props: {
   const entityDisplay = proposal.target.entityName ?? proposal.target.entityId;
 
   return (
-    <header className="border-t-2 border-foreground pt-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <header className="border-t-2 border-[var(--cockpit-accent)] pt-4">
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[var(--cockpit-accent-soft)] text-[var(--cockpit-accent)]">
+          <FileText className="size-5" aria-hidden />
+        </div>
         <div className="min-w-0 flex-1">
-          <p className="text-tiny uppercase tracking-widest text-default-500">
+          <p className="cockpit-klabel">
             {t(docketStrings.docketKicker)} ·{" "}
             <span className="font-mono normal-case tracking-normal">{proposal.id}</span>
           </p>
-          <h1 className="mt-1 font-serif text-2xl font-semibold leading-tight tracking-tight text-foreground">
+          <h1 className="mt-1 text-[21px] font-bold leading-tight tracking-tight text-foreground">
             {proposal.title}
           </h1>
           {proposal.summary ? (
-            <p className="mt-1 max-w-prose text-small text-default-600">{proposal.summary}</p>
+            <p className="mt-1 max-w-prose text-sm text-muted">{proposal.summary}</p>
           ) : null}
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-2">
-          <div className="flex items-center gap-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             <Chip size="sm" variant="soft" color={RISK_CHIP_COLOR[proposal.risk.level]}>
               {t(proposalRiskStrings[proposal.risk.level])}
             </Chip>
@@ -88,18 +89,18 @@ export function DocketHeader(props: {
               {t(proposalStatusStrings[proposal.status])}
             </Chip>
           </div>
-          <Button
-            isIconOnly
-            size="sm"
-            variant="ghost"
-            aria-label={t(docketStrings.refreshProposal)}
-            aria-busy={props.refreshPending}
-            isDisabled={props.refreshPending}
-            onPress={props.onRefreshPress}
-          >
-            <RefreshCw className={`size-4 ${props.refreshPending ? "animate-spin" : ""}`} />
-          </Button>
         </div>
+        <Button
+          isIconOnly
+          size="sm"
+          variant="ghost"
+          aria-label={t(docketStrings.refreshProposal)}
+          aria-busy={props.refreshPending}
+          isDisabled={props.refreshPending}
+          onPress={props.onRefreshPress}
+        >
+          <RefreshCw className={`size-4 ${props.refreshPending ? "animate-spin" : ""}`} />
+        </Button>
       </div>
 
       {props.isExpired ? (

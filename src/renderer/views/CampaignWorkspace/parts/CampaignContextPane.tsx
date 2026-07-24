@@ -1,16 +1,17 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button, Card, Chip, Spinner } from "@heroui/react";
+import { Button, Chip, Disclosure, Spinner } from "@heroui/react";
 import {
   AlertTriangle,
-  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   RefreshCw,
   ShieldAlert,
   WifiOff,
-  XCircle,
 } from "lucide-react";
 import type { CampaignContextViewModel } from "@/renderer/adapters/campaignViewModels";
 import type { CampaignContextState } from "@/renderer/hooks/useCampaignContext";
+import { CampaignContextStatusStrip } from "./CampaignContextStatusStrip";
 
 function formatMoney(value: number | undefined | null, currency: string): string {
   if (value === undefined || value === null) return "—";
@@ -25,29 +26,43 @@ function formatMoney(value: number | undefined | null, currency: string): string
   }
 }
 
-function formatDate(value: string | undefined | null): string {
-  if (!value) return "—";
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString();
-}
-
 function CenteredMessage(props: { icon?: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-default-400">
+    <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-muted">
       {props.icon}
       <p className="max-w-xs text-small">{props.children}</p>
     </div>
   );
 }
 
-function SectionCard(props: { title: ReactNode; children: ReactNode; className?: string }) {
+function CollapsibleSection(props: {
+  title: ReactNode;
+  count?: number;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <Card className={`border border-divider ${props.className ?? ""}`}>
-      <Card.Header className="px-3 py-2">
-        <h4 className="text-tiny font-medium text-foreground">{props.title}</h4>
-      </Card.Header>
-      <div className="px-3 pb-2 text-tiny text-default-600">{props.children}</div>
-    </Card>
+    <Disclosure
+      className="mb-2.5 overflow-hidden rounded-[10px] border border-[var(--hairline)] bg-surface-secondary"
+      defaultExpanded={props.defaultOpen ?? true}
+    >
+      <Disclosure.Heading>
+        <Disclosure.Trigger className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-bold text-foreground">
+          <span className="cockpit-klabel !text-[11px] !tracking-[0.07em]">{props.title}</span>
+          {props.count !== undefined ? (
+            <span className="rounded-full bg-surface-tertiary px-1.5 py-0.5 text-[10px] font-bold text-muted">
+              {props.count}
+            </span>
+          ) : null}
+          <Disclosure.Indicator className="ml-auto text-muted" />
+        </Disclosure.Trigger>
+      </Disclosure.Heading>
+      <Disclosure.Content>
+        <Disclosure.Body className="px-3 pb-3 pt-0 text-tiny text-default-600">
+          {props.children}
+        </Disclosure.Body>
+      </Disclosure.Content>
+    </Disclosure>
   );
 }
 
@@ -58,37 +73,16 @@ const priorityChipColors: Record<string, "danger" | "warning" | "default" | "suc
   P4: "default",
 };
 
-function IdentityHeader(props: { context: CampaignContextViewModel; onRefresh: () => void }) {
-  const { t } = useLingui();
-  const { identity } = props.context;
-  const clientDisplay = identity.clientName ?? "—";
-  return (
-    <header className="flex shrink-0 items-start justify-between gap-2 border-b border-divider p-3">
-      <div className="min-w-0">
-        <h2 className="truncate text-small font-semibold text-foreground">{clientDisplay}</h2>
-        <p className="truncate text-tiny text-default-500">{identity.campaignName}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-1">
-          <Chip size="sm" variant="soft">
-            {identity.lifecycleStatus}
-          </Chip>
-          {identity.jobNumber && (
-            <Chip size="sm" variant="soft">
-              {identity.jobNumber}
-            </Chip>
-          )}
-        </div>
-      </div>
-      <Button
-        size="sm"
-        variant="ghost"
-        isIconOnly
-        aria-label={t`Refresh context`}
-        onPress={props.onRefresh}
-      >
-        <RefreshCw className="size-4" />
-      </Button>
-    </header>
-  );
+function channelStatusTone(status: string | null): string {
+  if (!status) return "bg-[var(--row-hover)] text-muted";
+  const normalized = status.toLowerCase();
+  if (normalized.includes("live") || normalized.includes("active") || normalized === "delivering") {
+    return "bg-success/15 text-success";
+  }
+  if (normalized.includes("pause")) return "bg-warning/15 text-warning";
+  if (normalized.includes("schedule"))
+    return "bg-[var(--cockpit-accent-soft)] text-[var(--cockpit-accent)]";
+  return "bg-[var(--row-hover)] text-muted";
 }
 
 function ContextSections(props: {
@@ -97,23 +91,12 @@ function ContextSections(props: {
 }) {
   const { context } = props;
   const { t } = useLingui();
-  const budget = context.budget;
 
-  // The adapter emits macro-free English source strings (it is imported by a
-  // node-environment test (mcpExtraction.test.ts), where the Lingui macro and
-  // the `.po`-loading i18n singleton cannot run. They are localized here at the
-  // render boundary in CampaignContextPane.tsx.
   const localizedWarnings = context.missingDataWarnings.map((warning) => {
     const stale = warning.match(/^(\d+) data sources have stale data$/);
-    if (stale) {
-      const staleCount = Number(stale[1]);
-      return t`${staleCount} data sources have stale data`;
-    }
+    if (stale) return t`${Number(stale[1])} data sources have stale data`;
     const failed = warning.match(/^(\d+) data sources have failed to sync$/);
-    if (failed) {
-      const failedCount = Number(failed[1]);
-      return t`${failedCount} data sources have failed to sync`;
-    }
+    if (failed) return t`${Number(failed[1])} data sources have failed to sync`;
     if (warning === "No budget configured") return t`No budget configured`;
     if (warning === "No data sources connected") return t`No data sources connected`;
     if (warning === "No KPI targets set") return t`No KPI targets set`;
@@ -121,148 +104,26 @@ function ContextSections(props: {
   });
 
   return (
-    <div className="space-y-3">
-      <SectionCard title={<Trans>Dates</Trans>}>
-        <p>
-          {formatDate(context.dates.startDate)} — {formatDate(context.dates.endDate)}
-        </p>
-      </SectionCard>
+    <div className="space-y-0">
+      <CampaignContextStatusStrip context={context} />
 
-      <SectionCard title={<Trans>Spend vs Budget</Trans>}>
-        <p>
-          {formatMoney(budget.spentToDate, budget.currency)} /{" "}
-          {formatMoney(budget.totalBudget, budget.currency)}
-          {budget.pctUsed !== null && ` (${Math.round(budget.pctUsed)}%)`}
-        </p>
-        {budget.remaining !== null && (
-          <p className="text-default-400">
-            <Trans>{formatMoney(budget.remaining, budget.currency)} remaining</Trans>
-          </p>
-        )}
-        {typeof context.pacing.variancePct === "number" && (
-          <p className="text-default-400">
-            <Trans>
-              {`${context.pacing.variancePct > 0 ? "+" : ""}${context.pacing.variancePct}%`} vs
-              expected
-            </Trans>
-          </p>
-        )}
-        {context.pacing.status !== "unknown" && (
-          <Chip size="sm" variant="soft" className="mt-1">
-            {context.pacing.status}
-          </Chip>
-        )}
-      </SectionCard>
-
-      <SectionCard title={<Trans>KPI Health</Trans>}>
-        {context.kpis.length === 0 ? (
-          <p className="text-default-400">
-            <Trans>No KPI targets set.</Trans>
-          </p>
-        ) : (
-          <ul className="space-y-1">
-            {context.kpis.map((kpi) => (
-              <li
-                key={kpi.id}
-                className="flex flex-col gap-0.5 border-b border-divider py-1.5 last:border-0 last:pb-0 first:pt-0"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold truncate">{kpi.label}</span>
-                  {kpi.status && (
-                    <span className="shrink-0 text-xs capitalize text-default-500">
-                      {kpi.status.replace("_", " ")}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center justify-between text-xs text-default-400">
-                  <span className="truncate uppercase">{kpi.targetType}</span>
-                  <span className="shrink-0 tabular-nums">
-                    {kpi.actualValue ?? "—"} / {kpi.targetValue}
-                    {kpi.pctAchieved !== null && ` (${Math.round(kpi.pctAchieved)}%)`}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </SectionCard>
-
-      <SectionCard title={<Trans>Channels</Trans>}>
-        {context.channels.length === 0 ? (
-          <p className="text-default-400">
-            <Trans>No channel executions.</Trans>
-          </p>
-        ) : (
-          <ul className="space-y-1">
-            {context.channels.map((ch) => (
-              <li
-                key={ch.id}
-                className="flex flex-col gap-0.5 border-b border-divider py-1.5 last:border-0 last:pb-0 first:pt-0"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold truncate">{ch.channelLabel}</span>
-                  {ch.status && (
-                    <span className="shrink-0 text-xs capitalize text-default-500">
-                      {ch.status.replace("_", " ")}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center justify-between text-xs text-default-400">
-                  <span className="truncate capitalize">{ch.platform}</span>
-                  <span className="shrink-0 tabular-nums">
-                    {formatMoney(ch.actualSpend, "GBP")} / {formatMoney(ch.plannedBudget, "GBP")}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </SectionCard>
-
-      <SectionCard title={<Trans>Source Health</Trans>}>
-        {context.sourceHealth.length === 0 ? (
-          <p className="text-default-400">
-            <Trans>No connected sources reported.</Trans>
-          </p>
-        ) : (
-          <ul className="space-y-1.5">
-            {context.sourceHealth.map((src) => (
-              <li
-                key={src.sourceId}
-                className="flex flex-col gap-0.5 py-1.5 border-b border-divider last:border-0 last:pb-0 first:pt-0"
-              >
-                <div className="flex items-center gap-1.5">
-                  {src.status === "healthy" ? (
-                    <CheckCircle2 className="size-3 shrink-0 text-success" />
-                  ) : src.status === "failed" ? (
-                    <XCircle className="size-3 shrink-0 text-danger" />
-                  ) : (
-                    <AlertTriangle className="size-3 shrink-0 text-warning" />
-                  )}
-                  <span className="truncate flex-1 font-medium">{src.label}</span>
-                  <span className="shrink-0 text-default-400 text-xs">
-                    {src.lastSyncedAt ? formatDate(src.lastSyncedAt) : "—"}
-                  </span>
-                </div>
-                {src.reason && src.status !== "healthy" && (
-                  <span className="text-xs text-danger/80 pl-5 break-words">{src.reason}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </SectionCard>
-
-      <SectionCard title={<Trans>Open Alerts</Trans>}>
+      <CollapsibleSection
+        title={<Trans>Open alerts</Trans>}
+        count={context.openAlerts.length}
+        defaultOpen={context.openAlerts.length > 0}
+      >
         {context.openAlerts.length === 0 ? (
-          <p className="text-default-400">
+          <p className="text-muted">
             <Trans>No open alerts.</Trans>
           </p>
         ) : (
-          <ul className="space-y-1">
+          <ul className="space-y-2">
             {context.openAlerts.map((alert) => (
-              <li key={alert.id} className="flex items-center justify-between gap-2">
-                <span className="truncate">{alert.title}</span>
+              <li
+                key={alert.id}
+                className="flex items-center justify-between gap-2 border-t border-[var(--hairline)] pt-2 first:border-0 first:pt-0"
+              >
+                <span className="truncate text-sm text-foreground">{alert.title}</span>
                 <Chip
                   size="sm"
                   variant="soft"
@@ -274,100 +135,138 @@ function ContextSections(props: {
             ))}
           </ul>
         )}
-      </SectionCard>
+      </CollapsibleSection>
 
-      <SectionCard title={<Trans>Decisions & Proposals</Trans>}>
-        <p>
-          <Trans>{context.activeDecisions.length} active decisions</Trans>
-        </p>
-        <ul className="mt-1 space-y-0.5">
-          {context.activeDecisions.map((dec) => (
-            <li key={dec.id} className="truncate text-default-400">
-              {dec.title} — {dec.status}
-            </li>
-          ))}
-        </ul>
-        <div className="mt-1.5 flex items-center justify-between gap-2">
-          <p>
-            <Trans>{context.pendingProposals.length} pending proposals</Trans>
-          </p>
-          {context.pendingProposals.length > 0 && props.onOpenApprovals ? (
-            <Button size="sm" variant="ghost" onPress={() => props.onOpenApprovals?.()}>
-              <Trans>Review</Trans>
-            </Button>
-          ) : null}
-        </div>
-        <ul className="mt-1 space-y-0.5">
-          {context.pendingProposals.map((prop) => (
-            <li key={prop.id}>
-              {props.onOpenApprovals ? (
-                <button
-                  type="button"
-                  className="w-full truncate text-left text-default-400 hover:text-foreground"
-                  onClick={() => props.onOpenApprovals?.(prop.id)}
-                >
-                  {prop.title} — {prop.status}
-                  {prop.riskLevel && ` (${prop.riskLevel})`}
-                </button>
-              ) : (
-                <span className="truncate text-default-400">
-                  {prop.title} — {prop.status}
-                  {prop.riskLevel && ` (${prop.riskLevel})`}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      </SectionCard>
-
-      <SectionCard title={<Trans>Recent Events</Trans>}>
-        {context.recentEvents.length === 0 ? (
-          <p className="text-default-400">
-            <Trans>No recent events.</Trans>
+      <CollapsibleSection title={<Trans>KPI health</Trans>} count={context.kpis.length}>
+        {context.kpis.length === 0 ? (
+          <p className="text-muted">
+            <Trans>No KPI targets set.</Trans>
           </p>
         ) : (
-          <ul className="space-y-1.5">
-            {context.recentEvents.map((event) => (
-              <li key={event.id}>
-                <span className="text-default-400">{formatDate(event.occurredAt)}</span>{" "}
-                <span className="text-default-600">{event.summary}</span>
+          <ul className="space-y-3">
+            {context.kpis.map((kpi) => {
+              const pct = kpi.pctAchieved ?? 0;
+              const onTrack = kpi.status === "on_track" || kpi.status === "healthy";
+              return (
+                <li
+                  key={kpi.id}
+                  className="border-t border-[var(--hairline)] pt-2 first:border-0 first:pt-0"
+                >
+                  <div className="mb-1 flex justify-between text-xs">
+                    <span className="font-semibold text-foreground">{kpi.label}</span>
+                    <span
+                      className={`tabular-nums font-semibold ${onTrack ? "text-success" : "text-warning"}`}
+                    >
+                      {kpi.pctAchieved !== null ? `${Math.round(kpi.pctAchieved)}%` : "—"}
+                    </span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-[var(--hairline-strong)]">
+                    <div
+                      className={`h-full rounded-full ${onTrack ? "bg-success" : "bg-warning"}`}
+                      style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </CollapsibleSection>
+
+      <CollapsibleSection title={<Trans>Channels</Trans>} count={context.channels.length}>
+        {context.channels.length === 0 ? (
+          <p className="text-muted">
+            <Trans>No channel executions.</Trans>
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {context.channels.map((ch) => (
+              <li
+                key={ch.id}
+                className="border-t border-[var(--hairline)] pt-2 first:border-0 first:pt-0"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-[74px] shrink-0 text-xs font-semibold text-foreground">
+                    {ch.channelLabel}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${channelStatusTone(ch.status)}`}
+                  >
+                    {ch.status?.replaceAll("_", " ") ?? t`Unknown`}
+                  </span>
+                </div>
+                <p className="mt-1 text-[10.5px] tabular-nums text-muted">
+                  {formatMoney(ch.actualSpend, "GBP")} / {formatMoney(ch.plannedBudget, "GBP")}
+                </p>
               </li>
             ))}
           </ul>
         )}
-      </SectionCard>
+      </CollapsibleSection>
 
-      {context.suggestedQuestions.length > 0 && (
-        <SectionCard title={<Trans>Suggested Questions</Trans>}>
-          <ul className="space-y-0.5">
-            {context.suggestedQuestions.map((q, i) => (
-              <li key={i} className="text-default-500">
-                "{q}"
-              </li>
-            ))}
-          </ul>
-        </SectionCard>
-      )}
-
-      {context.missingDataWarnings.length > 0 && (
-        <Card className="border border-warning/40 bg-warning/5">
-          <Card.Header className="px-3 py-2">
-            <h4 className="flex items-center gap-1 text-tiny font-medium text-warning">
-              <AlertTriangle className="size-3.5" />
-              <Trans>Missing Data</Trans>
-            </h4>
-          </Card.Header>
-          <div className="px-3 pb-2 text-tiny text-default-600">
-            <ul className="list-inside list-disc space-y-0.5">
-              {localizedWarnings.map((warning) => (
-                <li key={warning}>{warning}</li>
+      <CollapsibleSection
+        title={<Trans>Decisions & proposals</Trans>}
+        count={context.pendingProposals.length}
+        defaultOpen={context.pendingProposals.length > 0}
+      >
+        <p className="text-sm text-foreground">
+          <Trans>{context.activeDecisions.length} active decisions</Trans>
+        </p>
+        {context.pendingProposals.length > 0 ? (
+          <div className="mt-2 rounded-md border border-[var(--cockpit-accent-line)] bg-[var(--cockpit-accent-soft)] px-3 py-2 text-[11.5px] text-muted">
+            <p>
+              <Trans>{context.pendingProposals.length} pending proposals</Trans>
+            </p>
+            {props.onOpenApprovals ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="mt-1 h-7 text-[var(--cockpit-accent)]"
+                onPress={() => props.onOpenApprovals?.()}
+              >
+                <Trans>Review</Trans>
+              </Button>
+            ) : null}
+            <ul className="mt-1 space-y-0.5">
+              {context.pendingProposals.map((prop) => (
+                <li key={prop.id}>
+                  {props.onOpenApprovals ? (
+                    <button
+                      type="button"
+                      className="w-full truncate text-left hover:text-foreground"
+                      onClick={() => props.onOpenApprovals?.(prop.id)}
+                    >
+                      {prop.title}
+                    </button>
+                  ) : (
+                    <span className="truncate">{prop.title}</span>
+                  )}
+                </li>
               ))}
             </ul>
           </div>
-        </Card>
-      )}
+        ) : (
+          <p className="mt-1 text-muted">
+            <Trans>No pending proposals.</Trans>
+          </p>
+        )}
+      </CollapsibleSection>
 
-      <p className="px-1 text-tiny text-default-400">
+      {context.missingDataWarnings.length > 0 ? (
+        <div className="mt-2 rounded-[10px] border border-warning/40 bg-warning/5 px-3 py-2">
+          <p className="flex items-center gap-1 text-tiny font-medium text-warning">
+            <AlertTriangle className="size-3.5" />
+            <Trans>Missing data</Trans>
+          </p>
+          <ul className="mt-1 list-inside list-disc space-y-0.5 text-tiny text-muted">
+            {localizedWarnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <p className="px-1 pt-2 text-[10px] text-muted">
         <Trans>Evidence freshness</Trans>: {context.evidenceFreshness}
       </p>
     </div>
@@ -377,22 +276,84 @@ function ContextSections(props: {
 export function CampaignContextPane(props: {
   campaignContext: CampaignContextState & { refetch: () => void };
   onOpenApprovals?: (proposalId?: string) => void;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 }) {
+  const { t } = useLingui();
   const { campaignContext } = props;
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
+  const collapsed = props.collapsed ?? internalCollapsed;
+  const toggleCollapsed =
+    props.onToggleCollapsed ?? (() => setInternalCollapsed((value) => !value));
+
+  if (collapsed) {
+    return (
+      <div className="relative flex h-full items-start justify-end">
+        <Button
+          size="sm"
+          variant="ghost"
+          isIconOnly
+          className="absolute left-0 top-16 z-10 rounded-l-lg rounded-r-none border border-r-0 border-[var(--hairline)] bg-surface-secondary"
+          aria-label={t`Expand context panel`}
+          onPress={toggleCollapsed}
+        >
+          <ChevronLeft className="size-4" />
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
       {campaignContext.status === "ready" ? (
-        <IdentityHeader context={campaignContext.data} onRefresh={campaignContext.refetch} />
+        <header className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--hairline)] px-3 py-2.5">
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-semibold text-foreground">
+              {campaignContext.data.identity.clientName ?? "—"}
+            </h2>
+            <p className="truncate text-tiny text-muted">
+              {campaignContext.data.identity.campaignName}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              isIconOnly
+              aria-label={t`Refresh context`}
+              onPress={campaignContext.refetch}
+            >
+              <RefreshCw className="size-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              isIconOnly
+              aria-label={t`Collapse context panel`}
+              onPress={toggleCollapsed}
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </header>
       ) : (
-        <header className="flex shrink-0 items-center justify-between border-b border-divider p-3">
+        <header className="flex shrink-0 items-center justify-between border-b border-[var(--hairline)] p-3">
           <h2 className="text-small font-semibold text-foreground">
-            <Trans>Campaign Context</Trans>
+            <Trans>Campaign context</Trans>
           </h2>
+          <Button
+            size="sm"
+            variant="ghost"
+            isIconOnly
+            aria-label={t`Collapse context panel`}
+            onPress={toggleCollapsed}
+          >
+            <ChevronRight className="size-4" />
+          </Button>
         </header>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {campaignContext.status === "loading" && (
           <CenteredMessage icon={<Spinner size="sm" />}>
             <Trans>Loading campaign context…</Trans>

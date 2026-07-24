@@ -8,6 +8,7 @@ import {
   retryConsultation,
   subscribeToConsultationUpdates,
 } from "@/renderer/actions/consultationActions";
+import { ControlCentreDataBlock } from "@/renderer/campaign/cockpit/ControlCentreDataBlock";
 import { useConsultationStore } from "./consultationStore";
 import { ConsultationCard } from "./ConsultationCard";
 import { ConsultationPanelCard } from "./ConsultationPanelCard";
@@ -45,12 +46,12 @@ export function ConsultationDock({ threadId, onOpenThread }: ConsultationDockPro
   }
 
   return (
-    <div className="flex flex-col gap-2 border-t border-border px-3 py-2">
-      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+    <div className="flex flex-col gap-3 border-t border-[var(--hairline)] py-2">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-muted">
         <Sparkles size={12} />
         <Trans>Consultations</Trans>
       </div>
-      <div className="flex max-h-72 flex-col gap-2 overflow-y-auto">
+      <div className="flex max-h-72 flex-col gap-3 overflow-y-auto">
         {topLevel.map((record) =>
           record.consultationMode === "panel" ? (
             <PanelCardContainer
@@ -87,15 +88,15 @@ function StandardCardContainer({
   const getAttachment = useConsultationStore((s) => s.getAttachment);
   const resultAttachment = record.status === "completed" ? getAttachment(record.id) : null;
 
-  const contextPacket = record.contextPacketId ? contextPackets.get(record.contextPacketId) ?? null : null;
+  const contextPacket = record.contextPacketId
+    ? (contextPackets.get(record.contextPacketId) ?? null)
+    : null;
   const evidenceFreshness = contextPacket?.evidenceFreshness ?? null;
   const missingDataWarnings = contextPacket?.missingDataWarnings ?? [];
   const hasBudget = contextPacket
     ? contextPacket.structuredContext.budget.totalBudget !== null
     : true;
-  const hasPlan = contextPacket
-    ? contextPacket.structuredContext.kpiEvidence.length > 0
-    : true;
+  const hasPlan = contextPacket ? contextPacket.structuredContext.kpiEvidence.length > 0 : true;
   const controlCentreAvailable = contextPacket !== null;
   const canCancel =
     record.status !== "completed" &&
@@ -104,20 +105,35 @@ function StandardCardContainer({
     record.status !== "cancel_requested";
   const canRetry = record.status === "failed" || record.status === "cancelled";
   return (
-    <ConsultationCard
-      record={record}
-      resultAttachment={resultAttachment}
-      evidenceFreshness={evidenceFreshness}
-      missingDataWarnings={missingDataWarnings}
-      onCancel={(id) => void cancelConsultation(id)}
-      onRetry={(id) => void retryConsultation(id)}
-      onNavigateToChild={(childId) => onOpenThread?.(childId)}
-      canCancel={canCancel}
-      canRetry={canRetry}
-      hasBudget={hasBudget}
-      hasPlan={hasPlan}
-      controlCentreAvailable={controlCentreAvailable}
-    />
+    <>
+      {contextPacket ? (
+        <ControlCentreDataBlock
+          context={contextPacket.structuredContext}
+          capturedAt={
+            contextPacket.createdAt
+              ? new Date(contextPacket.createdAt).toLocaleTimeString(undefined, {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : null
+          }
+        />
+      ) : null}
+      <ConsultationCard
+        record={record}
+        resultAttachment={resultAttachment}
+        evidenceFreshness={evidenceFreshness}
+        missingDataWarnings={missingDataWarnings}
+        onCancel={(id) => void cancelConsultation(id)}
+        onRetry={(id) => void retryConsultation(id)}
+        onNavigateToChild={(childId) => onOpenThread?.(childId)}
+        canCancel={canCancel}
+        canRetry={canRetry}
+        hasBudget={hasBudget}
+        hasPlan={hasPlan}
+        controlCentreAvailable={controlCentreAvailable}
+      />
+    </>
   );
 }
 
@@ -137,15 +153,15 @@ function PanelCardContainer({
   const recordsById = useConsultationStore((s) => s.records);
   const panelResult = record.status === "completed" ? getAttachment(record.id) : null;
 
-  const contextPacket = record.contextPacketId ? contextPackets.get(record.contextPacketId) ?? null : null;
+  const contextPacket = record.contextPacketId
+    ? (contextPackets.get(record.contextPacketId) ?? null)
+    : null;
   const evidenceFreshness = contextPacket?.evidenceFreshness ?? null;
   const missingDataWarnings = contextPacket?.missingDataWarnings ?? [];
   const hasBudget = contextPacket
     ? contextPacket.structuredContext.budget.totalBudget !== null
     : true;
-  const hasPlan = contextPacket
-    ? contextPacket.structuredContext.kpiEvidence.length > 0
-    : true;
+  const hasPlan = contextPacket ? contextPacket.structuredContext.kpiEvidence.length > 0 : true;
   const controlCentreAvailable = contextPacket !== null;
   const memberStates = members
     .map((membership) => {
@@ -153,8 +169,7 @@ function PanelCardContainer({
       if (!memberRecord) return null;
       return {
         record: memberRecord,
-        result:
-          memberRecord.status === "completed" ? getAttachment(memberRecord.id) : null,
+        result: memberRecord.status === "completed" ? getAttachment(memberRecord.id) : null,
         memberRole: membership.memberRole,
         requiredOrOptional: membership.requiredOrOptional,
       };

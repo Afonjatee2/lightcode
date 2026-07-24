@@ -55,6 +55,11 @@ msgstr "{0, plural, one {# sprawdzenie} few {# sprawdzenia} many {# sprawdzeń} 
 msgid "{0, plural, one {# file} other {# files}}"
 msgstr "{0, plural, one {# plik} few {# pliki} many {# plików} other {# pliku}}"
 
+#. placeholder {0}: operationsToday.data.counts.total
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0, plural, one {# live campaign} other {# live campaigns}}"
+msgstr "{0, plural, one {# aktywna kampania} few {# aktywne kampanie} many {# aktywnych kampanii} other {# aktywnej kampanii}}"
+
 #. placeholder {0}: groupRows.length
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "{0, plural, one {# MCP server} other {# MCP servers}}"
@@ -165,17 +170,27 @@ msgstr "Usunięto dane uwierzytelniające {0}."
 msgid "{0} credentials saved."
 msgstr "{0} – dane uwierzytelniające zostały zapisane."
 
+#. placeholder {0}: Number(failed[1])
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "{0} data sources have failed to sync"
+msgstr "{0} źródeł danych nie zsynchronizowało się"
+
+#. placeholder {0}: Number(stale[1])
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "{0} data sources have stale data"
+msgstr "{0} źródeł danych ma nieaktualne dane"
+
 #. placeholder {0}: devices.length
 #: src/renderer/views/ProfileOverlay/parts/ProfileHeader.tsx
 msgid "{0} devices"
 msgstr "Urządzenia: {0}"
 
-#. placeholder {0}: summary.failed
+#. placeholder {0}: props.failed
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "{0} failed"
 msgstr "{0} nieudane"
 
-#. placeholder {0}: summary.healthy
+#. placeholder {0}: props.healthy
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "{0} healthy"
 msgstr "{0} sprawne"
@@ -255,10 +270,15 @@ msgstr "{0} promptów - {when}"
 msgid "{0} prompts - {when}"
 msgstr "{0} promptów - {when}"
 
+#. placeholder {0}: props.campaign.pendingProposalCount
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} proposals awaiting approval"
+msgstr "{0} propozycji oczekuje na zatwierdzenie"
+
 #. placeholder {0}: formatMoney(budget.remaining, budget.currency)
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "{0} remaining"
-msgstr "Pozostało: {0}"
+#~ msgid "{0} remaining"
+#~ msgstr "Pozostało: {0}"
 
 #. placeholder {0}: item.runCount.toLocaleString()
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
@@ -270,7 +290,7 @@ msgstr "{0} uruchomień"
 msgid "{0} runs"
 msgstr "{0} uruchomień"
 
-#. placeholder {0}: summary.stale
+#. placeholder {0}: props.stale
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "{0} stale"
 msgstr "{0} nieaktualne"
@@ -335,8 +355,8 @@ msgstr "{0}: {stateLabel}"
 #. placeholder {0}: context.pacing.variancePct > 0 ? "+" : ""
 #. placeholder {1}: context.pacing.variancePct
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "{0}{1}% vs expected"
-msgstr "{0}{1}% względem oczekiwanego"
+#~ msgid "{0}{1}% vs expected"
+#~ msgstr "{0}{1}% względem oczekiwanego"
 
 #. placeholder {0}: selectedRows.length
 #. placeholder {0}: selectedSkills.length
@@ -397,8 +417,8 @@ msgid "{envOrAgentLabel} needs authentication."
 msgstr "{envOrAgentLabel} wymaga uwierzytelnienia."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "{failedCount} data sources have failed to sync"
-msgstr "Synchronizacja {failedCount} źródeł danych nie powiodła się"
+#~ msgid "{failedCount} data sources have failed to sync"
+#~ msgstr "Synchronizacja {failedCount} źródeł danych nie powiodła się"
 
 #: src/mobile/views/pr/PrOverviewPage.tsx
 msgid "{filesCount, plural, one {# file changed} other {# files changed}}"
@@ -495,6 +515,10 @@ msgstr "{minutes} min temu"
 msgid "{missingAuthLabel} needs authentication."
 msgstr "{missingAuthLabel} wymaga uwierzytelnienia."
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{needsYouCount, plural, one {# thing needs you.} other {# things need you.}}"
+msgstr "{needsYouCount, plural, one {Masz # sprawę do załatwienia.} few {Masz # sprawy do załatwienia.} many {Masz # spraw do załatwienia.} other {Masz # sprawy do załatwienia.}}"
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "{original}\n"
 "Worktree cleanup also failed: {cleanup}"
@@ -544,8 +568,8 @@ msgid "{serverName} from {providerLabel}: {disabledLabel}"
 msgstr "{serverName} z {providerLabel}: {disabledLabel}"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "{staleCount} data sources have stale data"
-msgstr "{staleCount} źródeł danych ma nieaktualne dane"
+#~ msgid "{staleCount} data sources have stale data"
+#~ msgstr "{staleCount} źródeł danych ma nieaktualne dane"
 
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "{used} tokens"
@@ -1159,6 +1183,10 @@ msgstr "Inna operacja dla tego eksperymentu wciąż trwa."
 msgid "Antigravity"
 msgstr "Antigravity"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Any sources stale right now?"
+msgstr "Czy są teraz nieaktualne źródła?"
+
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "API_KEY=value"
 msgstr "API_KEY=value"
@@ -1192,6 +1220,10 @@ msgstr "Zastosuj predefiniowanego dostawcę"
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Apply result"
 msgstr "Wynik zastosowania"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Applying"
+msgstr "Stosowanie"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Applying…"
@@ -1308,8 +1340,12 @@ msgid "Ask anything about your campaigns"
 msgstr "Zapytaj o cokolwiek dotyczące kampanii"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Ask anything about your campaigns…"
-msgstr "Zapytaj o cokolwiek dotyczące kampanii…"
+#~ msgid "Ask anything about your campaigns…"
+#~ msgstr "Zapytaj o cokolwiek dotyczące kampanii…"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask anything across your campaigns — grounded in Control Centre data…"
+msgstr "Zapytaj o cokolwiek w swoich kampaniach — na podstawie danych Control Centre…"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Ask each time"
@@ -1455,8 +1491,16 @@ msgid "Avatar color {color}"
 msgstr "Kolor awatara {color}"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Awaiting"
+msgstr "Oczekuje"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Awaiting approval"
 msgstr "Oczekuje na zatwierdzenie"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Awaiting input"
+msgstr "Oczekiwanie na dane"
 
 #: src/mobile/views/BrowserView.tsx
 #: src/mobile/views/NotesView.tsx
@@ -1487,12 +1531,17 @@ msgstr "Wróć do plików"
 #~ msgstr "Wróć do serwerów MCP"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
-msgid "Back to monitoring"
-msgstr "Wróć do monitorowania"
+#~ msgid "Back to monitoring"
+#~ msgstr "Wróć do monitorowania"
 
 #: src/mobile/views/pr/PrSubPage.tsx
 msgid "Back to overview"
 msgstr "Wróć do przeglądu"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+#: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+msgid "Back to thread"
+msgstr "Wróć do wątku"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Background process exited unexpectedly"
@@ -1709,6 +1758,14 @@ msgstr "Dane budżetowe niedostępne"
 msgid "Budget limit reached"
 msgstr "Osiągnięto limit budżetu"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
+msgid "Budget used"
+msgstr "Wykorzystany budżet"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Building"
+msgstr "Budowanie"
+
 #: src/renderer/components/diff/DiffCardList.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/InlineDiffView.tsx
 msgid "Building diff…"
@@ -1782,8 +1839,12 @@ msgid "Campaign & client"
 msgstr "Kampania i klient"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Campaign Context"
+msgid "Campaign context"
 msgstr "Kontekst kampanii"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#~ msgid "Campaign Context"
+#~ msgstr "Kontekst kampanii"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Campaign event"
@@ -1887,10 +1948,15 @@ msgid "cancelled"
 msgstr "anulowane"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 msgid "Cancelled"
 msgstr "Anulowano"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Cancelling"
+msgstr "Anulowanie"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Candidate actions"
@@ -2481,6 +2547,10 @@ msgstr "Zwiń wszystkie foldery"
 msgid "Collapse composer"
 msgstr "Zwiń kompozytor"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Collapse context panel"
+msgstr "Zwiń panel kontekstu"
+
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Collapse error"
 msgstr "Zwiń błąd"
@@ -2607,6 +2677,7 @@ msgstr "Porównaj ten odcisk palca z odciskiem wyświetlanym na serwerze."
 msgid "complete"
 msgstr "ukończono"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Complete"
@@ -2908,6 +2979,10 @@ msgstr "Kontynuuj w..."
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control an external Chrome browser."
 msgstr "Steruje zewnętrzną przeglądarką Chrome."
+
+#: src/renderer/campaign/cockpit/ControlCentreDataBlock.tsx
+msgid "CONTROL CENTRE"
+msgstr "CONTROL CENTRE"
 
 #: src/renderer/hooks/useControlCentreTool.ts
 msgid "Control Centre \"{toolName}\" returned a response that was too large or malformed. Try refreshing."
@@ -3318,6 +3393,10 @@ msgstr "Poświadczenia są skonfigurowane."
 msgid "Credits"
 msgstr "Kredyty"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Critical"
+msgstr "Krytyczne"
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Critical risk"
 msgstr "Krytyczne ryzyko"
@@ -3449,8 +3528,8 @@ msgid "Dark"
 msgstr "Ciemny"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Dates"
-msgstr "Daty"
+#~ msgid "Dates"
+#~ msgstr "Daty"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #~ msgid "Days"
@@ -3477,8 +3556,12 @@ msgid "Decision record"
 msgstr "Zapis decyzji"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Decisions & Proposals"
+msgid "Decisions & proposals"
 msgstr "Decyzje i propozycje"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#~ msgid "Decisions & Proposals"
+#~ msgstr "Decyzje i propozycje"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 msgid "Decline"
@@ -3656,6 +3739,10 @@ msgstr "Usuń drzewo robocze {0}"
 msgid "Deleting"
 msgstr "Usuwanie"
 
+#: src/renderer/components/campaignDeployment/parts/ChangeComparison.tsx
+msgid "Delta"
+msgstr "Delta"
+
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/helpers.ts
 msgid "Deny"
 msgstr "Odmów"
@@ -3732,6 +3819,15 @@ msgstr "Wykryto <0>{0}</0>"
 #: src/renderer/views/QuickComposerOverlay/QuickComposerOverlay.tsx
 msgid "Detecting agents…"
 msgstr "Wykrywanie agentów…"
+
+#: src/renderer/campaign/cockpit/ControlCentreDataBlock.tsx
+msgid "deterministic"
+msgstr "deterministyczne"
+
+#. placeholder {0}: props.capturedAt
+#: src/renderer/campaign/cockpit/ControlCentreDataBlock.tsx
+msgid "deterministic · {0}"
+msgstr "deterministyczne · {0}"
 
 #. Settings section: developer/debug tools
 #. Settings section: developer/debug tools
@@ -4098,6 +4194,10 @@ msgstr "Poziomy rozumowania"
 msgid "Effort levels for {modelName}"
 msgstr "Poziomy wysiłku dla {modelName}"
 
+#: src/renderer/campaign/cockpit/ControlCentreDataBlock.tsx
+msgid "Elapsed pacing target"
+msgstr "Upłynięty cel tempa"
+
 #. About page label: Electron framework version
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Electron"
@@ -4363,6 +4463,10 @@ msgstr "Rozwiń {label}"
 msgid "Expand all"
 msgstr "Rozwiń wszystko"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Expand context panel"
+msgstr "Rozwiń panel kontekstu"
+
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Expand error"
 msgstr "Rozwiń błąd"
@@ -4509,6 +4613,7 @@ msgstr "nie powiodło się"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/components/campaignDeployment/parts/OutcomeSection.tsx
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
@@ -5113,6 +5218,18 @@ msgstr "Cel"
 msgid "Goals set"
 msgstr "Ustawione cele"
 
+#: src/renderer/campaign/cockpit/cockpitGreeting.ts
+msgid "Good afternoon"
+msgstr "Dzień dobry"
+
+#: src/renderer/campaign/cockpit/cockpitGreeting.ts
+msgid "Good evening"
+msgstr "Dobry wieczór"
+
+#: src/renderer/campaign/cockpit/cockpitGreeting.ts
+msgid "Good morning"
+msgstr "Dzień dobry"
+
 #: src/renderer/views/WhatsNewOverlay.tsx
 msgid "Got it"
 msgstr "Rozumiem"
@@ -5162,6 +5279,10 @@ msgstr "Zawiera niewysłaną wersję roboczą"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Headers"
 msgstr "Nagłówki"
+
+#: src/renderer/campaign/cockpit/cockpitGreeting.ts
+msgid "Hello"
+msgstr "Witaj"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #~ msgid "Help me create a schedule. Ask for any missing details, then use the Poracode schedule controls to create it for me."
@@ -5407,6 +5528,10 @@ msgstr "Skanowanie kamerą w aplikacji działa tylko przez HTTPS. Użyj aplikacj
 msgid "Inactive"
 msgstr "Nieaktywny"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Info"
+msgstr "Info"
+
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Inherit global"
 msgstr "Dziedzicz globalne"
@@ -5644,8 +5769,12 @@ msgid "Kimi Code ended the turn without returning a response. Restart the thread
 msgstr "Kimi Code zakończył turę bez zwrócenia odpowiedzi. Uruchom wątek ponownie i spróbuj jeszcze raz."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "KPI Health"
+msgid "KPI health"
 msgstr "Stan KPI"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#~ msgid "KPI Health"
+#~ msgstr "Stan KPI"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -6357,8 +6486,12 @@ msgid "Mirroring is unavailable."
 msgstr "Kopia lustrzana jest niedostępna."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Missing Data"
+msgid "Missing data"
 msgstr "Brakujące dane"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#~ msgid "Missing Data"
+#~ msgstr "Brakujące dane"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Mobile push notifications"
@@ -6865,8 +6998,8 @@ msgid "No configured MCP servers yet"
 msgstr "Nie skonfigurowano jeszcze żadnych serwerów MCP"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "No connected sources reported."
-msgstr "Nie zgłoszono podłączonych źródeł."
+#~ msgid "No connected sources reported."
+#~ msgstr "Nie zgłoszono podłączonych źródeł."
 
 #: src/mobile/WideShell.tsx
 msgid "No connection paired"
@@ -7062,6 +7195,7 @@ msgid "No patterns."
 msgstr "Żadnych wzorów."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "No pending proposals."
 msgstr "Brak oczekujących propozycji."
 
@@ -7107,8 +7241,8 @@ msgid "No pull requests found."
 msgstr "Nie znaleziono żądań ściągnięcia."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "No recent events."
-msgstr "Brak ostatnich zdarzeń."
+#~ msgid "No recent events."
+#~ msgstr "Brak ostatnich zdarzeń."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
 msgid "No remote configured. Add a remote to enable push and pull."
@@ -7283,6 +7417,10 @@ msgstr "Powiadom mnie o"
 msgid "npx"
 msgstr "npx"
 
+#: src/renderer/campaign/cockpit/ControlCentreDataBlock.tsx
+msgid "of"
+msgstr "z"
+
 #: src/renderer/views/ProjectSettingsOverlay/parts/SearchSection.tsx
 msgid "off"
 msgstr "wyłączone"
@@ -7353,6 +7491,10 @@ msgstr "Online"
 msgid "Only when unfocused"
 msgstr "Tylko gdy nieaktywne"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Only you can approve — nothing executes without it"
+msgstr "Tylko Ty możesz zatwierdzić — bez zatwierdzenia nic się nie wykona"
+
 #: src/renderer/notifications.ts
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrMetaRow.tsx
@@ -7383,8 +7525,12 @@ msgid "Open a thread first to attach to it."
 msgstr "Najpierw otwórz wątek, aby się do niego dołączyć."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Open Alerts"
+msgid "Open alerts"
 msgstr "Otwarte alerty"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#~ msgid "Open Alerts"
+#~ msgstr "Otwarte alerty"
 
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ExperimentGroupHeader.tsx
@@ -7643,6 +7789,10 @@ msgstr "Otwarto pull request #{0} dla kandydata."
 msgid "OpenSSH private key"
 msgstr "Klucz prywatny OpenSSH"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Operations brief"
+msgstr "Przegląd operacji"
+
 #: src/renderer/components/campaignDeployment/parts/DecisionActions.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Optional"
@@ -7720,9 +7870,14 @@ msgstr "Zastępuje {conflict}"
 msgid "Overriding the global setting for this project."
 msgstr "Zastępowanie ustawienia globalnego dla tego projektu."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
 msgid "Pacing"
 msgstr "Tempo"
+
+#: src/renderer/campaign/cockpit/ControlCentreDataBlock.tsx
+msgid "Pacing delta"
+msgstr "Delta tempa"
 
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 msgid "Package config"
@@ -8254,6 +8409,10 @@ msgstr "Prompt"
 msgid "Prompts"
 msgstr "Prompty"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Proposal lifecycle"
+msgstr "Cykl życia propozycji"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
 msgid "Proposals & Approvals"
 msgstr "Propozycje i zatwierdzenia"
@@ -8437,6 +8596,10 @@ msgstr "Qoder CLI"
 msgid "Questions"
 msgstr "Pytania"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Queued"
+msgstr "W kolejce"
+
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/providers/usageFormat.ts
 msgid "Quota reached"
@@ -8491,6 +8654,7 @@ msgstr "Sparuj to połączenie ponownie, aby przyznać dostęp do przekierowywan
 msgid "Reading each candidate's changes…"
 msgstr "Odczytywanie zmian każdego kandydata…"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "Ready"
 msgstr "Gotowy"
@@ -8516,8 +8680,8 @@ msgid "Recent"
 msgstr "Najnowsze"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Recent Events"
-msgstr "Ostatnie zdarzenia"
+#~ msgid "Recent Events"
+#~ msgstr "Ostatnie zdarzenia"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Recent installs"
@@ -9105,6 +9269,7 @@ msgstr "Powrócić do punktu kontrolnego?"
 msgid "Revert to this checkpoint"
 msgstr "Wróć do tego punktu kontrolnego"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Review"
 msgstr "Przejrzyj"
@@ -9284,6 +9449,7 @@ msgstr "Automatycznie uruchamiaj ten harmonogram według poniższego harmonogram
 msgid "running"
 msgstr "uruchomiony"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "Running"
@@ -10095,17 +10261,35 @@ msgstr "Sortuj umiejętności z marketplace"
 msgid "Sort threads"
 msgstr "Sortuj wątki"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Sorted by severity · click through to the campaign thread"
+msgstr "Posortowane wg ważności · przejdź do wątku kampanii"
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Source branch {branch} moved before the worktree was created"
 msgstr "Gałąź źródłowa {branch} została przesunięta przed utworzeniem drzewa roboczego"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Source Health"
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Source health"
 msgstr "Stan źródeł"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#~ msgid "Source Health"
+#~ msgstr "Stan źródeł"
+
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Source health:"
-msgstr "Stan źródeł:"
+#~ msgid "Source health:"
+#~ msgstr "Stan źródeł:"
+
+#. placeholder {0}: source.label
+#. placeholder {1}: source.freshness
+#: src/renderer/components/campaignDeployment/parts/EvidenceSection.tsx
+msgid "Source: {0} · {1}"
+msgstr "Źródło: {0} · {1}"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Source: {source} · {freshness}"
+msgstr "Źródło: {source} · {freshness}"
 
 #: src/renderer/components/campaignDeployment/parts/EvidenceSection.tsx
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
@@ -10116,9 +10300,18 @@ msgstr "Źródła"
 msgid "Space separated; use quotes around spaces"
 msgstr "Rozdzielone spacjami; wartości zawierające spacje ujmij w cudzysłowy"
 
+#: src/renderer/campaign/cockpit/ControlCentreDataBlock.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
+msgid "Spend"
+msgstr "Wydatki"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Spend vs Budget"
-msgstr "Wydatki a budżet"
+#~ msgid "Spend vs Budget"
+#~ msgstr "Wydatki a budżet"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
+msgid "spent"
+msgstr "wydane"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/DevTerminalPanel/DevTerminalPanel.tsx
 msgid "Split Terminal"
@@ -10196,6 +10389,10 @@ msgstr "Przygotowane"
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 msgid "Staged ({0})"
 msgstr "Przygotowane ({0})"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "stale {age} — treated with caution"
+msgstr "nieaktualne {age} — traktuj ostrożnie"
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Standard"
@@ -10466,8 +10663,8 @@ msgid "Succeeded"
 msgstr "Powodzenie"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Suggested Questions"
-msgstr "Sugerowane pytania"
+#~ msgid "Suggested Questions"
+#~ msgstr "Sugerowane pytania"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Suggestions"
@@ -10476,6 +10673,10 @@ msgstr "Sugestie"
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Summarize this week's progress, unfinished work, and the most important risks for next week."
 msgstr "Podsumuj postępy w tym tygodniu, niedokończoną pracę i najważniejsze ryzyka na przyszły tydzień."
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Summarize what needs approval today"
+msgstr "Podsumuj, co wymaga dziś zatwierdzenia"
 
 #: src/renderer/components/providers/composerControlBuilders.tsx
 msgid "Supervised"
@@ -10942,6 +11143,10 @@ msgstr "Te wbudowane serwery MCP są współdzielone przez wątki OpenCode. Zapi
 msgid "Thinking"
 msgstr "Myślenie"
 
+#: src/renderer/components/campaignDeployment/parts/StrongConfirmationDialog.tsx
+msgid "This action cannot be undone. Type the confirmation phrase exactly as shown."
+msgstr "Tej czynności nie można cofnąć. Wpisz frazę potwierdzającą dokładnie jak pokazano."
+
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "This agent is not installed."
 msgstr "Ten agent nie jest zainstalowany."
@@ -11161,6 +11366,10 @@ msgstr "Wątki oznaczone jako zakończone, które nie były poruszane przez tyle
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Time"
 msgstr "Godzina"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
+msgid "Time elapsed"
+msgstr "Upłynęły czas"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Timeout (ms)"
@@ -11623,6 +11832,7 @@ msgstr "Odinstaluj"
 #: src/renderer/components/campaignDeployment/parts/DocketHeader.tsx
 #: src/renderer/components/thread/threadContextUsage.ts
 #: src/renderer/utils/prStatus.ts
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Unknown"
 msgstr "Nieznany"
@@ -11906,6 +12116,10 @@ msgstr "v{0} dostępne"
 msgid "value"
 msgstr "wartość"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
+msgid "Variance"
+msgstr "Odchylenie"
+
 #: src/mobile/views/DesktopsView.tsx
 msgid "Verify host key"
 msgstr "Sprawdź klucz hosta"
@@ -12079,6 +12293,10 @@ msgstr "Rozgrzewanie środowisk powłoki..."
 msgid "Warming up WSL shell environment…"
 msgstr "Rozgrzewanie środowiska powłoki WSL…"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Warning"
+msgstr "Ostrzeżenie"
+
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
 msgid "We have a winner!"
 msgstr "Mamy zwycięzcę!"
@@ -12208,6 +12426,10 @@ msgstr "Gdzie tworzona jest rozmowa uruchomienia."
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Where the terminal panel appears."
 msgstr "Gdzie pojawia się panel terminali."
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Which campaigns are off pace this week?"
+msgstr "Które kampanie są w tym tygodniu poza tempem?"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Why this is risky"
@@ -12413,6 +12635,10 @@ msgstr "Folder bazowy WSL"
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Yes"
 msgstr "Tak"
+
+#: src/renderer/campaign/cockpit/cockpitGreeting.ts
+msgid "You're all caught up."
+msgstr "Wszystko załatwione."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Your local changes are stashed and will be re-applied when you commit or abort this merge."

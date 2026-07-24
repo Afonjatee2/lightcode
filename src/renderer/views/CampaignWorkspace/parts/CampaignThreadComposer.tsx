@@ -30,6 +30,7 @@ export interface CampaignThreadComposerProps {
   parentThreadId: string | undefined;
   campaignGroupId: string;
   defaultProvider: string;
+  suggestedQuestions?: readonly string[];
 }
 
 export function CampaignThreadComposer(props: CampaignThreadComposerProps) {
@@ -167,43 +168,61 @@ export function CampaignThreadComposer(props: CampaignThreadComposerProps) {
           <Trans>Drop here to attach</Trans>
         </div>
       ) : null}
-      <AttachmentBar
-        attachments={attachments.attachments}
-        onRemove={attachments.removeAttachment}
-        onPreviewImage={(att) => {
-          const imageAttachments = attachments.attachments.filter(
-            (attachment) => attachment.isImage,
-          );
-          const index = imageAttachments.findIndex((attachment) => attachment.id === att.id);
-          if (index >= 0) openAttachmentLightbox(imageAttachments, index);
-        }}
-        onPreviewPdf={(att) => openPdfPreview(att.path)}
-        layout="flush"
-      />
-      <div className="flex items-end gap-2 p-3">
-        <ComposerAddMenu mcpServers={[]} showFileOption onPickFiles={handlePickFiles} />
-        <textarea
-          ref={textareaRef}
-          aria-label={t`Message composer`}
-          placeholder={t`@codex check budget pacing, or type a message…`}
-          rows={2}
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          disabled={!props.parentThreadId || isSubmitting}
-          className="flex-1 resize-none rounded-medium border border-divider bg-content1 px-3 py-2 text-small text-foreground placeholder:text-default-400 disabled:opacity-50"
+      <div className="flex flex-col gap-2 border-t border-[var(--hairline)] bg-surface px-4 py-3">
+        {props.suggestedQuestions && props.suggestedQuestions.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {props.suggestedQuestions.map((question) => (
+              <button
+                key={question}
+                type="button"
+                className="cockpit-chip max-w-full truncate"
+                disabled={!props.parentThreadId || isSubmitting}
+                onClick={() => setInput(question)}
+              >
+                {question}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <AttachmentBar
+          attachments={attachments.attachments}
+          onRemove={attachments.removeAttachment}
+          onPreviewImage={(att) => {
+            const imageAttachments = attachments.attachments.filter(
+              (attachment) => attachment.isImage,
+            );
+            const index = imageAttachments.findIndex((attachment) => attachment.id === att.id);
+            if (index >= 0) openAttachmentLightbox(imageAttachments, index);
+          }}
+          onPreviewPdf={(att) => openPdfPreview(att.path)}
+          layout="flush"
         />
-        <Button
-          isIconOnly
-          size="sm"
-          variant="primary"
-          isDisabled={!canSubmit}
-          aria-label={t`Send message`}
-          onPress={() => void handleSubmit()}
-        >
-          <Send className="size-4" />
-        </Button>
+        <div className="flex items-end gap-2">
+          <ComposerAddMenu mcpServers={[]} showFileOption onPickFiles={handlePickFiles} />
+          <textarea
+            ref={textareaRef}
+            aria-label={t`Message composer`}
+            placeholder={t`@codex check budget pacing, or type a message…`}
+            rows={2}
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            disabled={!props.parentThreadId || isSubmitting}
+            className="cockpit-askbar flex-1 resize-none rounded-xl border border-[var(--hairline-strong)] bg-surface-secondary px-3 py-2 text-sm text-foreground placeholder:text-muted disabled:opacity-50"
+          />
+          <Button
+            isIconOnly
+            size="sm"
+            variant="primary"
+            className="bg-[var(--cockpit-accent)] text-[#0e0e14]"
+            isDisabled={!canSubmit}
+            aria-label={t`Send message`}
+            onPress={() => void handleSubmit()}
+          >
+            <Send className="size-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );

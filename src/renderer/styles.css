@@ -1042,6 +1042,12 @@
     --default: #242429;
     --accent: #8892ef;
     --accent-foreground: #0a0a12;
+    /* Cockpit campaign surfaces — restrained violet for interactive/approval only */
+    --cockpit-accent: #8b7bff;
+    --cockpit-accent-soft: color-mix(in oklab, #8b7bff 14%, transparent);
+    --cockpit-accent-line: color-mix(in oklab, #8b7bff 38%, transparent);
+    --cockpit-accent-ring: color-mix(in oklab, #8b7bff 12%, transparent);
+    --cockpit-fg: #eaf0fb;
     --danger: oklch(0.64 0.2 24.63);
     --danger-foreground: var(--snow);
     --field-background: #18181b;
@@ -3739,4 +3745,140 @@ html[data-poracode-drag-active="true"] [data-poracode-chat-scroller="true"] {
 .tooltip {
   word-break: normal;
   overflow-wrap: break-word;
+}
+
+/* ── Cockpit campaign surfaces (Phase A) ───────────────────────────── */
+.cockpit-klabel {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cockpit-control-block__body {
+  background: var(--surface);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 4px 12px 12px 12px;
+  padding: 14px 16px;
+}
+
+.cockpit-askbar {
+  border: 1px solid var(--hairline-strong);
+  border-radius: 14px;
+  background: var(--surface-secondary);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.cockpit-askbar:focus-within {
+  border-color: var(--cockpit-accent-line);
+  box-shadow: 0 0 0 3px var(--cockpit-accent-ring);
+}
+
+.cockpit-chip {
+  border: 1px solid var(--hairline-strong);
+  border-radius: 999px;
+  background: var(--surface-secondary);
+  color: color-mix(in oklab, var(--foreground) 66%, transparent);
+  font-size: 12px;
+  padding: 5px 12px;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.cockpit-chip:hover:not(:disabled) {
+  border-color: var(--cockpit-accent-line);
+  color: var(--foreground);
+  background: var(--cockpit-accent-soft);
+}
+
+.cockpit-alert-row {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.cockpit-alert-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+}
+
+.cockpit-alert-row--crit::before {
+  background: var(--danger);
+}
+
+.cockpit-alert-row--warn::before {
+  background: var(--warning);
+}
+
+.cockpit-alert-row--info::before {
+  background: var(--cockpit-accent);
+}
+
+.cockpit-approval-row {
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.cockpit-approval-row:hover {
+  border-color: var(--cockpit-accent-line);
+  background: var(--surface-secondary);
+}
+
+.cockpit-status-strip {
+  border-radius: 14px;
+  border: 1px solid color-mix(in oklab, var(--warning) 28%, transparent);
+  background:
+    linear-gradient(160deg, color-mix(in oklab, var(--warning) 10%, transparent), transparent 55%),
+    var(--surface-secondary);
+  padding: 14px;
+}
+
+.cockpit-status-strip--ok {
+  border-color: color-mix(in oklab, var(--success) 28%, transparent);
+  background:
+    linear-gradient(160deg, color-mix(in oklab, var(--success) 10%, transparent), transparent 55%),
+    var(--surface-secondary);
+}
+
+.cockpit-consult-card {
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.cockpit-topic-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px 11px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  cursor: default;
+  user-select: none;
+}
+
+.cockpit-topic-tab--active {
+  color: var(--foreground);
+  border-bottom-color: var(--cockpit-accent);
+}
+
+.cockpit-docket-dialog {
+  border: 1px solid var(--cockpit-accent-line);
+  box-shadow: 0 30px 90px color-mix(in oklab, #000 70%, transparent);
 }

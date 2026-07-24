@@ -34,26 +34,33 @@ export function EvidenceSection(props: { proposal: ActionProposalViewModel }) {
       ) : (
         <div className="space-y-4">
           {evidence.items.length > 0 ? (
-            <ul className="divide-y divide-divider/60">
+            <ul className="space-y-2">
               {evidence.items.map((item) => (
-                <li key={item.id} className="flex flex-wrap items-baseline gap-x-3 py-2">
-                  <Chip size="sm" variant="tertiary" className="shrink-0">
-                    {t(evidenceKindStrings[item.kind] ?? { message: item.kind })}
-                  </Chip>
-                  <span className="min-w-0 flex-1 text-small text-foreground">
-                    {item.label}
-                    {item.value ? (
-                      <span className="block text-tiny text-default-600">{item.value}</span>
-                    ) : null}
-                  </span>
-                  {item.reference ? (
-                    <span className="font-mono text-tiny text-default-400">{item.reference}</span>
-                  ) : null}
-                  {item.observedAt ? (
-                    <span className="text-tiny text-default-400">
-                      {formatDocketDateTime(item.observedAt)}
+                <li
+                  key={item.id}
+                  className="rounded-md border border-[var(--hairline)] bg-background px-3 py-2.5"
+                >
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <Chip size="sm" variant="tertiary" className="shrink-0">
+                      {t(evidenceKindStrings[item.kind] ?? { message: item.kind })}
+                    </Chip>
+                    <span className="min-w-0 flex-1 text-sm font-medium text-foreground">
+                      {item.label}
+                      {item.value ? (
+                        <span className="mt-0.5 block font-mono text-xs text-muted">
+                          {item.value}
+                        </span>
+                      ) : null}
                     </span>
-                  ) : null}
+                  </div>
+                  {(item.reference || item.observedAt) && (
+                    <p className="mt-2 flex flex-wrap gap-3 text-[10.5px] text-muted">
+                      {item.reference ? <span className="font-mono">{item.reference}</span> : null}
+                      {item.observedAt ? (
+                        <span>{formatDocketDateTime(item.observedAt)}</span>
+                      ) : null}
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>
@@ -61,16 +68,21 @@ export function EvidenceSection(props: { proposal: ActionProposalViewModel }) {
 
           {evidence.sources.length > 0 ? (
             <div>
-              <h3 className="text-tiny font-medium uppercase tracking-wide text-default-500">
+              <h3 className="cockpit-klabel">
                 <Trans>Sources</Trans>
               </h3>
-              <ul className="mt-1 space-y-1">
+              <ul className="mt-2 space-y-2">
                 {evidence.sources.map((source) => (
-                  <li key={source.id} className="flex flex-wrap items-baseline gap-x-2 text-small">
-                    <span className="text-foreground">{source.label}</span>
-                    <span className="font-mono text-tiny text-default-400">{source.reference}</span>
+                  <li
+                    key={source.id}
+                    className="rounded-md border border-[var(--hairline)] bg-background px-3 py-2 text-sm"
+                  >
+                    <p className="font-medium text-foreground">{source.label}</p>
+                    <p className="font-mono text-xs text-muted">{source.reference}</p>
                     {source.freshness ? (
-                      <span className="text-tiny text-default-400">{source.freshness}</span>
+                      <p className="mt-1 text-[10.5px] text-muted">
+                        {t`Source: ${source.label} · ${source.freshness}`}
+                      </p>
                     ) : null}
                   </li>
                 ))}

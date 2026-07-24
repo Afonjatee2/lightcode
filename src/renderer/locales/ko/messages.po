@@ -55,6 +55,11 @@ msgstr "{0, plural, other {체크 #개}}"
 msgid "{0, plural, one {# file} other {# files}}"
 msgstr "{0, plural, one {# 파일} other {# 파일}}"
 
+#. placeholder {0}: operationsToday.data.counts.total
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0, plural, one {# live campaign} other {# live campaigns}}"
+msgstr "{0, plural, other {실행 중 캠페인 #개}}"
+
 #. placeholder {0}: groupRows.length
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "{0, plural, one {# MCP server} other {# MCP servers}}"
@@ -165,17 +170,27 @@ msgstr "{0} 자격 증명이 제거되었습니다."
 msgid "{0} credentials saved."
 msgstr "{0} 자격 증명이 저장되었습니다."
 
+#. placeholder {0}: Number(failed[1])
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "{0} data sources have failed to sync"
+msgstr "{0}개 데이터 소스 동기화 실패"
+
+#. placeholder {0}: Number(stale[1])
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "{0} data sources have stale data"
+msgstr "{0}개 데이터 소스에 오래된 데이터가 있습니다"
+
 #. placeholder {0}: devices.length
 #: src/renderer/views/ProfileOverlay/parts/ProfileHeader.tsx
 msgid "{0} devices"
 msgstr "기기 {0}개"
 
-#. placeholder {0}: summary.failed
+#. placeholder {0}: props.failed
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "{0} failed"
 msgstr "{0}개 실패"
 
-#. placeholder {0}: summary.healthy
+#. placeholder {0}: props.healthy
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "{0} healthy"
 msgstr "{0}개 정상"
@@ -255,10 +270,15 @@ msgstr "프롬프트 {0}개 - {when}"
 msgid "{0} prompts - {when}"
 msgstr "프롬프트 {0}개 - {when}"
 
+#. placeholder {0}: props.campaign.pendingProposalCount
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{0} proposals awaiting approval"
+msgstr "승인 대기 제안 {0}개"
+
 #. placeholder {0}: formatMoney(budget.remaining, budget.currency)
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "{0} remaining"
-msgstr "{0}개 남음"
+#~ msgid "{0} remaining"
+#~ msgstr "{0}개 남음"
 
 #. placeholder {0}: item.runCount.toLocaleString()
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
@@ -270,7 +290,7 @@ msgstr "{0}회 실행"
 msgid "{0} runs"
 msgstr "{0}회 실행"
 
-#. placeholder {0}: summary.stale
+#. placeholder {0}: props.stale
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "{0} stale"
 msgstr "{0}개 오래됨"
@@ -335,8 +355,8 @@ msgstr "{0}: {stateLabel}"
 #. placeholder {0}: context.pacing.variancePct > 0 ? "+" : ""
 #. placeholder {1}: context.pacing.variancePct
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "{0}{1}% vs expected"
-msgstr "예상 대비 {0}{1}%"
+#~ msgid "{0}{1}% vs expected"
+#~ msgstr "예상 대비 {0}{1}%"
 
 #. placeholder {0}: selectedRows.length
 #. placeholder {0}: selectedSkills.length
@@ -397,8 +417,8 @@ msgid "{envOrAgentLabel} needs authentication."
 msgstr "{envOrAgentLabel}에는 인증이 필요합니다."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "{failedCount} data sources have failed to sync"
-msgstr "{failedCount}개의 데이터 소스 동기화에 실패했습니다"
+#~ msgid "{failedCount} data sources have failed to sync"
+#~ msgstr "{failedCount}개의 데이터 소스 동기화에 실패했습니다"
 
 #: src/mobile/views/pr/PrOverviewPage.tsx
 msgid "{filesCount, plural, one {# file changed} other {# files changed}}"
@@ -495,6 +515,10 @@ msgstr "{minutes}분 전"
 msgid "{missingAuthLabel} needs authentication."
 msgstr "{missingAuthLabel}에는 인증이 필요합니다."
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "{needsYouCount, plural, one {# thing needs you.} other {# things need you.}}"
+msgstr "{needsYouCount, plural, other {처리가 필요한 항목이 #개 있습니다.}}"
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "{original}\n"
 "Worktree cleanup also failed: {cleanup}"
@@ -544,8 +568,8 @@ msgid "{serverName} from {providerLabel}: {disabledLabel}"
 msgstr "{providerLabel}의 {serverName}: {disabledLabel}"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "{staleCount} data sources have stale data"
-msgstr "{staleCount}개의 데이터 소스에 오래된 데이터가 있습니다"
+#~ msgid "{staleCount} data sources have stale data"
+#~ msgstr "{staleCount}개의 데이터 소스에 오래된 데이터가 있습니다"
 
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "{used} tokens"
@@ -1159,6 +1183,10 @@ msgstr "이 실험에 대한 다른 작업이 아직 실행 중입니다."
 msgid "Antigravity"
 msgstr "Antigravity"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Any sources stale right now?"
+msgstr "지금 오래된 소스가 있나요?"
+
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "API_KEY=value"
 msgstr "API_KEY=value"
@@ -1192,6 +1220,10 @@ msgstr "제공자 프리셋 적용"
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Apply result"
 msgstr "적용 결과"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Applying"
+msgstr "적용 중"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Applying…"
@@ -1308,8 +1340,12 @@ msgid "Ask anything about your campaigns"
 msgstr "캠페인에 대해 무엇이든 질문하세요"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Ask anything about your campaigns…"
-msgstr "캠페인에 대해 무엇이든 질문하세요…"
+#~ msgid "Ask anything about your campaigns…"
+#~ msgstr "캠페인에 대해 무엇이든 질문하세요…"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask anything across your campaigns — grounded in Control Centre data…"
+msgstr "캠페인에 대해 무엇이든 물어보세요 — Control Centre 데이터 기반…"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Ask each time"
@@ -1455,8 +1491,16 @@ msgid "Avatar color {color}"
 msgstr "아바타 색상 {color}"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Awaiting"
+msgstr "대기 중"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Awaiting approval"
 msgstr "승인 대기"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Awaiting input"
+msgstr "입력 대기"
 
 #: src/mobile/views/BrowserView.tsx
 #: src/mobile/views/NotesView.tsx
@@ -1487,12 +1531,17 @@ msgstr "파일로 돌아가기"
 #~ msgstr "MCP 서버로 돌아가기"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
-msgid "Back to monitoring"
-msgstr "모니터링으로 돌아가기"
+#~ msgid "Back to monitoring"
+#~ msgstr "모니터링으로 돌아가기"
 
 #: src/mobile/views/pr/PrSubPage.tsx
 msgid "Back to overview"
 msgstr "개요로 돌아가기"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+#: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+msgid "Back to thread"
+msgstr "스레드로 돌아가기"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Background process exited unexpectedly"
@@ -1709,6 +1758,14 @@ msgstr "예산 데이터 사용 불가"
 msgid "Budget limit reached"
 msgstr "예산 한도 도달"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
+msgid "Budget used"
+msgstr "사용 예산"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Building"
+msgstr "구성 중"
+
 #: src/renderer/components/diff/DiffCardList.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/InlineDiffView.tsx
 msgid "Building diff…"
@@ -1782,8 +1839,12 @@ msgid "Campaign & client"
 msgstr "캠페인 및 클라이언트"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Campaign Context"
+msgid "Campaign context"
 msgstr "캠페인 컨텍스트"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#~ msgid "Campaign Context"
+#~ msgstr "캠페인 컨텍스트"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Campaign event"
@@ -1887,10 +1948,15 @@ msgid "cancelled"
 msgstr "취소됨"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 msgid "Cancelled"
 msgstr "취소됨"
+
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Cancelling"
+msgstr "취소 중"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Candidate actions"
@@ -2481,6 +2547,10 @@ msgstr "모든 폴더 접기"
 msgid "Collapse composer"
 msgstr "작성기 접기"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Collapse context panel"
+msgstr "컨텍스트 패널 접기"
+
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Collapse error"
 msgstr "오류 접기"
@@ -2607,6 +2677,7 @@ msgstr "이 지문을 서버에 표시된 지문과 비교하세요."
 msgid "complete"
 msgstr "완료"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/consultations/ConsultationPanelCard.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Complete"
@@ -2908,6 +2979,10 @@ msgstr "다음에서 계속..."
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control an external Chrome browser."
 msgstr "외부 Chrome 브라우저를 제어합니다."
+
+#: src/renderer/campaign/cockpit/ControlCentreDataBlock.tsx
+msgid "CONTROL CENTRE"
+msgstr "CONTROL CENTRE"
 
 #: src/renderer/hooks/useControlCentreTool.ts
 msgid "Control Centre \"{toolName}\" returned a response that was too large or malformed. Try refreshing."
@@ -3318,6 +3393,10 @@ msgstr "자격 증명이 구성되었습니다."
 msgid "Credits"
 msgstr "크레딧"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Critical"
+msgstr "심각"
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Critical risk"
 msgstr "치명적 위험"
@@ -3449,8 +3528,8 @@ msgid "Dark"
 msgstr "다크"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Dates"
-msgstr "날짜"
+#~ msgid "Dates"
+#~ msgstr "날짜"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #~ msgid "Days"
@@ -3477,8 +3556,12 @@ msgid "Decision record"
 msgstr "결정 기록"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Decisions & Proposals"
+msgid "Decisions & proposals"
 msgstr "결정 및 제안"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#~ msgid "Decisions & Proposals"
+#~ msgstr "결정 및 제안"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 msgid "Decline"
@@ -3656,6 +3739,10 @@ msgstr "작업 트리 {0} 삭제"
 msgid "Deleting"
 msgstr "삭제 중"
 
+#: src/renderer/components/campaignDeployment/parts/ChangeComparison.tsx
+msgid "Delta"
+msgstr "변화량"
+
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/helpers.ts
 msgid "Deny"
 msgstr "거부"
@@ -3732,6 +3819,15 @@ msgstr "<0>{0}</0> 감지됨"
 #: src/renderer/views/QuickComposerOverlay/QuickComposerOverlay.tsx
 msgid "Detecting agents…"
 msgstr "에이전트 감지 중…"
+
+#: src/renderer/campaign/cockpit/ControlCentreDataBlock.tsx
+msgid "deterministic"
+msgstr "결정론적"
+
+#. placeholder {0}: props.capturedAt
+#: src/renderer/campaign/cockpit/ControlCentreDataBlock.tsx
+msgid "deterministic · {0}"
+msgstr "결정론적 · {0}"
 
 #. Settings section: developer/debug tools
 #. Settings section: developer/debug tools
@@ -4098,6 +4194,10 @@ msgstr "추론 강도 단계"
 msgid "Effort levels for {modelName}"
 msgstr "{modelName}의 노력 수준"
 
+#: src/renderer/campaign/cockpit/ControlCentreDataBlock.tsx
+msgid "Elapsed pacing target"
+msgstr "경과 페이싱 목표"
+
 #. About page label: Electron framework version
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Electron"
@@ -4363,6 +4463,10 @@ msgstr "{label} 펼치기"
 msgid "Expand all"
 msgstr "모두 펼치기"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Expand context panel"
+msgstr "컨텍스트 패널 펼치기"
+
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Expand error"
 msgstr "확장 오류"
@@ -4509,6 +4613,7 @@ msgstr "실패"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 #: src/renderer/components/campaignDeployment/parts/OutcomeSection.tsx
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
@@ -5113,6 +5218,18 @@ msgstr "목표"
 msgid "Goals set"
 msgstr "설정한 목표"
 
+#: src/renderer/campaign/cockpit/cockpitGreeting.ts
+msgid "Good afternoon"
+msgstr "안녕하세요"
+
+#: src/renderer/campaign/cockpit/cockpitGreeting.ts
+msgid "Good evening"
+msgstr "좋은 저녁입니다"
+
+#: src/renderer/campaign/cockpit/cockpitGreeting.ts
+msgid "Good morning"
+msgstr "좋은 아침입니다"
+
 #: src/renderer/views/WhatsNewOverlay.tsx
 msgid "Got it"
 msgstr "확인"
@@ -5162,6 +5279,10 @@ msgstr "보내지 않은 초안이 있습니다"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Headers"
 msgstr "헤더"
+
+#: src/renderer/campaign/cockpit/cockpitGreeting.ts
+msgid "Hello"
+msgstr "안녕하세요"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 #~ msgid "Help me create a schedule. Ask for any missing details, then use the Poracode schedule controls to create it for me."
@@ -5407,6 +5528,10 @@ msgstr "앱 내 카메라 스캔은 HTTPS에서만 작동합니다. 휴대폰의
 msgid "Inactive"
 msgstr "비활성"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Info"
+msgstr "정보"
+
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Inherit global"
 msgstr "전역 설정 상속"
@@ -5644,8 +5769,12 @@ msgid "Kimi Code ended the turn without returning a response. Restart the thread
 msgstr "Kimi Code가 응답을 반환하지 않고 작업을 종료했습니다. 스레드를 다시 시작한 후 다시 시도하세요."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "KPI Health"
+msgid "KPI health"
 msgstr "KPI 상태"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#~ msgid "KPI Health"
+#~ msgstr "KPI 상태"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -6357,8 +6486,12 @@ msgid "Mirroring is unavailable."
 msgstr "미러링을 사용할 수 없습니다."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Missing Data"
+msgid "Missing data"
 msgstr "누락된 데이터"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#~ msgid "Missing Data"
+#~ msgstr "누락된 데이터"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Mobile push notifications"
@@ -6865,8 +6998,8 @@ msgid "No configured MCP servers yet"
 msgstr "아직 구성된 MCP 서버가 없습니다"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "No connected sources reported."
-msgstr "연결된 소스가 보고되지 않았습니다."
+#~ msgid "No connected sources reported."
+#~ msgstr "연결된 소스가 보고되지 않았습니다."
 
 #: src/mobile/WideShell.tsx
 msgid "No connection paired"
@@ -7062,6 +7195,7 @@ msgid "No patterns."
 msgstr "패턴이 없습니다."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "No pending proposals."
 msgstr "대기 중인 제안이 없습니다."
 
@@ -7107,8 +7241,8 @@ msgid "No pull requests found."
 msgstr "풀 리퀘스트를 찾을 수 없습니다."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "No recent events."
-msgstr "최근 이벤트가 없습니다."
+#~ msgid "No recent events."
+#~ msgstr "최근 이벤트가 없습니다."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
 msgid "No remote configured. Add a remote to enable push and pull."
@@ -7283,6 +7417,10 @@ msgstr "나에게 알림"
 msgid "npx"
 msgstr "npx"
 
+#: src/renderer/campaign/cockpit/ControlCentreDataBlock.tsx
+msgid "of"
+msgstr "/"
+
 #: src/renderer/views/ProjectSettingsOverlay/parts/SearchSection.tsx
 msgid "off"
 msgstr "꺼짐"
@@ -7353,6 +7491,10 @@ msgstr "온라인"
 msgid "Only when unfocused"
 msgstr "포커스가 없을 때만"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Only you can approve — nothing executes without it"
+msgstr "승인은 본인만 가능합니다 — 승인 없이는 실행되지 않습니다"
+
 #: src/renderer/notifications.ts
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrMetaRow.tsx
@@ -7383,8 +7525,12 @@ msgid "Open a thread first to attach to it."
 msgstr "먼저 스레드를 열어 연결하세요."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Open Alerts"
+msgid "Open alerts"
 msgstr "열린 알림"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#~ msgid "Open Alerts"
+#~ msgstr "열린 알림"
 
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ExperimentGroupHeader.tsx
@@ -7643,6 +7789,10 @@ msgstr "후보의 풀 리퀘스트 #{0}을(를) 열었습니다."
 msgid "OpenSSH private key"
 msgstr "OpenSSH 개인 키"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Operations brief"
+msgstr "운영 브리핑"
+
 #: src/renderer/components/campaignDeployment/parts/DecisionActions.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Optional"
@@ -7720,9 +7870,14 @@ msgstr "{conflict} 재정의"
 msgid "Overriding the global setting for this project."
 msgstr "이 프로젝트의 전역 설정을 재정의합니다."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
 msgid "Pacing"
 msgstr "진행 속도"
+
+#: src/renderer/campaign/cockpit/ControlCentreDataBlock.tsx
+msgid "Pacing delta"
+msgstr "페이싱 차이"
 
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 msgid "Package config"
@@ -8254,6 +8409,10 @@ msgstr "프롬프트"
 msgid "Prompts"
 msgstr "프롬프트"
 
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Proposal lifecycle"
+msgstr "제안 수명 주기"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
 msgid "Proposals & Approvals"
 msgstr "제안 및 승인"
@@ -8437,6 +8596,10 @@ msgstr "Qoder CLI"
 msgid "Questions"
 msgstr "질문"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
+msgid "Queued"
+msgstr "대기 중"
+
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/providers/usageFormat.ts
 msgid "Quota reached"
@@ -8491,6 +8654,7 @@ msgstr "포트 포워딩 액세스 권한을 부여하려면 이 연결을 다�
 msgid "Reading each candidate's changes…"
 msgstr "각 후보의 변경 사항을 읽는 중…"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "Ready"
 msgstr "준비"
@@ -8516,8 +8680,8 @@ msgid "Recent"
 msgstr "최근"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Recent Events"
-msgstr "최근 이벤트"
+#~ msgid "Recent Events"
+#~ msgstr "최근 이벤트"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Recent installs"
@@ -9105,6 +9269,7 @@ msgstr "체크포인트로 되돌리시겠습니까?"
 msgid "Revert to this checkpoint"
 msgstr "이 체크포인트로 되돌리기"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Review"
 msgstr "검토"
@@ -9284,6 +9449,7 @@ msgstr "아래 일정에 따라 이 일정을 자동으로 실행합니다."
 msgid "running"
 msgstr "실행 중"
 
+#: src/renderer/components/consultations/ConsultationCard.tsx
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "Running"
@@ -10095,17 +10261,35 @@ msgstr "마켓플레이스 스킬 정렬"
 msgid "Sort threads"
 msgstr "스레드 정렬"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Sorted by severity · click through to the campaign thread"
+msgstr "심각도순 · 캠페인 스레드로 이동"
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Source branch {branch} moved before the worktree was created"
 msgstr "작업 트리가 생성되기 전에 소스 브랜치 {branch}이(가) 이동했습니다"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Source Health"
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Source health"
 msgstr "소스 상태"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#~ msgid "Source Health"
+#~ msgstr "소스 상태"
+
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Source health:"
-msgstr "소스 상태:"
+#~ msgid "Source health:"
+#~ msgstr "소스 상태:"
+
+#. placeholder {0}: source.label
+#. placeholder {1}: source.freshness
+#: src/renderer/components/campaignDeployment/parts/EvidenceSection.tsx
+msgid "Source: {0} · {1}"
+msgstr "소스: {0} · {1}"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "Source: {source} · {freshness}"
+msgstr "소스: {source} · {freshness}"
 
 #: src/renderer/components/campaignDeployment/parts/EvidenceSection.tsx
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
@@ -10116,9 +10300,18 @@ msgstr "소스"
 msgid "Space separated; use quotes around spaces"
 msgstr "공백으로 구분하며, 공백이 포함된 값은 따옴표로 감싸세요"
 
+#: src/renderer/campaign/cockpit/ControlCentreDataBlock.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
+msgid "Spend"
+msgstr "지출"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Spend vs Budget"
-msgstr "지출 대 예산"
+#~ msgid "Spend vs Budget"
+#~ msgstr "지출 대 예산"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
+msgid "spent"
+msgstr "사용됨"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/DevTerminalPanel/DevTerminalPanel.tsx
 msgid "Split Terminal"
@@ -10196,6 +10389,10 @@ msgstr "스테이지됨"
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 msgid "Staged ({0})"
 msgstr "스테이지됨 ({0})"
+
+#: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
+msgid "stale {age} — treated with caution"
+msgstr "오래됨 {age} — 주의해서 처리"
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Standard"
@@ -10466,8 +10663,8 @@ msgid "Succeeded"
 msgstr "성공"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Suggested Questions"
-msgstr "추천 질문"
+#~ msgid "Suggested Questions"
+#~ msgstr "추천 질문"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Suggestions"
@@ -10476,6 +10673,10 @@ msgstr "제안"
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Summarize this week's progress, unfinished work, and the most important risks for next week."
 msgstr "이번 주의 진행 상황, 미완료 작업, 다음 주의 가장 중요한 위험을 요약해 주세요."
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Summarize what needs approval today"
+msgstr "오늘 승인이 필요한 내용 요약"
 
 #: src/renderer/components/providers/composerControlBuilders.tsx
 msgid "Supervised"
@@ -10942,6 +11143,10 @@ msgstr "이 기본 제공 MCP 서버는 OpenCode 스레드 간에 공유됩니�
 msgid "Thinking"
 msgstr "생각 중"
 
+#: src/renderer/components/campaignDeployment/parts/StrongConfirmationDialog.tsx
+msgid "This action cannot be undone. Type the confirmation phrase exactly as shown."
+msgstr "이 작업은 취소할 수 없습니다. 표시된 확인 문구를 정확히 입력하세요."
+
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "This agent is not installed."
 msgstr "이 에이전트는 설치되지 않았습니다."
@@ -11161,6 +11366,10 @@ msgstr "완료로 표시된 스레드 중 며칠 동안 건드리지 않은 스�
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Time"
 msgstr "시간"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
+msgid "Time elapsed"
+msgstr "경과 시간"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Timeout (ms)"
@@ -11623,6 +11832,7 @@ msgstr "제거"
 #: src/renderer/components/campaignDeployment/parts/DocketHeader.tsx
 #: src/renderer/components/thread/threadContextUsage.ts
 #: src/renderer/utils/prStatus.ts
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Unknown"
 msgstr "알 수 없음"
@@ -11906,6 +12116,10 @@ msgstr "v{0} 사용 가능"
 msgid "value"
 msgstr "값"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
+msgid "Variance"
+msgstr "편차"
+
 #: src/mobile/views/DesktopsView.tsx
 msgid "Verify host key"
 msgstr "호스트 키 확인"
@@ -12079,6 +12293,10 @@ msgstr "쉘 환경 준비 중..."
 msgid "Warming up WSL shell environment…"
 msgstr "WSL 셸 환경 준비 중…"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Warning"
+msgstr "경고"
+
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
 msgid "We have a winner!"
 msgstr "우승자가 결정되었습니다!"
@@ -12208,6 +12426,10 @@ msgstr "실행의 대화가 생성되는 위치입니다."
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Where the terminal panel appears."
 msgstr "터미널 패널이 나타나는 위치."
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Which campaigns are off pace this week?"
+msgstr "이번 주 페이스가 느린 캠페인은?"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Why this is risky"
@@ -12413,6 +12635,10 @@ msgstr "WSL 기본 폴더"
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Yes"
 msgstr "예"
+
+#: src/renderer/campaign/cockpit/cockpitGreeting.ts
+msgid "You're all caught up."
+msgstr "모두 처리되었습니다."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Your local changes are stashed and will be re-applied when you commit or abort this merge."

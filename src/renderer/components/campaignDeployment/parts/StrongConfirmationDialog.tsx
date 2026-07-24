@@ -22,7 +22,6 @@ export function StrongConfirmationDialog(props: {
   const { t } = useLingui();
   const [phrase, setPhrase] = useState("");
 
-  // Reset the phrase every time the dialog is (re)opened.
   useEffect(() => {
     if (props.isOpen) setPhrase("");
   }, [props.isOpen]);
@@ -32,21 +31,26 @@ export function StrongConfirmationDialog(props: {
   return (
     <AlertDialog.Backdrop isOpen={props.isOpen} onOpenChange={(open) => !open && props.onClose()}>
       <AlertDialog.Container>
-        <AlertDialog.Dialog>
+        <AlertDialog.Dialog className="cockpit-docket-dialog">
           <AlertDialog.Header>
             <AlertDialog.Icon status="warning" />
             <AlertDialog.Heading>{t(docketStrings.strongConfirmTitle)}</AlertDialog.Heading>
           </AlertDialog.Header>
           <AlertDialog.Body>
-            <p className="text-small text-default-600">{props.proposalTitle}</p>
-            <p className="mt-2 text-small text-foreground">{t(docketStrings.strongConfirmBody)}</p>
+            <p className="text-sm text-muted">{props.proposalTitle}</p>
+            <p className="mt-2 text-sm text-foreground">{t(docketStrings.strongConfirmBody)}</p>
+            <div className="mt-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-foreground">
+              <Trans>
+                This action cannot be undone. Type the confirmation phrase exactly as shown.
+              </Trans>
+            </div>
             <div className="mt-3">
-              <Label htmlFor="strong-confirmation-phrase" className="text-tiny text-default-500">
+              <Label htmlFor="strong-confirmation-phrase" className="cockpit-klabel">
                 {t(docketStrings.strongConfirmInputLabel)}
               </Label>
               <Input
                 id="strong-confirmation-phrase"
-                className="mt-1 w-full"
+                className="mt-1 w-full font-mono"
                 value={phrase}
                 onChange={(event) => setPhrase(event.target.value)}
                 placeholder={STRONG_CONFIRMATION_PHRASE}
@@ -55,7 +59,7 @@ export function StrongConfirmationDialog(props: {
               />
               <p
                 id="strong-confirmation-hint"
-                className="mt-1 font-mono text-tiny text-default-400"
+                className="mt-1 font-mono text-xs text-[var(--cockpit-accent)]"
               >
                 {STRONG_CONFIRMATION_PHRASE}
               </p>
@@ -71,7 +75,8 @@ export function StrongConfirmationDialog(props: {
               <Trans>Cancel</Trans>
             </Button>
             <Button
-              variant="danger"
+              variant="primary"
+              className="bg-[var(--cockpit-accent)] text-[#0e0e14]"
               isDisabled={!matches || props.submitPending}
               aria-disabled={!matches || props.submitPending}
               onPress={() => props.onConfirm(phrase.trim())}

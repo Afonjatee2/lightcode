@@ -23,26 +23,30 @@ export function RiskSection(props: { proposal: ActionProposalViewModel }) {
 
   return (
     <DocketSection index="03" heading={t(docketStrings.riskHeading)}>
-      {risk.reasons.length > 0 ? (
-        <div>
-          <h3 className="text-tiny font-medium uppercase tracking-wide text-default-500">
-            {t(docketStrings.riskReasonsLabel)}
-          </h3>
-          <ul className="mt-1 space-y-1">
-            {risk.reasons.map((reason) => (
-              <li key={reason} className="flex items-start gap-2 text-small text-foreground">
-                <ShieldAlert aria-hidden className="mt-0.5 size-3.5 shrink-0 text-danger" />
-                {reason}
-              </li>
-            ))}
-          </ul>
+      <div className="flex gap-3 rounded-xl border border-warning/30 bg-warning/5 p-4">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-warning/15 text-warning">
+          <ShieldAlert className="size-4" aria-hidden />
         </div>
-      ) : null}
-      {strongRequired ? (
-        <p className="mt-2 text-small font-medium text-danger">
-          {t(docketStrings.strongConfirmationRequiredNote)}
-        </p>
-      ) : null}
+        <div className="min-w-0 flex-1">
+          {risk.reasons.length > 0 ? (
+            <div>
+              <h3 className="cockpit-klabel">{t(docketStrings.riskReasonsLabel)}</h3>
+              <ul className="mt-2 space-y-1.5">
+                {risk.reasons.map((reason) => (
+                  <li key={reason} className="text-sm text-foreground">
+                    {reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {strongRequired ? (
+            <p className="mt-2 text-sm font-medium text-warning">
+              {t(docketStrings.strongConfirmationRequiredNote)}
+            </p>
+          ) : null}
+        </div>
+      </div>
     </DocketSection>
   );
 }

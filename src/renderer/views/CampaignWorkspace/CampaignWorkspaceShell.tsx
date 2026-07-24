@@ -129,6 +129,9 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
           <CampaignThreadPane
             projectId={props.projectId}
             identity={campaignContext.status === "ready" ? campaignContext.data.identity : null}
+            suggestedQuestions={
+              campaignContext.status === "ready" ? campaignContext.data.suggestedQuestions : []
+            }
           />
         )}
       </main>

@@ -18,6 +18,10 @@ vi.mock("@/renderer/bridge", async (importOriginal) => {
     isRemoteSession: () => false,
     readBridge: () => ({
       callMcpTool: mocks.callMcpTool,
+      getProfileIdentity: async () => ({
+        identity: { name: "", handle: "", avatarColor: "#8B7BFF" },
+        device: { id: "test", label: "Test", platform: "darwin" },
+      }),
     }),
   };
 });
@@ -80,6 +84,6 @@ describe("CampaignTodayView", () => {
     expect(screen.getByText(/Holiday Gifting Campaign/)).toBeInTheDocument();
     expect(screen.getAllByText(/B2B Lead Gen/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Recently resolved/i)).toBeInTheDocument();
-    expect(screen.getByText(/Source health:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Source health/i)).toBeInTheDocument();
   });
 });

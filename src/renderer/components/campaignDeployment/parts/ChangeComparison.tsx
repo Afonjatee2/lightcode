@@ -1,9 +1,10 @@
-import { useLingui } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { ArrowRight } from "lucide-react";
 
 import { formatDocketValue, type ActionProposalViewModel } from "../actionProposalViewModel";
 import { docketStrings } from "../approvalDocketStrings";
 import { DocketSection } from "./DocketSection";
+import { deriveFieldChangeDelta } from "./fieldChangeDelta";
 
 /**
  * Section 01 — the requested change: narrative summary, the field-level
@@ -24,46 +25,76 @@ export function ChangeComparison(props: { proposal: ActionProposalViewModel }) {
   return (
     <DocketSection index="01" heading={t(docketStrings.requestedChangeHeading)}>
       {proposal.requestedChangeSummary ? (
-        <p className="max-w-prose text-small text-foreground">{proposal.requestedChangeSummary}</p>
+        <p className="max-w-prose text-sm text-foreground">{proposal.requestedChangeSummary}</p>
       ) : null}
 
       {proposal.fieldChanges.length > 0 ? (
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full border-collapse text-left text-small">
+        <div className="mt-3 overflow-x-auto rounded-xl border border-[var(--hairline)]">
+          <table className="w-full border-collapse text-left text-sm">
             <caption className="sr-only">{t(docketStrings.requestedChangeHeading)}</caption>
             <thead>
-              <tr className="border-b border-divider text-tiny uppercase tracking-wide text-default-500">
-                <th scope="col" className="py-1.5 pr-4 font-medium">
+              <tr className="border-b border-[var(--hairline)] bg-surface-secondary text-[10.5px] uppercase tracking-wide text-muted">
+                <th scope="col" className="px-3 py-2 font-bold">
                   {t(docketStrings.fieldColumn)}
                 </th>
-                <th scope="col" className="py-1.5 pr-4 font-medium">
+                <th scope="col" className="px-3 py-2 font-bold">
                   {t(docketStrings.currentColumn)}
                 </th>
-                <th scope="col" className="py-1.5 font-medium">
+                <th scope="col" className="px-3 py-2 font-bold">
                   {t(docketStrings.proposedColumn)}
+                </th>
+                <th scope="col" className="px-3 py-2 font-bold">
+                  <Trans>Delta</Trans>
                 </th>
               </tr>
             </thead>
             <tbody>
-              {proposal.fieldChanges.map((change) => (
-                <tr key={change.field} className="border-b border-divider/60 align-top">
-                  <th scope="row" className="py-2 pr-4 font-normal text-default-600">
-                    {change.label ?? change.field}
-                  </th>
-                  <td className="py-2 pr-4 text-foreground" data-testid={`current-${change.field}`}>
-                    {fmt(change.currentValue, change.unit)}
-                  </td>
-                  <td
-                    className="py-2 font-medium text-foreground"
-                    data-testid={`proposed-${change.field}`}
+              {proposal.fieldChanges.map((change) => {
+                const delta = deriveFieldChangeDelta(change);
+                const deltaClass =
+                  delta?.direction === "up"
+                    ? "bg-warning/15 text-warning"
+                    : delta?.direction === "down"
+                      ? "bg-[var(--cockpit-accent-soft)] text-[var(--cockpit-accent)]"
+                      : "bg-[var(--row-hover)] text-muted";
+
+                return (
+                  <tr
+                    key={change.field}
+                    className="border-b border-[var(--hairline)] align-middle last:border-0"
                   >
-                    <span className="inline-flex items-center gap-1.5">
-                      <ArrowRight aria-hidden className="size-3.5 text-default-400" />
-                      {fmt(change.proposedValue, change.unit)}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+                    <th scope="row" className="px-3 py-2.5 font-medium text-muted">
+                      {change.label ?? change.field}
+                    </th>
+                    <td
+                      className="px-3 py-2.5 tabular-nums text-muted"
+                      data-testid={`current-${change.field}`}
+                    >
+                      {fmt(change.currentValue, change.unit)}
+                    </td>
+                    <td
+                      className="px-3 py-2.5 font-bold tabular-nums text-warning"
+                      data-testid={`proposed-${change.field}`}
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        <ArrowRight aria-hidden className="size-3.5 text-muted" />
+                        {fmt(change.proposedValue, change.unit)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {delta ? (
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${deltaClass}`}
+                        >
+                          {delta.label}
+                        </span>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -72,21 +103,17 @@ export function ChangeComparison(props: { proposal: ActionProposalViewModel }) {
       {proposal.beforeStateNote || proposal.proposedStateNote ? (
         <dl className="mt-3 grid gap-3 sm:grid-cols-2">
           {proposal.beforeStateNote ? (
-            <div className="border-l-2 border-divider pl-3">
-              <dt className="text-tiny uppercase tracking-wide text-default-500">
-                {t(docketStrings.beforeStateLabel)}
-              </dt>
-              <dd className="mt-1 whitespace-pre-wrap text-small text-default-600">
+            <div className="border-l-2 border-[var(--hairline)] pl-3">
+              <dt className="cockpit-klabel">{t(docketStrings.beforeStateLabel)}</dt>
+              <dd className="mt-1 whitespace-pre-wrap text-sm text-muted">
                 {proposal.beforeStateNote}
               </dd>
             </div>
           ) : null}
           {proposal.proposedStateNote ? (
-            <div className="border-l-2 border-foreground pl-3">
-              <dt className="text-tiny uppercase tracking-wide text-default-500">
-                {t(docketStrings.afterStateLabel)}
-              </dt>
-              <dd className="mt-1 whitespace-pre-wrap text-small text-foreground">
+            <div className="border-l-2 border-[var(--cockpit-accent)] pl-3">
+              <dt className="cockpit-klabel">{t(docketStrings.afterStateLabel)}</dt>
+              <dd className="mt-1 whitespace-pre-wrap text-sm text-foreground">
                 {proposal.proposedStateNote}
               </dd>
             </div>

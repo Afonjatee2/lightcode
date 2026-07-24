@@ -89,15 +89,16 @@ export function CampaignApprovalsPane(props: {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <header className="flex shrink-0 items-center gap-2 border-b border-divider px-3 py-2">
+      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--hairline)] px-4 py-3">
         <Button
           size="sm"
           variant="ghost"
-          isIconOnly
-          aria-label={t`Back to monitoring`}
+          aria-label={t`Back to thread`}
           onPress={props.onBack}
+          className="text-[var(--cockpit-accent)]"
         >
           <ArrowLeft className="size-4" />
+          <Trans>Back to thread</Trans>
         </Button>
         <div className="min-w-0">
           <h3 className="truncate text-small font-medium text-foreground">

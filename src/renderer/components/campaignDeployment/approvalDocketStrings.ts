@@ -78,6 +78,15 @@ export const docketStrings = {
   yes: msg`Yes`,
   no: msg`No`,
   refreshProposal: msg`Refresh proposal`,
+  lifecycleHeading: msg`Proposal lifecycle`,
+  lifecycleDraft: msg`Draft`,
+  lifecycleAwaiting: msg`Awaiting`,
+  lifecycleApproved: msg`Approved`,
+  lifecycleApplying: msg`Applying`,
+  lifecycleApplied: msg`Applied`,
+  backToThread: msg`Back to thread`,
+  sourceFreshnessLine: msg`Source: {source} · {freshness}`,
+  staleFreshnessCaution: msg`stale {age} — treated with caution`,
 } satisfies Record<string, MessageDescriptor>;
 
 /** Status chip labels — keyed by the server-returned lifecycle status. */

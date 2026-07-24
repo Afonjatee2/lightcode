@@ -15,6 +15,7 @@ import { DocketHeader } from "./parts/DocketHeader";
 import { EvidenceSection } from "./parts/EvidenceSection";
 import { OutcomeSection } from "./parts/OutcomeSection";
 import { RiskSection } from "./parts/RiskSection";
+import { DocketLifecycleStepper } from "./parts/DocketLifecycleStepper";
 import { StrongConfirmationDialog } from "./parts/StrongConfirmationDialog";
 
 type PendingAction = "approve" | "reject" | null;
@@ -236,6 +237,8 @@ export function ApprovalDocket(props: ApprovalDocketProps) {
         refreshPending={refreshPending}
         onRefreshPress={() => void runRefresh()}
       />
+
+      <DocketLifecycleStepper status={proposal.status} />
 
       <ChangeComparison proposal={proposal} />
       <EvidenceSection proposal={proposal} />

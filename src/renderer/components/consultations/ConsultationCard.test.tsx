@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import { ConsultationCard } from "./ConsultationCard";
-import type { ConsultationRecord, ConsultationResultAttachment, EvidenceFreshnessSummary } from "@/shared/consultations";
+import type {
+  ConsultationRecord,
+  ConsultationResultAttachment,
+  EvidenceFreshnessSummary,
+} from "@/shared/consultations";
 
 const noopCancel = vi.fn<(id: string) => void>();
 const noopRetry = vi.fn<(id: string) => void>();
@@ -45,7 +49,9 @@ function makeRecord(overrides: Partial<ConsultationRecord> = {}): ConsultationRe
   };
 }
 
-function makeResult(overrides: Partial<ConsultationResultAttachment> = {}): ConsultationResultAttachment {
+function makeResult(
+  overrides: Partial<ConsultationResultAttachment> = {},
+): ConsultationResultAttachment {
   return {
     consultationId: "c-1",
     consultantLabel: "daily_operator · codex",
@@ -263,7 +269,7 @@ describe("ConsultationCard — lifecycle states", () => {
         controlCentreAvailable
       />,
     );
-    expect(screen.getByText("Cancelling")).toBeTruthy();
+    expect(screen.getByText(/Cancelling/i)).toBeTruthy();
   });
 
   it("renders cancelled state", () => {
