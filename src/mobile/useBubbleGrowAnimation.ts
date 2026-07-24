@@ -53,9 +53,36 @@ export function useBubbleGrowAnimation(
   const collapsedHeightRef = useRef(0);
   const expandedHeightRef = useRef(0);
   const prevExpandedRef = useRef(expanded);
+  const expandedRef = useRef(expanded);
+  expandedRef.current = expanded;
+
+  // Content edits happen below FloatingComposerDock (the contenteditable owns
+  // its own state), so they can resize the bubble without rendering this hook.
+  // Observe the actual border box to keep the rest-height cache current for a
+  // later collapse/re-expand. Without this, inserting a newline left
+  // expandedHeightRef at the pre-edit height and the collapse pin immediately
+  // clipped the newly-grown input back to that stale size.
+  useLayoutEffect(() => {
+    const bubble = bubbleRef.current;
+    if (!bubble) return;
+    const observer = new ResizeObserver((entries) => {
+      if (pinRef.current !== null) return;
+      const entry = entries[entries.length - 1];
+      const height = entry?.borderBoxSize?.[0]?.blockSize ?? bubble.getBoundingClientRect().height;
+      if (height <= 0) return;
+      if (expandedRef.current) {
+        expandedHeightRef.current = height;
+      } else {
+        collapsedHeightRef.current = height;
+      }
+    });
+    observer.observe(bubble);
+    return () => observer.disconnect();
+  }, [bubbleRef]);
 
   // Keep the rest height of the current state fresh whenever nothing is
-  // pinned (content grows while expanded: typing, attachments).
+  // pinned and this component does render. ResizeObserver above covers
+  // descendant-only layout changes (typing, attachments, and toolbar wraps).
   useLayoutEffect(() => {
     const bubble = bubbleRef.current;
     if (!bubble || pin !== null) return;
@@ -72,7 +99,16 @@ export function useBubbleGrowAnimation(
   });
 
   useLayoutEffect(() => {
-    if (prevExpandedRef.current === expanded) return;
+    if (prevExpandedRef.current === expanded) {
+      // The cold-keyboard probe may begin an animated expansion, then switch
+      // to the guarded-focus path once iOS reports the final keyboard height.
+      // That enables skipAnimation without another expanded-state flip. React
+      // cleans up the in-flight effect first (cancelling its release timeout),
+      // so explicitly drop its pin here; otherwise the old expanded height is
+      // left inline and removing editor lines can no longer shrink the bubble.
+      if (skipAnimation && pinRef.current !== null) setPinned(null);
+      return;
+    }
     prevExpandedRef.current = expanded;
     const bubble = bubbleRef.current;
     if (!bubble || skipAnimation) {

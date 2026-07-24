@@ -2,6 +2,7 @@ import type { PromptSegment } from "@/shared/contracts";
 import { msg } from "@/shared/messages";
 import { inlinePromptSegmentText } from "@/shared/promptContent";
 import { createAcpStructuredSession } from "../acp";
+import { createAcpSubagentCoordinator } from "../acp/subagentCoordinator";
 import {
   detectAgentInstall,
   detectProbeLocation,
@@ -11,8 +12,9 @@ import {
   quotePowerShellLiteral,
 } from "../base";
 import { resolveAgentBinaryPath } from "../binaryResolver";
-import { transformKimiAcpSessionUpdate } from "./acpTransform";
+import { createKimiAcpSessionUpdateTransform } from "./acpTransform";
 import { buildKimiAcpArgs, buildKimiArgs, buildKimiContinueArgs } from "./argv";
+import { createKimiBackgroundBridge } from "./backgroundBridge";
 import {
   buildKimiCommand,
   kimiDefaultCapabilities,
@@ -92,13 +94,10 @@ export function createKimiAdapter(): AgentAdapter {
       return status;
     },
 
-    buildUpdateCommand(_ctx, status) {
-      return {
-        binary: status.executablePath ?? kimiDetectionSpec.binary,
-        args: ["upgrade"],
-        strategy: "built-in",
-      };
-    },
+    // No `buildUpdateCommand` override: `kimi upgrade` is an interactive TUI, so
+    // the shared resolver drives the update from the detection spec's
+    // `installer` (re-runs the official install script non-interactively). This
+    // also keeps the supervisor and the renderer's command preview in sync.
 
     buildLaunchArgv(location, config, prompt) {
       // Kimi mints its own opaque session id and exposes no flag to pre-assign
@@ -126,11 +125,31 @@ export function createKimiAdapter(): AgentAdapter {
         [...acpArgs, "acp"],
         resolveAgentBinaryPath(input.projectLocation, "kimi"),
       );
-      return createAcpStructuredSession(command, {
+      let session: ReturnType<typeof createAcpStructuredSession>;
+      const subagents = createAcpSubagentCoordinator();
+      const backgroundBridge = createKimiBackgroundBridge(
+        input.projectLocation,
+        (notification) => session?.ingestExternalSessionUpdate(notification),
+        { subagents },
+      );
+      session = createAcpStructuredSession(command, {
         ...input,
         acpEmptyResponseErrorResolver: resolveKimiEmptyResponseError,
-        acpSessionUpdateTransform: transformKimiAcpSessionUpdate,
+        acpSessionUpdateTransform: createKimiAcpSessionUpdateTransform({
+          subagents,
+          onBackgroundLaunch: backgroundBridge.onBackgroundLaunch,
+        }),
       });
+      if (!session) {
+        backgroundBridge.dispose();
+        return undefined;
+      }
+      const disposeAcpSession = session.dispose.bind(session);
+      session.dispose = async () => {
+        backgroundBridge.dispose();
+        await disposeAcpSession();
+      };
+      return session;
     },
 
     // Kimi ACP advertises a single "login" auth method; the auth command is the

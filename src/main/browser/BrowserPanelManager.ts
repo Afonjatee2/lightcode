@@ -790,7 +790,6 @@ export class BrowserPanelManager {
   ): Promise<BrowserStartPickerResult> {
     const tab = this.findTab(tabId);
     if (!tab || !tab.isAttached()) return { ok: false, error: `No browser tab: ${tabId}` };
-    const wc = tab.webContents;
 
     // The user clicked the element in the picker, so it's already inside the
     // viewport. Capture from the renderer's painted bitmap via
@@ -804,8 +803,7 @@ export class BrowserPanelManager {
       width: Math.max(1, Math.ceil(rect.width)),
       height: Math.max(1, Math.ceil(rect.height)),
     };
-    const img = await wc.capturePage(clip);
-    const bytes = img.toPNG();
+    const bytes = await tab.capturePng(clip);
 
     const path = saveClipboardImageFile(this.paths, {
       threadId,

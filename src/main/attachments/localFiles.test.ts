@@ -1,9 +1,13 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resolvePoracodePaths } from "@/shared/poracodePaths";
-import { saveClipboardImageFile, saveUploadedAttachmentFile } from "./localFiles";
+import {
+  readLocalImageFile,
+  saveClipboardImageFile,
+  saveUploadedAttachmentFile,
+} from "./localFiles";
 
 describe("saveClipboardImageFile", () => {
   let tempDir: string | undefined;
@@ -66,5 +70,15 @@ describe("saveClipboardImageFile", () => {
     });
 
     expect(dirname(filePath)).toBe(join(paths.attachmentsDir, "--"));
+  });
+
+  it("reads bytes from a local image protocol URL", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "poracode-local-image-"));
+    const filePath = join(tempDir, "image.png");
+    const bytes = Buffer.from([137, 80, 78, 71]);
+    writeFileSync(filePath, bytes);
+
+    expect(readLocalImageFile(`poracode-local://local${filePath}`)).toEqual(bytes);
+    expect(() => readLocalImageFile(`file://${filePath}`)).toThrow("Unsupported local image URL");
   });
 });

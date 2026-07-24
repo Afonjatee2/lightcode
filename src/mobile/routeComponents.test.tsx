@@ -1,30 +1,50 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"url":"https://app.poracode.com/"}
 import { useEffect, type ReactNode } from "react";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Project, Thread } from "@/shared/contracts";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
+import { useAppStore } from "@/renderer/state/appStore";
 import { clearPairingLaunch, parsePairingLaunch, setPairingLaunch } from "./pairing";
 import {
   DesktopsRoute,
+  NotesRoute,
   SettingsSectionRoute,
+  SubAgentRoute,
   TerminalRoute,
   ThreadRoute,
   ThreadsRoute,
   WorkspaceRoute,
 } from "./routeComponents";
+import { useDesktopPanelStore } from "./desktopPanelStore";
 
 // Counts TerminalView mount events so a target change can be asserted to
 // remount (fresh PTY) rather than reuse the stale one.
 const terminalMounts = vi.hoisted(() => ({ count: 0 }));
 const workspaceMounts = vi.hoisted(() => ({ count: 0 }));
+const notesMounts = vi.hoisted(() => ({ count: 0 }));
+const media = vi.hoisted(() => ({ wide: false, rightPanel: false }));
 const desktopView = vi.hoisted(() => ({
   lastProps: null as null | {
     readonly manualEndpoint: string;
     readonly manualToken: string;
     readonly showPairingHint: boolean;
     readonly onPair: () => void;
+  },
+}));
+const mobileViews = vi.hoisted(() => ({
+  threadsProps: null as null | {
+    readonly onNewThreadInWorktree: (input: {
+      projectId: string;
+      worktreePath: string;
+      worktreeBranch: string;
+    }) => void;
+  },
+  quickComposeProps: null as null | {
+    readonly expanded: boolean;
+    readonly restoreWorktreeSelectionToken: number;
+    readonly onExpandedChange: (expanded: boolean) => void;
   },
 }));
 
@@ -56,7 +76,12 @@ const fixtures = vi.hoisted(() => {
 
   return {
     project,
-    params: { threadId: routedThread.id, projectId: project.id, section: "usage" },
+    params: {
+      threadId: routedThread.id,
+      parentItemId: "parent-1",
+      projectId: project.id,
+      section: "usage",
+    },
     search: {} as {
       worktree?: string;
       action?: string;
@@ -110,17 +135,42 @@ vi.mock("./remoteContext", () => ({
 }));
 
 vi.mock("./useMediaQuery", () => ({
+  DESKTOP_RIGHT_PANEL_QUERY: "(min-width: 1200px)",
   WIDE_SHELL_QUERY: "(min-width: 900px)",
-  useMediaQuery: () => false,
+  useMediaQuery: (query: string) =>
+    query === "(min-width: 1200px)" ? media.rightPanel : media.wide,
 }));
 
 vi.mock("./views/ThreadView", () => ({
-  ThreadView: (props: { thread: Thread | null; onOpenTerminal: () => void }) => (
+  ThreadView: (props: {
+    thread: Thread | null;
+    onOpenSubAgent: (parentItemId: string) => void;
+    onOpenNotes: () => void;
+    onOpenTerminal: () => void;
+    onOpenWorkspace: (tab: "changes" | "files") => void;
+  }) => (
     <div>
       <span data-testid="thread-title">{props.thread?.title ?? "No thread"}</span>
       <button type="button" onClick={props.onOpenTerminal}>
         Open terminal
       </button>
+      <button type="button" onClick={props.onOpenNotes}>
+        Open notes
+      </button>
+      <button type="button" onClick={() => props.onOpenWorkspace("changes")}>
+        Open Git
+      </button>
+      <button type="button" onClick={() => props.onOpenSubAgent("parent-1")}>
+        Open subagent
+      </button>
+    </div>
+  ),
+}));
+
+vi.mock("@/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay", () => ({
+  SubAgentContent: (props: { threadId: string; parentItemId: string; hideHeader?: boolean }) => (
+    <div data-testid="subagent-content" data-hide-header={props.hideHeader || undefined}>
+      {props.threadId}:{props.parentItemId}
     </div>
   ),
 }));
@@ -152,20 +202,59 @@ vi.mock("./views/WorkspaceView", () => ({
   },
 }));
 
+vi.mock("./views/NotesView", () => ({
+  NotesView: (props: { projectId: string; onClose: () => void }) => {
+    useEffect(() => {
+      notesMounts.count += 1;
+    }, []);
+    return (
+      <div>
+        <span data-testid="notes-project">{props.projectId}</span>
+        <button type="button" onClick={props.onClose}>
+          Close notes
+        </button>
+      </div>
+    );
+  },
+}));
+
+vi.mock("./views/DesktopWorkspacePanel", () => ({
+  DesktopWorkspacePanel: (props: { threadContent: ReactNode }) => (
+    <div data-testid="desktop-workspace-panel">{props.threadContent}</div>
+  ),
+}));
+
 vi.mock("./views/NewThreadView", () => ({
   NewThreadView: () => null,
 }));
 
 vi.mock("./views/QuickCompose", () => ({
-  QuickCompose: () => <div data-testid="quick-compose" />,
+  QuickCompose: (props: {
+    expanded: boolean;
+    restoreWorktreeSelectionToken: number;
+    onExpandedChange: (expanded: boolean) => void;
+  }) => {
+    mobileViews.quickComposeProps = props;
+    return <div data-testid="quick-compose" data-expanded={String(props.expanded)} />;
+  },
 }));
 
 vi.mock("./views/ThreadsView", () => ({
-  ThreadsView: (props: { emptyStateOverride?: ReactNode }) => (
-    <div data-testid="threads-view">
-      {props.emptyStateOverride ? <div>{props.emptyStateOverride}</div> : null}
-    </div>
-  ),
+  ThreadsView: (props: {
+    emptyStateOverride?: ReactNode;
+    onNewThreadInWorktree: (input: {
+      projectId: string;
+      worktreePath: string;
+      worktreeBranch: string;
+    }) => void;
+  }) => {
+    mobileViews.threadsProps = props;
+    return (
+      <div data-testid="threads-view">
+        {props.emptyStateOverride ? <div>{props.emptyStateOverride}</div> : null}
+      </div>
+    );
+  },
 }));
 
 vi.mock("./views/DesktopsView", () => ({
@@ -206,17 +295,20 @@ describe("mobile route components", () => {
       <>
         <WorkspaceRoute />
         <TerminalRoute />
+        <NotesRoute />
       </>,
     );
     await Promise.all([
       screen.findByTestId("workspace-view"),
       screen.findByTestId("terminal-title"),
+      screen.findByTestId("notes-project"),
     ]);
     warmup.unmount();
   });
 
   beforeEach(() => {
     fixtures.params.threadId = "thread-routed";
+    fixtures.params.parentItemId = "parent-1";
     fixtures.params.projectId = "project-1";
     fixtures.search = {};
     fixtures.remote.connection = "online";
@@ -235,6 +327,19 @@ describe("mobile route components", () => {
     clearPairingLaunch();
     terminalMounts.count = 0;
     workspaceMounts.count = 0;
+    notesMounts.count = 0;
+    media.wide = false;
+    media.rightPanel = false;
+    useDesktopPanelStore.setState({
+      open: false,
+      activeTab: "files",
+      threadId: null,
+      subAgentThreadId: null,
+      subAgentParentItemId: null,
+    });
+    mobileViews.threadsProps = null;
+    mobileViews.quickComposeProps = null;
+    useAppStore.setState({ pendingDraftWorktreeSelections: {} });
   });
 
   it("replaces the empty thread content with a desktop setup prompt while disconnected", () => {
@@ -262,6 +367,47 @@ describe("mobile route components", () => {
     render(<ThreadsRoute />);
 
     expect(await screen.findByTestId("quick-compose")).toBeTruthy();
+  });
+
+  it("expands the phone's inline composer and targets the selected worktree", async () => {
+    render(<ThreadsRoute />);
+    await screen.findByTestId("quick-compose");
+
+    act(() => {
+      mobileViews.threadsProps?.onNewThreadInWorktree({
+        projectId: "project-1",
+        worktreePath: "/repo/.poracode/worktrees/calm-viper",
+        worktreeBranch: "poracode/calm-viper",
+      });
+    });
+
+    expect(fixtures.navigate).not.toHaveBeenCalledWith({ to: "/new" });
+    expect(mobileViews.quickComposeProps?.expanded).toBe(true);
+    expect(useAppStore.getState().pendingDraftWorktreeSelections["project-1"]).toEqual({
+      branch: "poracode/calm-viper",
+      baseBranch: "poracode/calm-viper",
+      isWorktree: true,
+      worktreePath: "/repo/.poracode/worktrees/calm-viper",
+    });
+
+    act(() => mobileViews.quickComposeProps?.onExpandedChange(false));
+
+    expect(mobileViews.quickComposeProps?.expanded).toBe(false);
+    expect(mobileViews.quickComposeProps?.restoreWorktreeSelectionToken).toBe(1);
+  });
+
+  it("reveals the inline composer for a worktree target queued from another phone route", async () => {
+    useAppStore.getState().setPendingDraftWorktreeSelection("project-1", {
+      branch: "poracode/calm-viper",
+      baseBranch: "poracode/calm-viper",
+      isWorktree: true,
+      worktreePath: "/repo/.poracode/worktrees/calm-viper",
+    });
+
+    render(<ThreadsRoute />);
+    await screen.findByTestId("quick-compose");
+
+    expect(mobileViews.quickComposeProps?.expanded).toBe(true);
   });
 
   it("redirects stale Usage settings when no desktop is paired", async () => {
@@ -360,6 +506,108 @@ describe("mobile route components", () => {
     });
   });
 
+  it("opens project notes for the routed thread and returns to it", async () => {
+    render(<ThreadRoute />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open notes" }));
+
+    expect(fixtures.navigate).toHaveBeenCalledWith({
+      to: "/notes/$threadId",
+      params: { threadId: "thread-routed" },
+    });
+
+    fixtures.navigate.mockReset();
+    render(<NotesRoute />);
+    fireEvent.click(await screen.findByRole("button", { name: "Close notes" }));
+    expect(fixtures.navigate).toHaveBeenCalledWith({
+      to: "/thread/$threadId",
+      params: { threadId: "thread-routed" },
+    });
+  });
+
+  it("opens notes in the desktop panel without navigating away from the thread", async () => {
+    media.wide = true;
+    media.rightPanel = true;
+    render(<ThreadRoute />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open notes" }));
+
+    expect(useDesktopPanelStore.getState()).toMatchObject({
+      open: true,
+      activeTab: "notes",
+      threadId: "thread-routed",
+    });
+    expect(fixtures.navigate).not.toHaveBeenCalled();
+  });
+
+  it("routes a phone subagent into its own history-backed page", async () => {
+    render(<ThreadRoute />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open subagent" }));
+
+    expect(fixtures.navigate).toHaveBeenCalledWith({
+      to: "/subagent/$threadId/$parentItemId",
+      params: { threadId: "thread-routed", parentItemId: "parent-1" },
+    });
+  });
+
+  it("opens a desktop-width PWA subagent in the temporary right-panel tab", async () => {
+    media.wide = true;
+    media.rightPanel = true;
+    render(<ThreadRoute />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open subagent" }));
+
+    expect(useDesktopPanelStore.getState()).toMatchObject({
+      open: true,
+      activeTab: "subagent",
+      subAgentThreadId: "thread-routed",
+      subAgentParentItemId: "parent-1",
+    });
+    expect(fixtures.navigate).not.toHaveBeenCalled();
+  });
+
+  it("renders the routed subagent target and migrates deep links into the desktop panel", async () => {
+    const { unmount } = render(<SubAgentRoute />);
+    expect(screen.getByTestId("subagent-content")).toHaveTextContent("thread-routed:parent-1");
+    expect(screen.getByTestId("subagent-content")).toHaveAttribute("data-hide-header", "true");
+    unmount();
+
+    media.wide = true;
+    media.rightPanel = true;
+    render(<SubAgentRoute />);
+
+    await waitFor(() => {
+      expect(useDesktopPanelStore.getState()).toMatchObject({
+        open: true,
+        activeTab: "subagent",
+        subAgentThreadId: "thread-routed",
+        subAgentParentItemId: "parent-1",
+      });
+    });
+    expect(fixtures.navigate).toHaveBeenCalledWith({
+      to: "/thread/$threadId",
+      params: { threadId: "thread-routed" },
+      replace: true,
+    });
+  });
+
+  it("opens Git in the desktop panel without navigating or remounting the thread route", async () => {
+    media.wide = true;
+    media.rightPanel = true;
+    render(<ThreadRoute />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open Git" }));
+
+    expect(useDesktopPanelStore.getState()).toMatchObject({
+      open: true,
+      activeTab: "git",
+      threadId: "thread-routed",
+    });
+    expect(fixtures.navigate).not.toHaveBeenCalled();
+    expect(screen.getByTestId("thread-title")).toHaveTextContent("Routed thread");
+  });
+
   it("closes a project terminal back to its source thread", async () => {
     fixtures.search = { fromThread: "thread-routed" };
     render(<TerminalRoute />);
@@ -383,6 +631,29 @@ describe("mobile route components", () => {
     rerender(<WorkspaceRoute />);
 
     expect(workspaceMounts.count).toBe(2);
+  });
+
+  it("opens a desktop workspace deep link in the shell panel and returns to the thread route", async () => {
+    media.wide = true;
+    media.rightPanel = true;
+    fixtures.params.threadId = "thread-routed";
+    fixtures.search = { tab: "changes" };
+
+    render(<WorkspaceRoute />);
+
+    await waitFor(() => {
+      expect(useDesktopPanelStore.getState()).toMatchObject({
+        open: true,
+        activeTab: "git",
+        threadId: "thread-routed",
+      });
+    });
+    expect(fixtures.navigate).toHaveBeenCalledWith({
+      to: "/thread/$threadId",
+      params: { threadId: "thread-routed" },
+      replace: true,
+    });
+    expect(screen.queryByTestId("workspace-view")).not.toBeInTheDocument();
   });
 
   it("remounts the terminal (fresh shell) when the target changes", async () => {

@@ -13,7 +13,7 @@ import {
   waitForSelector,
   waitForText,
 } from "../cdp/tools";
-import { glideCursorToSelector } from "../cursorOverlay";
+import { glideCursorToSelector, withCursorOverlayHidden } from "../cursorOverlay";
 import { clampInteger } from "../mcp/tools/helpers";
 import type { McpContent, McpToolResult, ToolSpec } from "../mcp/tools/types";
 import { clickSelector, fillSelector, resolveRefToSelector, typeIntoSelector } from "../pageDriver";
@@ -242,12 +242,14 @@ export async function dispatchChromeTool(
     }
     case "chrome_screenshot": {
       const fullPage = payload.fullPage === true;
-      const buffer = await captureScreenshotPng(cdp, {
-        format: "jpeg",
-        quality: 60,
-        scale: 0.75,
-        ...(fullPage ? { fullPage: true } : {}),
-      });
+      const buffer = await withCursorOverlayHidden(cdp, () =>
+        captureScreenshotPng(cdp, {
+          format: "jpeg",
+          quality: 60,
+          scale: 0.75,
+          ...(fullPage ? { fullPage: true } : {}),
+        }),
+      );
       return { __image: buffer.toString("base64"), mimeType: "image/jpeg" };
     }
     case "chrome_eval": {

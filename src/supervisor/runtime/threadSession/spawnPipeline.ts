@@ -55,7 +55,7 @@ import {
 } from "../../agents/base";
 import { captureSupervisorException } from "../../diagnostics/sentry";
 import { ensureNodePtySpawnHelperExecutable } from "../../nodePty";
-import type { SessionRuntime } from "../sessionTypes";
+import type { QueuedStructuredTurn, SessionRuntime } from "../sessionTypes";
 import type { ThreadOutputPipeline } from "../threadOutputPipeline";
 import { rewriteSegmentsForWsl } from "../threadAttachments";
 import { applyLaunchArgsConfigRewrite, mergeCliHookExtraArgs } from "./cliHookArgs";
@@ -574,12 +574,9 @@ export class SpawnPipeline {
     return { threadId: payload.threadId };
   }
 
-  async restartThread(
-    session: SessionRuntime,
-    prompt: string,
-    config: ThreadConfig,
-  ): Promise<void> {
+  async restartThread(session: SessionRuntime, turn: QueuedStructuredTurn): Promise<void> {
     const ctx = this.ctx;
+    const { prompt, config } = turn;
     if (!session.sessionRef) {
       throw new Error("Session cannot be restarted without a known session reference.");
     }
@@ -689,9 +686,15 @@ export class SpawnPipeline {
         ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
       });
       if (prompt.trim().length > 0 && structuredSession.startTurn) {
-        const optimisticItemId = ctx.emitOptimisticUserMessage(session.threadId, prompt);
+        const optimisticItemId =
+          turn.userMessageItemId ??
+          ctx.emitOptimisticUserMessage(session.threadId, prompt, turn.segments);
+        const startOptions = {
+          userMessageItemId: optimisticItemId,
+          ...(turn.inlineInstructions ? { inlineInstructions: turn.inlineInstructions } : {}),
+        };
         void structuredSession
-          .startTurn(prompt, launchConfig, undefined, { userMessageItemId: optimisticItemId })
+          .startTurn(prompt, launchConfig, turn.segments, startOptions)
           .catch((error) => {
             if (ctx.sessions.get(restarted.threadId)?.instanceId !== restarted.instanceId) {
               return;

@@ -78,6 +78,20 @@ describe("applyShellSnapshot", () => {
     expect(threadStatus()).toBe("finished");
   });
 
+  it("clears a finished badge only when the metadata event explicitly marks it viewed", () => {
+    useAppStore.setState({ threads: [makeThread("finished")] });
+
+    dispatchRemoteSupervisorEvent({
+      type: "remote-threads-changed",
+      threadIds: [THREAD_ID],
+      viewedThreadIds: [THREAD_ID],
+    });
+
+    expect(threadStatus()).toBe("idle");
+    applyShellSnapshot(makeShellSnapshot([makeThread("idle")]));
+    expect(threadStatus()).toBe("idle");
+  });
+
   it("applies non-idle snapshot statuses over a local finished badge", () => {
     useAppStore.setState({ threads: [makeThread("finished")] });
     applyShellSnapshot(makeShellSnapshot([makeThread("working")]));
@@ -98,6 +112,15 @@ describe("applyShellSnapshot", () => {
     useAppStore.setState({ threads: [makeThread("finished")] });
     useAppStore.getState().openThread(THREAD_ID);
     applyShellSnapshot(makeShellSnapshot([makeThread("idle")]));
+    expect(threadStatus()).toBe("idle");
+  });
+
+  it("does not restore a finished badge onto an open thread", () => {
+    useAppStore.setState({ threads: [makeThread("finished")] });
+    useAppStore.getState().openThread(THREAD_ID);
+
+    applyShellSnapshot(makeShellSnapshot([makeThread("finished")]));
+
     expect(threadStatus()).toBe("idle");
   });
 

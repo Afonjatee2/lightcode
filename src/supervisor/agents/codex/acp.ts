@@ -6,7 +6,6 @@ import {
   areAgentSlashCommandsEqual,
   type AgentSlashCommand,
   type PromptSegment,
-  type ResolvedMcpServer,
   type RuntimeEvent,
   type SessionRef,
   type ThreadConfig,
@@ -63,13 +62,6 @@ export { deriveCodexStructuredState, parseCodexSocketMessage } from "./acpProtoc
 export type { CodexThreadStatus } from "./acpProtocol";
 
 type TurnStartParams = CodexClientRequestMap["turn/start"]["params"];
-
-/** Codex app-server only activates launch-time MCP overrides after an explicit reload. */
-export function shouldReloadCodexMcpServers(
-  mcpServers: readonly ResolvedMcpServer[] | undefined,
-): boolean {
-  return (mcpServers?.length ?? 0) > 0;
-}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -222,7 +214,6 @@ export class CodexStructuredSession implements StructuredSessionHandle {
         threadId: string;
       }>
     | undefined;
-  private readonly hasMcpServers: boolean;
   /**
    * Codex can report a plain `active` status while `thread/resume` is only
    * attaching to an existing saved thread. Treat that as history-load noise
@@ -239,13 +230,11 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     rpc: CodexAppServerRpc,
     threadId: string,
     wslDistro?: string,
-    hasMcpServers = false,
   ) {
     this.appServer = appServer;
     this.rpc = rpc;
     this.threadId = threadId;
     this.wslDistro = wslDistro;
-    this.hasMcpServers = hasMcpServers;
     this.launchOptions = {
       suppressResumeConfigOverrides: true,
     };
@@ -442,13 +431,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     const wslDistro =
       input.projectLocation.kind === "wsl" ? input.projectLocation.distro : undefined;
     const rpc = new CodexAppServerRpc(transport, input.threadId);
-    const session = new CodexStructuredSession(
-      appServer,
-      rpc,
-      input.threadId,
-      wslDistro,
-      shouldReloadCodexMcpServers(input.mcpServers),
-    );
+    const session = new CodexStructuredSession(appServer, rpc, input.threadId, wslDistro);
     session.attachRpcHandlers();
 
     return session;
@@ -693,9 +676,6 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     const sandboxPolicy = toCodexSandboxPolicy(config.sandboxMode);
     const collaborationMode = buildCodexCollaborationMode(config);
     try {
-      if (this.hasMcpServers) {
-        await this.rpc.request("config/mcpServer/reload", undefined);
-      }
       const result = await this.rpc.request("turn/start", {
         threadId,
         input,

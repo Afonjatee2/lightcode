@@ -18,6 +18,7 @@ import {
 
 import { useAppStore } from "./state/appStore";
 import {
+  acknowledgeThread,
   archiveThread,
   deleteThread,
   openThread,
@@ -346,6 +347,9 @@ const mainWindowCleanups: Array<() => void> = isMainWindow
         const thread = useAppStore.getState().threads.find((t) => t.id === command.threadId);
         if (!thread) return;
         switch (command.kind) {
+          case "acknowledge":
+            acknowledgeThread(command.threadId);
+            break;
           case "rename":
             renameThread(command.threadId, command.title);
             break;
@@ -403,6 +407,11 @@ const mainWindowCleanups: Array<() => void> = isMainWindow
       // settings over the remote API) — apply without echoing a persist.
       readBridge().onSharedSettingsChanged((settings) => {
         applyExternalSharedSettings(normalizeSharedSettings(settings));
+      }),
+      // Main-process project mutations must reach this whole-store snapshot
+      // before its next dbSyncAll persistence write.
+      readBridge().onProjectStateChanged(({ projects }) => {
+        useAppStore.setState({ projects });
       }),
       readBridge().onThreadOpenRequested(({ threadId }) => {
         openThread(threadId, { focusComposer: true });

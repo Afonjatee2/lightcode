@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, createEvent, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FloatingComposerDock } from "./FloatingComposerDock";
 import { resetComposerKeyboardMemoryForTests } from "./useComposerKeyboard";
 
@@ -13,6 +13,7 @@ const scrollLockMock = vi.hoisted(() => ({
   lockComposeScroll: vi.fn<(source?: HTMLElement | null) => void>(),
   unlockComposeScroll: vi.fn<() => void>(),
 }));
+const originalResizeObserver = globalThis.ResizeObserver;
 
 vi.mock("./useKeyboardOffset", () => ({
   useKeyboardGeometry: () => ({
@@ -119,6 +120,10 @@ function FocusLossHarness(props: { collapseOnFocusLoss?: boolean }) {
 }
 
 describe("FloatingComposerDock", () => {
+  afterEach(() => {
+    globalThis.ResizeObserver = originalResizeObserver;
+  });
+
   beforeEach(() => {
     keyboardMock.offset = 0;
     window.localStorage.clear();
@@ -332,7 +337,59 @@ describe("FloatingComposerDock", () => {
     expect(dock).toHaveAttribute("data-expanded");
   });
 
+  it("lets a desktop outside press collapse without consuming the background interaction", () => {
+    const onExpandedChange = vi.fn<(expanded: boolean) => void>();
+    const onBackgroundClick = vi.fn<() => void>();
+
+    render(
+      <>
+        <button type="button" onClick={onBackgroundClick}>
+          Background action
+        </button>
+        <FloatingComposerDock
+          expanded
+          keyboardKey="thread-1"
+          nonBlockingOutsidePress
+          scrimLabel="Close composer"
+          onExpandedChange={onExpandedChange}
+        >
+          <div data-composer-input-anchor="">
+            <div
+              role="textbox"
+              tabIndex={0}
+              contentEditable
+              suppressContentEditableWarning
+              aria-label="Composer input"
+            />
+          </div>
+        </FloatingComposerDock>
+      </>,
+    );
+
+    expect(screen.queryByLabelText("Close composer")).not.toBeInTheDocument();
+
+    // Earlier guarded-touch tests arm the one-shot synthetic-click suppressor.
+    // Consume it so this assertion measures the non-blocking outside press.
+    fireEvent.click(document.body);
+    const backgroundAction = screen.getByRole("button", { name: "Background action" });
+    fireEvent.pointerDown(backgroundAction);
+    fireEvent.click(backgroundAction);
+
+    expect(onExpandedChange).toHaveBeenCalledWith(false);
+    expect(onBackgroundClick).toHaveBeenCalledOnce();
+  });
+
   it("pins a measured max-height while the dock flips, then releases to CSS", async () => {
+    const resizeCallbacks: ResizeObserverCallback[] = [];
+    globalThis.ResizeObserver = class ResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallbacks.push(callback);
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+
     const { rerender } = render(<ControlledDockHarness />);
     const input = screen.getByRole("textbox", { name: "Composer input" });
     const bubble = document.querySelector<HTMLElement>(".m-compose-bubble");
@@ -367,9 +424,25 @@ describe("FloatingComposerDock", () => {
     fireHeightEnd();
     expect(bubble.style.height).toBe("");
 
-    // The expanded rest height is cached once the pin clears.
+    // The expanded rest height is cached once the pin clears. A subsequent
+    // descendant-only resize (such as typing a newline in the contenteditable)
+    // must refresh it even though FloatingComposerDock itself does not render.
     rectHeight = 90;
     rerender(<ControlledDockHarness />);
+    rectHeight = 132;
+    input.scrollTop = 56;
+    input.scrollLeft = 12;
+    act(() => {
+      resizeCallbacks[0]?.(
+        [
+          {
+            borderBoxSize: [{ blockSize: 132, inlineSize: 320 }],
+            target: bubble,
+          } as unknown as ResizeObserverEntry,
+        ],
+        {} as ResizeObserver,
+      );
+    });
 
     // Earlier touch-tap tests arm the one-shot ghost-tap guard
     // (suppressGhostTap.ts), which swallows the next document click — consume
@@ -380,9 +453,11 @@ describe("FloatingComposerDock", () => {
     // lifted so it can't clamp the pin), shrink to the collapsed line, then
     // release.
     fireEvent.click(screen.getByLabelText("Close composer"));
+    expect(input.scrollTop).toBe(0);
+    expect(input.scrollLeft).toBe(0);
     expect(dock).toHaveAttribute("data-expanded");
-    expect(bubble.style.height).toBe("90px");
-    expect(bubble.style.maxHeight).toBe("90px");
+    expect(bubble.style.height).toBe("132px");
+    expect(bubble.style.maxHeight).toBe("132px");
     await act(async () => {
       await waitForTwoFrames();
     });
@@ -391,6 +466,81 @@ describe("FloatingComposerDock", () => {
     expect(dock).not.toHaveAttribute("data-expanded");
     expect(bubble.style.height).toBe("");
     expect(bubble.style.maxHeight).toBe("");
+  });
+
+  it("releases an expansion pin when guarded focus interrupts the animation", async () => {
+    const restoreVisualViewport = installVisualViewport();
+    const resizeCallbacks: ResizeObserverCallback[] = [];
+    globalThis.ResizeObserver = class ResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallbacks.push(callback);
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+    window.localStorage.setItem("poracode-mobile-keyboard-height", "320");
+    resetComposerKeyboardMemoryForTests();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+    try {
+      const { rerender } = render(<ControlledDockHarness />);
+      const bubble = document.querySelector<HTMLElement>(".m-compose-bubble");
+      expect(bubble).not.toBeNull();
+      if (!bubble) return;
+
+      let rectHeight = 34;
+      vi.spyOn(bubble, "getBoundingClientRect").mockImplementation(
+        () => ({ height: rectHeight }) as unknown as DOMRect,
+      );
+      Object.defineProperty(bubble, "scrollHeight", { configurable: true, value: 132 });
+      rerender(<ControlledDockHarness />);
+
+      const tapTarget = screen.getByLabelText("Open composer");
+      const pointerDown = createEvent.pointerDown(tapTarget, {
+        cancelable: true,
+        pointerType: "touch",
+      });
+      fireEvent(tapTarget, pointerDown);
+
+      expect(bubble.style.height).toBe("34px");
+      await act(async () => {
+        await waitForTwoFrames();
+      });
+      expect(bubble.style.height).toBe("132px");
+
+      // The keyboard measurement completes the probe and switches the same
+      // already-expanded dock to instant guarded focus. That handoff used to
+      // cancel the animation cleanup while leaving its 132px pin behind.
+      keyboardMock.offset = 320;
+      rectHeight = 132;
+      rerender(<ControlledDockHarness />);
+      act(() => {
+        vi.runOnlyPendingTimers();
+      });
+
+      expect(bubble.style.height).toBe("");
+      expect(bubble.style.maxHeight).toBe("");
+
+      // Once CSS owns the height again, descendant shrink measurements are
+      // accepted instead of being ignored as an in-flight animation.
+      rectHeight = 90;
+      act(() => {
+        resizeCallbacks[0]?.(
+          [
+            {
+              borderBoxSize: [{ blockSize: 90, inlineSize: 320 }],
+              target: bubble,
+            } as unknown as ResizeObserverEntry,
+          ],
+          {} as ResizeObserver,
+        );
+      });
+      expect(bubble.style.height).toBe("");
+    } finally {
+      vi.useRealTimers();
+      restoreVisualViewport();
+    }
   });
 
   it("collapses on input focus loss when collapseOnFocusLoss is set", async () => {

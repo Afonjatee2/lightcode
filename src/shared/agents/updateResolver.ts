@@ -11,7 +11,11 @@ import type { AgentUpdateInfo } from "@/shared/contracts";
  *      install channels (npm → native installer → brew) without our help.
  *   2. A package-manager command inferred from the executable path (brew,
  *      winget, pnpm-global, bun-global, npm-global).
- *   3. A last-resort `npm install -g <pkg>@latest` for kinds that publish on
+ *   3. The provider's own install script (`installer`) re-run non-interactively,
+ *      for agents that ship a `curl … | bash` / `irm … | iex` installer (and
+ *      whose CLI self-updater is an interactive TUI) instead of publishing
+ *      through a package manager.
+ *   4. A last-resort `npm install -g <pkg>@latest` for kinds that publish on
  *      npm but live somewhere we don't recognise (PATH overrides, wrappers).
  */
 
@@ -143,6 +147,15 @@ export function resolveSharedUpdateCommand(
       args: ["install", "-g", `${pkg.npm}@latest`],
       strategy: "npm-global",
     };
+  }
+
+  // A provider that ships its own install script re-runs it non-interactively.
+  // Preferred over the npm last-resort so an agent installed by its own
+  // installer (not a package manager) updates in place instead of spawning a
+  // conflicting global npm install. `posix` covers WSL too.
+  if (pkg.installer) {
+    const spec = input.envKind === "windows" ? pkg.installer.windows : pkg.installer.posix;
+    return { binary: spec.binary, args: spec.args, strategy: "installer" };
   }
 
   // Last resort: try npm-global. Most legacy agents publish via npm, so even

@@ -357,6 +357,24 @@ describe("remoteSocketCoordinator", () => {
     expect(socket.readyState).toBe(FakeWebSocket.CLOSED);
   });
 
+  it("requests catch-up when Safari restores the page or window focus", async () => {
+    const harness = track(createHarness());
+    const socket = await start(harness);
+    socket.open();
+    await vi.advanceTimersByTimeAsync(600);
+    harness.requestRefresh.mockClear();
+
+    window.dispatchEvent(new Event("pageshow"));
+    window.dispatchEvent(new Event("focus"));
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(harness.requestRefresh).toHaveBeenCalledTimes(1);
+    expect(harness.requestRefresh).toHaveBeenCalledWith({
+      refreshSelectedThread: true,
+      includeAuxiliary: true,
+    });
+  });
+
   it("clears a health timeout only for the correlated pong", async () => {
     const harness = track(createHarness());
     const socket = await start(harness);

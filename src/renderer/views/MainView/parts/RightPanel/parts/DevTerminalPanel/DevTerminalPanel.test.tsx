@@ -108,4 +108,15 @@ describe("DevTerminalPanel", () => {
     expect(usePanelStore.getState().gitReviewContext).toEqual({ projectId: project.id });
     expect(usePanelStore.getState().filesPanelContext?.projectId).toBe(project.id);
   });
+
+  it("can force the right layout for an embedded host without changing saved settings", () => {
+    useSharedSettings.setState({ terminalPosition: "bottom" });
+    const onEmpty = vi.fn<() => void>();
+    render(<DevTerminalPanel hideHeader positionOverride="right" onEmpty={onEmpty} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "close right tab" }));
+
+    expect(onEmpty).toHaveBeenCalledOnce();
+    expect(useSharedSettings.getState().terminalPosition).toBe("bottom");
+  });
 });

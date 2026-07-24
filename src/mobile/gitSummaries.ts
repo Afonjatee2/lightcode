@@ -13,6 +13,7 @@ interface GitSummariesStore {
   remoteByThread: RemoteGitSummaries;
   setAll(byThread: RemoteGitSummaries): void;
   setThread(threadId: string, summary: RemoteThreadGitSummary): void;
+  setThreadPr(threadId: string, pr: RemoteThreadGitSummary["pr"]): void;
   reset(): void;
 }
 
@@ -72,6 +73,32 @@ export const useGitSummariesStore = create<GitSummariesStore>()((set) => ({
       const existing = state.localByThread[threadId];
       if (existing && summariesEqual(existing, summary)) return state;
       const localByThread = { ...state.localByThread, [threadId]: summary };
+      return {
+        localByThread,
+        byThread: mergeSummaries(localByThread, state.remoteByThread),
+      };
+    }),
+  setThreadPr: (threadId, pr) =>
+    set((state) => {
+      const remoteSummary = state.remoteByThread[threadId];
+      if (remoteSummary) {
+        if (JSON.stringify(remoteSummary.pr) === JSON.stringify(pr)) return state;
+        const remoteByThread = {
+          ...state.remoteByThread,
+          [threadId]: { ...remoteSummary, pr },
+        };
+        return {
+          remoteByThread,
+          byThread: mergeSummaries(state.localByThread, remoteByThread),
+        };
+      }
+
+      const localSummary = state.localByThread[threadId];
+      if (!localSummary || JSON.stringify(localSummary.pr) === JSON.stringify(pr)) return state;
+      const localByThread = {
+        ...state.localByThread,
+        [threadId]: { ...localSummary, pr },
+      };
       return {
         localByThread,
         byThread: mergeSummaries(localByThread, state.remoteByThread),

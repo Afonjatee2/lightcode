@@ -63,6 +63,13 @@ pnpm run smoke:integration -- --scope changed --mode mock
 
 This allocates a free dev-server port and a free CDP port (override with `--vitePort`/`--port`; explicit values are verified free), creates and commits a disposable fixture project, seeds an isolated database, starts Electron with an isolated profile, dismisses and verifies the first-launch welcome screen, runs the integration suite, writes screenshots/report artifacts under `~/.poracode-smoke`, and tears down the process automatically. No provider credentials, PTY input, git mutations, MCP server, mobile device, or native update flow is required for the default mock run.
 
+**`HOME` and provider detection — no drift between test and app.** Poracode's own state is always isolated via `PORACODE_BASE_DIR`, independent of `HOME`. Provider _detection_, however, resolves each CLI through the login-shell `command -v` (e.g. `kimi` → `~/.kimi-code/bin/kimi`) and reads credentials under the home dir — so it only matches the real app when `HOME` is the real home. Therefore:
+
+- **Mock mode** sandboxes `HOME`/`APPDATA` and uses a mock keychain (deterministic isolation; providers are mocked). Real providers legitimately show **"Not found"** here — that is expected, not a bug, and mock gates never depend on real credentials.
+- **Real mode** (`--mode real`) and the manual `dev:test` launch both keep the **real `HOME`**, so authenticated providers (Kimi, Qwen, …) can detect as in the shipped app. Always verify a provider-dependent surface in real mode; never diagnose a real detection issue from a mock-mode "Not found".
+
+Real `HOME` is necessary but not always sufficient: detection probes `command -v <binary>` in a login+interactive shell with **`cwd: homedir()`**, so a CLI whose bin dir is on `PATH` only via a _project-scoped_ mechanism (direnv `.envrc`, `asdf` local, `mise`, a per-repo `.env`) is invisible to the detector even though it works inside the project — direnv unloads at the home cwd. Symptom: the app log prints `direnv: unloading` and the provider shows "Not found". Fix in the environment, not the app: put the binary on a globally-resolvable `PATH` (e.g. symlink into `~/.local/bin`, as qwen/grok are). This is why `~/.kimi-code/bin/kimi` (direnv-only) can miss while `~/.local/bin`-installed providers detect fine.
+
 The runner prints the chosen ports and writes them to `<smoke root>/ports.json` (`{ appUrl, cdpPort, devServerPort }`). Every follow-up command in this skill must target that run's ports — export them before driving manual gates:
 
 ```sh
@@ -78,8 +85,15 @@ The committed dev hooks must honor `PORACODE_CDP_PORT` and `PORACODE_BASE_DIR` (
 PORACODE_DEV_SERVER_PORT=<vitePort> \
 PORACODE_CDP_PORT=<cdpPort> \
 PORACODE_BASE_DIR="$HOME/.poracode-smoke/<run-id>" \
-pnpm run dev
+pnpm run dev:test
 ```
+
+`dev:test` is the manual-test entrypoint: it bypasses the first-launch welcome
+overlay before the renderer's first paint and releases the welcome gate for
+background work immediately. Use ordinary `pnpm run dev` when the welcome experience
+itself is under test. The one-command integration runner also keeps using the
+ordinary launch path because its baseline explicitly exercises and verifies the
+real welcome dismissal flow.
 
 Set `PORACODE_APP_URL="http://127.0.0.1:<vitePort>/"` and
 `PORACODE_CDP_PORT=<cdpPort>` before using the CDP helpers. Do not launch a

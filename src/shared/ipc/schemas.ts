@@ -69,6 +69,10 @@ export const copyImageToClipboardPayloadSchema = z.object({
   data: z.instanceof(Uint8Array),
 });
 
+export const readLocalImageFilePayloadSchema = z.object({
+  url: z.string().regex(/^(?:poracode|lightcode)-local:\/\//),
+});
+
 export const createProjectDirectoryPayloadSchema = z.object({
   /** Absolute parent directory (native path, or a `\\wsl...` UNC path). */
   parent: z.string().min(1),

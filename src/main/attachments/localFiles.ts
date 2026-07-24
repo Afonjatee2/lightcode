@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
 import { net, protocol } from "electron";
@@ -57,6 +57,18 @@ export function saveUploadedAttachmentFile(
 /** Write raw image bytes to a user-chosen absolute path (download "Save as…"). */
 export function writeImageFile(filePath: string, data: Uint8Array): void {
   writeFileSync(filePath, Buffer.from(data));
+}
+
+/** Read image bytes addressed by the desktop-only local-file protocol. */
+export function readLocalImageFile(url: string): Uint8Array {
+  if (!/^(?:poracode|lightcode)-local:\/\//.test(url)) {
+    throw new Error("Unsupported local image URL");
+  }
+  const filePath = resolveLocalFileUrlPath(url);
+  if (filePath.includes("\0")) {
+    throw new Error("Invalid local image path");
+  }
+  return readFileSync(resolve(filePath));
 }
 
 export function saveHandoffContextFile(

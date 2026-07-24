@@ -126,6 +126,10 @@ export const useGitReviewActionStore = create<GitReviewActionStore>((set, get) =
   },
 }));
 
+export function resetGitReviewActionStore(): void {
+  useGitReviewActionStore.setState({ panels: {} });
+}
+
 /**
  * Reactive read of a single panel's state. Returns a stable empty default when
  * the panel has no state yet, so an absent key never triggers re-render churn.

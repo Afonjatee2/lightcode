@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Thread } from "@/shared/contracts";
-import { diffSyncedThreadIds } from "./threadSyncBroadcast";
+import { diffSyncedThreadIds, diffSyncedThreads } from "./threadSyncBroadcast";
 
 function testThread(overrides: Partial<Thread> = {}): Thread {
   return {
@@ -63,5 +63,23 @@ describe("diffSyncedThreadIds", () => {
     const before = [testThread()];
     const after = [testThread({ updatedAt: "2026-01-02T00:00:00.000Z" })];
     expect(diffSyncedThreadIds(before, after)).toEqual([]);
+  });
+
+  it("identifies only explicit finished-to-idle transitions as viewed", () => {
+    const before = [
+      testThread({ id: "thread-1", status: "finished" }),
+      testThread({ id: "thread-2", status: "working" }),
+      testThread({ id: "thread-3", status: "finished" }),
+    ];
+    const after = [
+      testThread({ id: "thread-1", status: "idle" }),
+      testThread({ id: "thread-2", status: "idle" }),
+      testThread({ id: "thread-3", status: "working" }),
+    ];
+
+    expect(diffSyncedThreads(before, after)).toEqual({
+      changedThreadIds: ["thread-1", "thread-2", "thread-3"],
+      viewedThreadIds: ["thread-1"],
+    });
   });
 });

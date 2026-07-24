@@ -144,6 +144,9 @@ describe("useComposerKeyboard", () => {
     });
     render(<ComposerKeyboardHarness onBeforeGuardedFocus={() => focusOrder.push("expand")} />);
     const input = screen.getByRole("textbox");
+    input.innerHTML = "First line<div>Second line</div>";
+    Object.defineProperty(input, "scrollHeight", { configurable: true, value: 120 });
+    input.scrollTop = 0;
 
     const pointerDown = createEvent.pointerDown(input, {
       pointerType: "touch",
@@ -152,6 +155,10 @@ describe("useComposerKeyboard", () => {
     fireEvent(input, pointerDown);
 
     expect(focusOrder).toEqual(["expand", "sentinel", "input"]);
+    const selection = window.getSelection();
+    expect(selection?.anchorNode).toBe(input);
+    expect(selection?.anchorOffset).toBe(input.childNodes.length);
+    expect(input.scrollTop).toBe(120);
   });
 
   it("uses the guarded focus path when the unfocused input shield is tapped", () => {

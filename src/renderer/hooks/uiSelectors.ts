@@ -114,7 +114,8 @@ export function isGitPanelEclipsed(
     rightPanelTab === "files" ||
     rightPanelTab === "browser" ||
     rightPanelTab === "usage" ||
-    rightPanelTab === "notes"
+    rightPanelTab === "notes" ||
+    rightPanelTab === "subagent"
   );
 }
 

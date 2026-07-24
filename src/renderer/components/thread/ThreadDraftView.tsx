@@ -157,6 +157,7 @@ export function ThreadDraftView(props: {
   compact?: boolean;
   quickComposer?: boolean;
   composerPlaceholder?: string;
+  restoreWorktreeSelectionToken?: number;
   /** Override whether unmodified Enter submits instead of inserting a newline. */
   submitOnEnter?: boolean;
   pickFiles?: () => Promise<string[] | null>;
@@ -1020,6 +1021,9 @@ export function ThreadDraftView(props: {
           <ThreadDraftComposerArea
             project={project}
             {...(props.paneId ? { paneId: props.paneId } : {})}
+            {...(props.restoreWorktreeSelectionToken !== undefined
+              ? { restoreWorktreeSelectionToken: props.restoreWorktreeSelectionToken }
+              : {})}
             selectedAgent={selectedAgent}
             controls={draftControls}
             config={{

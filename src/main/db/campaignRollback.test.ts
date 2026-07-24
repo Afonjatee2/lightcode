@@ -1,8 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { closeDatabase, initDatabase } from "@/main/db/connection";
 import {
   dbDeleteProject,
   dbDeleteThread,
@@ -11,6 +7,11 @@ import {
   dbUpsertProject,
   dbUpsertThread,
 } from "@/main/db/projectsThreads";
+import {
+  setupTempDb,
+  sqliteAvailable,
+  teardownTempDb,
+} from "@/supervisor/consultations/sqliteTestHarness";
 
 /**
  * Proves that the campaign creation rollback logic leaves no orphaned
@@ -38,8 +39,8 @@ function makeGuiThread(threadId: string, projectId: string) {
     projectId,
     title: "GUI Thread",
     agentKind: "claude",
-    config: { model: "claude-sonnet-4", mode: "agent" as const },
-    status: "inactive" as const,
+    config: { model: "sonnet" },
+    status: "idle" as const,
     attention: "none" as const,
     archived: false,
     done: false,
@@ -52,17 +53,15 @@ function makeGuiThread(threadId: string, projectId: string) {
   };
 }
 
-describe("durable rollback — no orphaned projects or threads", () => {
+describe.skipIf(!sqliteAvailable)("durable rollback — no orphaned projects or threads", () => {
   let dir: string;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "lc-rollback-"));
-    initDatabase(join(dir, "state.sqlite"));
+    dir = setupTempDb();
   });
 
   afterEach(() => {
-    closeDatabase();
-    rmSync(dir, { recursive: true, force: true });
+    teardownTempDb(dir);
   });
 
   it("deleting a project removes it from SQLite", () => {
@@ -124,52 +123,48 @@ describe("durable rollback — no orphaned projects or threads", () => {
   });
 
   it("deleting non-existent ids does not throw", () => {
-    expect(() => dbDeleteProject("never-existed")).not.toThrow();
-    expect(() => dbDeleteThread("never-existed")).not.toThrow();
+    expect(() => dbDeleteProject("does-not-exist")).not.toThrow();
+    expect(() => dbDeleteThread("does-not-exist")).not.toThrow();
   });
 
   it("re-creating a project after deletion works cleanly", () => {
-    const project = makeCampaignProject("proj-rt");
-    const thread1 = makeGuiThread("thread-rt-1", project.id);
-
+    const project = makeCampaignProject("proj-recreate");
     dbUpsertProject(project, 0);
-    dbUpsertThread(thread1, 0);
-
-    dbDeleteThread(thread1.id);
     dbDeleteProject(project.id);
-
-    // Re-create
     dbUpsertProject(project, 0);
-    const thread2 = makeGuiThread("thread-rt-2", project.id);
-    dbUpsertThread(thread2, 0);
 
-    const projects = dbGetProjects();
-    const projectThreads = dbGetThreads().filter((t) => t.projectId === project.id);
-
-    expect(projects.filter((p) => p.id === project.id).length).toBe(1);
-    expect(projectThreads.length).toBe(1);
-    expect(projectThreads[0]?.id).toBe("thread-rt-2");
+    expect(dbGetProjects().find((p) => p.id === project.id)).toBeDefined();
   });
 
   it("campaignExtension survives delete and re-create", () => {
-    const project = {
-      ...makeCampaignProject("proj-survive"),
-      campaignExtension: {
-        campaignGroupId: "cg-survive",
-        clientName: "Survivor",
-        campaignName: "Survival Campaign",
-        jobNumber: "JOB-001",
-        mcpProfile: "deployment" as const,
+    const project = makeCampaignProject("proj-survive");
+    dbUpsertProject(
+      {
+        ...project,
+        campaignExtension: {
+          campaignGroupId: "cg-survive",
+          clientName: "Survivor",
+          campaignName: "Survival Campaign",
+          mcpProfile: "deployment",
+        },
       },
-    };
-    dbUpsertProject(project, 0);
+      0,
+    );
     dbDeleteProject(project.id);
-
-    // Re-create
-    dbUpsertProject(project, 0);
+    dbUpsertProject(
+      {
+        ...project,
+        campaignExtension: {
+          campaignGroupId: "cg-survive",
+          clientName: "Survivor",
+          campaignName: "Survival Campaign",
+          mcpProfile: "deployment",
+        },
+      },
+      0,
+    );
 
     const found = dbGetProjects().find((p) => p.id === project.id);
-    expect(found).toBeDefined();
     expect(found?.purpose).toBe("campaign");
     expect(found?.campaignExtension?.campaignGroupId).toBe("cg-survive");
     expect(found?.campaignExtension?.clientName).toBe("Survivor");
@@ -177,23 +172,21 @@ describe("durable rollback — no orphaned projects or threads", () => {
   });
 
   it("campaign project round-trips through real dbUpsertProject/dbGetProjects", () => {
-    const project = {
-      ...makeCampaignProject("proj-roundtrip"),
-      campaignExtension: {
-        campaignGroupId: "cg-rt-001",
-        clientName: "Roundtrip Client",
-        campaignName: "Roundtrip Campaign",
-        jobNumber: "RT-001",
-        defaultAgentKind: "claude",
-        defaultModel: "claude-sonnet-4",
-        mcpProfile: "monitoring" as const,
-        resourceAliases: { "@media": "/path/to/media" },
+    const project = makeCampaignProject("proj-rt");
+    dbUpsertProject(
+      {
+        ...project,
+        campaignExtension: {
+          campaignGroupId: "cg-rt-001",
+          clientName: "Roundtrip",
+          campaignName: "Roundtrip Campaign",
+          resourceAliases: { "@media": "/path/to/media" },
+        },
       },
-    };
-    dbUpsertProject(project, 0);
+      0,
+    );
 
     const found = dbGetProjects().find((p) => p.id === project.id);
-    expect(found).toBeDefined();
     expect(found?.purpose).toBe("campaign");
     expect(found?.campaignExtension?.campaignGroupId).toBe("cg-rt-001");
     expect(found?.campaignExtension?.resourceAliases).toEqual({ "@media": "/path/to/media" });

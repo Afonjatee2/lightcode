@@ -120,7 +120,7 @@ export function CommitSyncPanel(props: {
     <GitReviewSection gap={1}>
       {hasAnyChanges ? (
         <>
-          <div className="relative">
+          <div className="relative flex">
             <TextArea
               fullWidth
               autoSize
@@ -154,7 +154,7 @@ export function CommitSyncPanel(props: {
                   isIconOnly
                   size="sm"
                   variant="ghost"
-                  className="lc-commit-generate !absolute top-1.5 right-1 size-6 min-w-0"
+                  className="lc-commit-field-action lc-commit-generate !absolute top-1.5 right-1 size-6 min-w-0"
                   isDisabled={isGenerating || !hasAnyChanges}
                   isPending={isGenerating}
                   onPress={() => void handleGenerateMessage()}
@@ -175,7 +175,7 @@ export function CommitSyncPanel(props: {
                   size="sm"
                   variant="ghost"
                   aria-label={t`Stashed changes pending`}
-                  className={`!absolute top-1.5 size-6 min-w-0 text-muted ${
+                  className={`lc-commit-field-action !absolute top-1.5 size-6 min-w-0 text-muted ${
                     canGenerateMessage ? "right-8" : "right-1"
                   }`}
                 >

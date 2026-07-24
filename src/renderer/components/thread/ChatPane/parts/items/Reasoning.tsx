@@ -1,6 +1,7 @@
 import { memo, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Brain, ChevronDown } from "lucide-react";
+import { useSmoothStreamedText } from "@/renderer/hooks/useSmoothStreamedText";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { useBrainThinking, useShimmer } from "@/renderer/thinkingAnimator";
@@ -17,6 +18,7 @@ export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
   const hasText = rawText.trim().length > 0;
   const isStreaming = item.state !== "completed";
   const [isOpen, setIsOpen] = useState(false);
+  const smoothedText = useSmoothStreamedText(rawText, isStreaming && !isOpen);
   const actions = useChatPaneActions();
 
   const thinkingTextRef = useShimmer<HTMLSpanElement>(isStreaming);
@@ -29,7 +31,7 @@ export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
   const preview = isOpen
     ? ""
     : isStreaming
-      ? getReasoningLastLine(rawText)
+      ? getReasoningLastLine(smoothedText)
       : getReasoningPreview(rawText);
 
   // Compact toggle — visually distinct from tool-call accordions: no border
@@ -59,7 +61,9 @@ export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
         >
           {isStreaming ? <Trans>Thinking</Trans> : <Trans>Thought</Trans>}
         </span>
-        {preview ? <span className="min-w-0 truncate opacity-70">{preview}</span> : null}
+        {/* pr keeps italic ink past the text advance from being clipped by
+            `truncate`'s overflow, same as ReasoningInline's preview. */}
+        {preview ? <span className="min-w-0 truncate pr-[0.2em] opacity-70">{preview}</span> : null}
         <ChevronDown
           className={`size-3 shrink-0 opacity-100 transition-[transform,opacity] [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-visible:opacity-100 ${isOpen ? "rotate-180" : ""}`}
         />

@@ -40,6 +40,33 @@ async function trayPng(svg, size, accent) {
     .toBuffer();
 }
 
+// macOS template image: a solid-black glyph on a transparent background. macOS
+// reads only the alpha channel and tints it per menu-bar appearance, so both the
+// P and the accent dot are forced to black. Monochrome ⇒ channel-neutral (one set).
+async function trayMacTemplatePng(svg, size) {
+  const source = (await readFile(svg, "utf8"))
+    .replace(
+      'viewBox="0 0 1024 1024" width="1024" height="1024"',
+      'viewBox="256 254 522 522" width="522" height="522"',
+    )
+    .replace('fill="currentColor"', 'fill="#000000"')
+    .replace("#8B7BFF", "#000000");
+  // macOS menu-bar template: the canvas point size matches the bar height, but the
+  // glyph must sit inside it with margin so it doesn't tower over neighbouring
+  // status items. Render the glyph at ~76% and center it on a transparent canvas.
+  const inner = Math.round(size * 0.76);
+  const glyph = await sharp(Buffer.from(source), { density: 512 })
+    .resize(inner, inner, { fit: "contain" })
+    .png()
+    .toBuffer();
+  return sharp({
+    create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  })
+    .composite([{ input: glyph, gravity: "centre" }])
+    .png()
+    .toBuffer();
+}
+
 // Minimal ICO container that embeds PNG frames (Vista+; supported everywhere modern).
 function buildIco(frames /* [{size, buf}] */) {
   const head = Buffer.alloc(6);
@@ -111,6 +138,13 @@ async function buildTrayVariant(name, svg, dir, accent) {
   console.log(`  ✓ ${name}: 16/20/24/32px .ico`);
 }
 
+async function buildTrayMacTemplate(svg, dir) {
+  await mkdir(dir, { recursive: true });
+  await writeFile(`${dir}/tray-icon-mac.png`, await trayMacTemplatePng(svg, 22));
+  await writeFile(`${dir}/tray-icon-mac@2x.png`, await trayMacTemplatePng(svg, 44));
+  console.log("  ✓ tray-icon-mac: 22px + @2x template PNG");
+}
+
 async function main() {
   await rm(OUT, { recursive: true, force: true });
   console.log("build/ (app icons):");
@@ -123,6 +157,7 @@ async function main() {
     `${OUT}/build`,
     "#5EE6E0",
   );
+  await buildTrayMacTemplate(`${HERE}poracode-glyph.svg`, `${OUT}/build`);
 
   console.log("website/public (favicons):");
   const web = `${OUT}/website`;

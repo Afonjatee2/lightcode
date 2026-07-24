@@ -57,9 +57,9 @@ export const threadSchema = z.object({
   errorMessage: z.string().optional(),
   slashCommands: z.array(agentSlashCommandSchema).optional(),
   /**
-   * Id of the orchestrator thread that created this thread via the Crossagents
-   * MCP `create_thread` tool. Persisted so the supervisor can re-address child
-   * threads after a restart; absent for user-created threads.
+   * Id of the thread that created this thread as a child (e.g. via the
+   * `poracode` MCP `create_thread` tool). Persisted so child threads render
+   * grouped with their parent in the sidebar; absent for user-created threads.
    */
   parentThreadId: z.string().min(1).optional(),
 });
@@ -67,10 +67,9 @@ export type Thread = z.infer<typeof threadSchema>;
 
 /**
  * Persisted orchestrator-child row pushed main → supervisor at supervisor
- * (re)start so the Crossagents orchestrator lane can re-address child threads
- * created before the restart (`get_thread`/`list_threads`/`read_thread`
- * instead of "Unknown thread_id"). Live transcript/final-result state is
- * in-memory only and does not survive the restart.
+ * (re)start so the consultation child-thread lane can re-address child threads
+ * created before the restart. Live transcript/final-result state is in-memory
+ * only and does not survive the restart.
  */
 export const orchestratorChildSeedSchema = z.object({
   threadId: z.string().min(1),
@@ -271,6 +270,7 @@ export const remoteThreadCommandSchema = z.discriminatedUnion("kind", [
     groupName: z.string().min(1),
   }),
   z.object({ kind: z.literal("rename"), threadId: z.string().min(1), title: z.string().min(1) }),
+  z.object({ kind: z.literal("acknowledge"), threadId: z.string().min(1) }),
   z.object({ kind: z.literal("set-done"), threadId: z.string().min(1), done: z.boolean() }),
   z.object({
     kind: z.literal("set-starred"),

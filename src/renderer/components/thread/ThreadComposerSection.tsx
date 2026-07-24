@@ -63,6 +63,7 @@ import type { ThreadTodoDockState } from "./threadTodoState";
 import type { TerminalPaneHandle } from "./TerminalPane";
 import { ThreadComposerDocks } from "./ThreadComposerDocks";
 import { useSkillSlashCommands } from "@/renderer/components/skills/useSkills";
+import { useDelayedPendingSteer } from "./useDelayedPendingSteer";
 
 type ThreadComposerSectionProps = {
   threadId: string;
@@ -89,6 +90,12 @@ type ThreadComposerSectionProps = {
   composerPlaceholder?: string | undefined;
   /** Override whether unmodified Enter submits instead of inserting a newline. */
   submitOnEnter?: boolean | undefined;
+  /**
+   * Override mount autofocus for the composer. Electron omits this and always
+   * uses desktop behavior; the PWA supplies its desktop-pointer media-query
+   * result so phone layouts do not summon the software keyboard.
+   */
+  autoFocusComposer?: boolean | undefined;
   /**
    * Suppress the informational docks (subagents/crossagents/workflows, context,
    * goal, plan, errors) inside the composer. The mobile PWA sets this and surfaces
@@ -328,6 +335,8 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   const [composerCollapsed, setComposerCollapsed] = useState(collapseTerminalComposerSetting);
   const canCollapseComposer = showTerminalComposer && !isRemote;
   const isComposerCollapsed = canCollapseComposer && composerCollapsed;
+  const shouldAutoFocusComposer =
+    paneCount === 1 && !isComposerCollapsed && (props.autoFocusComposer ?? !isRemote);
   const setComposerUi = useComposerUiStore((s) => s.setComposerUi);
   const branchName = useGitStore(
     (s) =>
@@ -356,6 +365,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     (canSubmitServerInput || canSubmitTerminalInput) && !isSubmitting && !authRequired;
   const canInterruptStructuredTurn = canShowRuntimeChrome && thread.status === "working";
   const pendingSteer = useAppStore((s) => s.pendingSteerByThreadId[thread.id]);
+  const visiblePendingSteer = useDelayedPendingSteer(pendingSteer);
   const usesPendingSteerPath = !usesTerminalPresentation && thread.status === "working";
   const runtimeRequests = useAppStore((s) => s.runtimeRequestsByThread[thread.id]);
   const activeRuntimeRequest = canShowRuntimeChrome ? runtimeRequests?.[0] : undefined;
@@ -580,13 +590,13 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
 
   const pendingComposerFocusThreadId = useAppStore((s) => s.pendingComposerFocusThreadId);
   useEffect(() => {
-    if (pendingComposerFocusThreadId !== thread.id) return;
+    if (pendingComposerFocusThreadId !== thread.id || isComposerCollapsed) return;
     const raf = requestAnimationFrame(() => {
       mentionRef.current?.focus();
       useAppStore.getState().clearComposerFocusRequest(thread.id);
     });
     return () => cancelAnimationFrame(raf);
-  }, [pendingComposerFocusThreadId, thread.id]);
+  }, [isComposerCollapsed, pendingComposerFocusThreadId, thread.id]);
 
   return (
     <>
@@ -611,7 +621,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                 }}
               >
                 <ThreadComposer
-                  autoFocus={paneCount === 1 && !isRemote} // eslint-disable-line jsx-a11y/no-autofocus -- desktop only; mobile PWA skips it so opening a thread doesn't pop the keyboard
+                  autoFocus={shouldAutoFocusComposer} // eslint-disable-line jsx-a11y/no-autofocus -- Electron is always desktop; the PWA enables this only for desktop-like input
                   compact
                   toolbarLayoutKey={[
                     isCliThread ? "cli" : "chat",
@@ -628,7 +638,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                     showGoalInComposer ||
                     showTodoInComposer ||
                     authRequired ||
-                    pendingSteer ||
+                    visiblePendingSteer ||
                     activeRuntimeRequest ||
                     showCommandPanel ? (
                       <ThreadComposerDocks
@@ -652,7 +662,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                         todoDockState={todoDockState}
                         todoDockCollapsed={todoDockCollapsed}
                         todoDockPlacement={todoDockPlacement}
-                        pendingSteer={pendingSteer}
+                        pendingSteer={visiblePendingSteer}
                         activeRuntimeRequest={activeRuntimeRequest}
                         filteredCommands={filteredCommands}
                         slashActiveIndex={slashActiveIndex}
@@ -692,7 +702,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                   inputContent={
                     <MentionInput
                       ref={mentionRef}
-                      autoFocus={paneCount === 1 && !isRemote} // eslint-disable-line jsx-a11y/no-autofocus -- desktop only; mobile PWA skips it so opening a thread doesn't pop the keyboard
+                      autoFocus={shouldAutoFocusComposer} // eslint-disable-line jsx-a11y/no-autofocus -- Electron is always desktop; the PWA enables this only for desktop-like input
                       compact
                       disabled={!(showServerComposer || showTerminalComposer)}
                       placeholder={

@@ -29,11 +29,12 @@ import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { normalizeChatProjectPath } from "../../chatPathUtils";
 import { CodeBlock } from "./CodeBlock";
 import { CopyTextButton } from "./CopyTextButton";
+import { ImageCard } from "./ImageCard";
 import { InlineFilePathChip } from "./InlineFilePathChip";
 import { InlineFolderPathChip } from "./InlineFolderPathChip";
 import { LC_SELECTOR_LANG, tryParseSelectorPayload } from "./SelectorBadge";
 import { normalizeGfmTableSeparators, normalizeShortCodeFenceClosers } from "./ItemMarkdown";
-import { chatInlineImageClass } from "./chatImageClass";
+import { imageViewSourceFromMarkdownImage } from "./imageViewSource";
 import { normalizeHighlightLanguage } from "./languageDetect";
 import { parseProjectPathRef, type ProjectPathRef } from "./parseProjectPathRef";
 import {
@@ -163,14 +164,19 @@ const MD_COMPONENTS: StreamdownComponents = {
   a({ href, children }) {
     return <MdAnchor href={href ?? ""}>{children}</MdAnchor>;
   },
-  img({ alt, className, ...rest }) {
+  img({ alt, className, src, width, height }) {
+    if (typeof src !== "string" || src.length === 0) return null;
     return (
-      <img
-        {...rest}
-        alt={alt ?? ""}
-        className={className ? `${markdownImageClass} ${className}` : markdownImageClass}
-        decoding="async"
-        draggable={false}
+      <ImageCard
+        source={imageViewSourceFromMarkdownImage({
+          src,
+          alt: alt ?? "",
+          width,
+          height,
+        })}
+        className="not-prose my-2"
+        isBlock
+        {...(className ? { imageClassName: className } : {})}
       />
     );
   },
@@ -212,8 +218,6 @@ const inlineCodeChipClass =
   "rounded border-0 bg-foreground/10 px-[0.35em] py-[0.1em] font-mono text-[0.875em] leading-none align-baseline text-foreground [overflow-wrap:anywhere]";
 const markdownCodeBlockClass =
   "not-prose my-2 min-w-0 overflow-x-hidden rounded bg-foreground/10 px-[0.5em] py-[0.25em] font-mono text-[0.875em] leading-snug text-foreground";
-const markdownImageClass = `not-prose my-2 rounded-lg border border-[color:var(--border)] bg-[var(--composer-surface)] ${chatInlineImageClass}`;
-
 const transformMarkdownUrl: UrlTransform = (url, key, node) =>
   key === "src" && node.tagName === "img" && url.startsWith("poracode-local://")
     ? url

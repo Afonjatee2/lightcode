@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { toast } from "@heroui/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppProvider } from "@/renderer/components/ui/provider";
+import { ImageLightboxHost } from "@/renderer/components/composer";
 import { ChatPaneActionsContext, type ChatPaneActions } from "../../chatPaneActionsContext";
 import ItemMarkdownInner from "./ItemMarkdownInner";
 import { LC_SELECTOR_LANG } from "./SelectorBadge";
@@ -126,7 +127,7 @@ describe("ItemMarkdownInner", () => {
   });
 
   it("caps markdown images so tall screenshots do not fill the chat", () => {
-    render(
+    const { container } = render(
       <AppProvider>
         <ItemMarkdownInner text={"![Tall screenshot](https://example.test/tall-screenshot.png)"} />
       </AppProvider>,
@@ -136,6 +137,28 @@ describe("ItemMarkdownInner", () => {
     expect(img).toHaveClass("max-h-[min(18rem,40vh)]", "max-w-full", "object-contain");
     expect(img).toHaveAttribute("decoding", "async");
     expect(img).toHaveAttribute("draggable", "false");
+    expect(img.closest('[data-poracode-image-card="true"]')).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Copy image" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Download image" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open preview" })).toBeTruthy();
+    expect(container.querySelector("p div")).toBeNull();
+  });
+
+  it("opens markdown images in the shared lightbox", () => {
+    render(
+      <AppProvider>
+        <ItemMarkdownInner text={"![Screenshot](https://example.test/screenshot.png)"} />
+        <ImageLightboxHost />
+      </AppProvider>,
+    );
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Open image preview" }));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(document.querySelector(".poracode-image-lightbox__image")).toHaveAttribute(
+      "src",
+      "https://example.test/screenshot.png",
+    );
   });
 
   it("renders Windows absolute markdown image paths through the local file protocol", () => {
@@ -197,6 +220,43 @@ describe("ItemMarkdownInner", () => {
     expect(src.startsWith("poracode-local://local/E:")).toBe(true);
     expect(src).toContain("verification-shots");
     expect(src).toContain("01-collapsed-same-file-edits.png");
+  });
+
+  it("copies project-relative markdown images through the local-file bridge", async () => {
+    const readLocalImageFile = vi
+      .fn<(payload: { url: string }) => Promise<Uint8Array>>()
+      .mockResolvedValue(new Uint8Array([137, 80, 78, 71]));
+    const copyImageToClipboard = vi
+      .fn<(payload: { data: Uint8Array }) => Promise<boolean>>()
+      .mockResolvedValue(true);
+    Object.defineProperty(window, "poracode", {
+      configurable: true,
+      value: {
+        appVersion: "test",
+        setWindowChrome: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        readLocalImageFile,
+        copyImageToClipboard,
+      },
+    });
+    const actions = makeActions({
+      projectLocation: { kind: "posix", path: "/tmp/project" },
+    });
+
+    render(
+      <AppProvider>
+        <ChatPaneActionsContext.Provider value={actions}>
+          <ItemMarkdownInner text={"![Screenshot](images/screenshot.png)"} />
+        </ChatPaneActionsContext.Provider>
+      </AppProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy image" }));
+
+    await waitFor(() => expect(copyImageToClipboard).toHaveBeenCalledTimes(1));
+    expect(readLocalImageFile).toHaveBeenCalledWith({
+      url: "poracode-local://local/tmp/project/images/screenshot.png",
+    });
+    expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy();
   });
 
   it("renders Grok session-relative images/ markdown via the local file protocol", () => {

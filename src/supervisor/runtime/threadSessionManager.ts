@@ -114,7 +114,6 @@ export class ThreadSessionManager {
     this.structuredInterruptWatchdog = new StructuredInterruptWatchdog({
       sessions: this.sessions,
       isDisposed: () => this.disposed,
-      clearPendingSteerSlot: (session) => clearPendingSteerSlot(session, options.emit),
       completeForcedInterrupt: (session) => this.completeForcedStructuredInterrupt(session),
     });
     this.structuredTurnQueue = new StructuredTurnQueue({
@@ -246,6 +245,27 @@ export class ThreadSessionManager {
     this.outputPipeline.updateState(session, "idle", "none", undefined, {
       forceCloseActiveTurn: true,
     });
+
+    // A force-stopped explicit Stop stays idle until the user's next submit.
+    // A force-stopped steer is different: the submitted message is still an
+    // accepted user action and must survive the dead provider process. Paint
+    // it before clearing the strip, then resume the session and send it with
+    // the same item id so the replacement session cannot duplicate it.
+    const pending = session.pendingSteer;
+    if (!pending) return;
+    const userMessageItemId =
+      pending.userMessageItemId ??
+      this.structuredTurnQueue.emitOptimisticUserMessage(
+        session.threadId,
+        pending.prompt,
+        pending.segments,
+      );
+    const turn: QueuedStructuredTurn = { ...pending, userMessageItemId };
+    clearPendingSteerSlot(session, this.options.emit);
+    void this.spawnPipeline.restartThread(session, turn).catch((error) => {
+      if (!this.isCurrentSession(session)) return;
+      this.failStructuredSession(session, error);
+    });
   }
 
   private enqueueRuntimeEvent(threadId: string, event: RuntimeEvent): void {
@@ -360,7 +380,7 @@ export class ThreadSessionManager {
   /**
    * Orchestrator host hook: a thread's live runtime state plus whether its
    * session supports non-interrupting steer. `undefined` once the session is
-   * gone. Consumed by the Crossagents MCP orchestrator lane.
+   * gone. Consumed by the consultation child-thread lane.
    */
   getOrchestratorThreadState(threadId: string):
     | {
@@ -487,14 +507,9 @@ export class ThreadSessionManager {
 
   async sendThreadInput(payload: SendThreadInputPayload): Promise<void> {
     const session = this.requireSession(payload.threadId);
-    if (session.status === "inactive") {
-      if (session.sessionRef) {
-        await this.spawnPipeline.restartThread(session, payload.prompt, payload.config);
-        return;
-      }
+    if (session.status === "inactive" && !session.sessionRef) {
       throw new Error("This thread exited before a resumable session id was discovered.");
     }
-
     const usesStructuredFlow =
       session.adapter.capabilities.liveInputMode === "server" || session.presentationMode === "gui";
     const effectiveSegments = payload.segments
@@ -514,27 +529,34 @@ export class ThreadSessionManager {
         : payload.config;
 
     session.config = effectiveConfig;
+    const inlineInstructions = usesStructuredFlow
+      ? await this.resolveSkillTurnInjection(session, effectiveSegments)
+      : undefined;
+    const turn: QueuedStructuredTurn = {
+      prompt,
+      config: effectiveConfig,
+      ...(effectiveSegments ? { segments: effectiveSegments } : {}),
+      ...(payload.userMessageItemId ? { userMessageItemId: payload.userMessageItemId } : {}),
+      ...(inlineInstructions ? { inlineInstructions } : {}),
+    };
+    if (session.status === "inactive") {
+      // Guaranteed to have a sessionRef here — the no-ref case threw above.
+      await this.spawnPipeline.restartThread(session, turn);
+      return;
+    }
     if (
       usesStructuredFlow &&
       !session.structuredSession &&
       (session.status === "error" || session.status === "idle") &&
       session.sessionRef
     ) {
-      await this.spawnPipeline.restartThread(session, prompt, effectiveConfig);
+      await this.spawnPipeline.restartThread(session, turn);
       return;
     }
     // Route through the structured session when either the adapter is
     // server-controlled OR this thread was launched in chat mode (the
     // structured session owns input/output instead of the PTY).
     if (usesStructuredFlow && session.structuredSession?.startTurn) {
-      const inlineInstructions = await this.resolveSkillTurnInjection(session, effectiveSegments);
-      const turn: QueuedStructuredTurn = {
-        prompt,
-        config: effectiveConfig,
-        ...(effectiveSegments ? { segments: effectiveSegments } : {}),
-        ...(payload.userMessageItemId ? { userMessageItemId: payload.userMessageItemId } : {}),
-        ...(inlineInstructions ? { inlineInstructions } : {}),
-      };
       // GUI threads route submit-while-working through the pending-steer
       // path. Renderers should call `setPendingSteer` directly for that case;
       // any `sendThreadInput` that lands here while working is treated as a

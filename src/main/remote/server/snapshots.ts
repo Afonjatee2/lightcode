@@ -103,10 +103,13 @@ export async function buildAgentStatuses(ctx: RemoteServerContext): Promise<Remo
 export async function buildThreadSnapshot(
   ctx: RemoteServerContext,
   threadId: string,
-  options: { readonly runtimePage?: boolean } = {},
+  options: {
+    readonly runtimePage?: boolean;
+    readonly targetTimelineEntryCount?: number;
+  } = {},
 ): Promise<RemoteThreadSnapshot> {
-  const thread = dbGetThread(threadId);
-  if (!thread) {
+  const initialThread = dbGetThread(threadId);
+  if (!initialThread) {
     throw new RemoteHttpError("thread_not_found", "Thread not found.", 404);
   }
 
@@ -124,8 +127,17 @@ export async function buildThreadSnapshot(
     terminalSize = undefined;
   }
 
+  // The terminal reads above cross an async supervisor boundary. Runtime and
+  // thread-state events can persist while they are in flight, so re-read the
+  // row before taking the synchronous runtime snapshot; otherwise a completed
+  // transcript can be returned with an older `working` status and the client
+  // will conservatively treat the history as non-authoritative.
+  const thread = dbGetThread(threadId);
+  if (!thread) {
+    throw new RemoteHttpError("thread_not_found", "Thread not found.", 404);
+  }
   const runtimePage = options.runtimePage
-    ? dbGetThreadRuntimeItemsPage(threadId, undefined, 500, 40)
+    ? dbGetThreadRuntimeItemsPage(threadId, undefined, 500, options.targetTimelineEntryCount ?? 40)
     : null;
   return remoteThreadSnapshotSchema.parse({
     snapshotSeq: ctx.seq,

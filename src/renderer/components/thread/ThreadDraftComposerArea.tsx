@@ -266,6 +266,8 @@ export function ThreadDraftComposerArea(props: {
   supportsModePicker: boolean;
   presentationMode: ThreadPresentationMode;
   placeholder?: string;
+  /** Restores the selection replaced by a one-shot worktree target when this token changes. */
+  restoreWorktreeSelectionToken?: number;
   /** Override whether unmodified Enter submits instead of inserting a newline. */
   submitOnEnter?: boolean;
   pickFiles?: () => Promise<string[] | null>;
@@ -320,9 +322,20 @@ export function ThreadDraftComposerArea(props: {
       });
     }
   }, [pendingPickedAttachments, inboxKey]);
+  const initialPendingWorktreeSelection =
+    useAppStore.getState().pendingDraftWorktreeSelections[props.project.id] ?? null;
   const [branchSelection, setBranchSelection] = useState<BranchSelection | null>(
-    () => useAppStore.getState().pendingDraftWorktreeSelections[props.project.id] ?? null,
+    initialPendingWorktreeSelection,
   );
+  const worktreeSelectionRestoreRef = useRef<{
+    branchSelection: BranchSelection | null;
+    worktreeMode: boolean;
+  } | null>(
+    initialPendingWorktreeSelection
+      ? { branchSelection: null, worktreeMode: props.worktreeMode }
+      : null,
+  );
+  const previousRestoreTokenRef = useRef(props.restoreWorktreeSelectionToken);
   const pendingWorktreeSelection = useAppStore(
     (s) => s.pendingDraftWorktreeSelections[props.project.id],
   );
@@ -743,10 +756,39 @@ export function ThreadDraftComposerArea(props: {
   const onWorktreeModeChange = props.onWorktreeModeChange;
   useEffect(() => {
     if (!pendingWorktreeSelection) return;
+    worktreeSelectionRestoreRef.current ??= {
+      branchSelection,
+      worktreeMode: props.worktreeMode,
+    };
     setBranchSelection(pendingWorktreeSelection);
     onWorktreeModeChange(!pendingWorktreeSelection.worktreePath);
     useAppStore.getState().clearPendingDraftWorktreeSelection(projectId);
-  }, [pendingWorktreeSelection, projectId, onWorktreeModeChange]);
+  }, [
+    pendingWorktreeSelection,
+    projectId,
+    onWorktreeModeChange,
+    branchSelection,
+    props.worktreeMode,
+  ]);
+
+  // The mobile inline composer stays mounted when it collapses. Restore the
+  // selection that the context-menu worktree target temporarily replaced, so
+  // reopening behaves like dismissing and reopening Electron's draft composer.
+  const restoreWorktreeSelectionToken = props.restoreWorktreeSelectionToken;
+  useEffect(() => {
+    if (
+      restoreWorktreeSelectionToken === undefined ||
+      restoreWorktreeSelectionToken === previousRestoreTokenRef.current
+    ) {
+      return;
+    }
+    previousRestoreTokenRef.current = restoreWorktreeSelectionToken;
+    const previousSelection = worktreeSelectionRestoreRef.current;
+    if (!previousSelection) return;
+    worktreeSelectionRestoreRef.current = null;
+    setBranchSelection(previousSelection.branchSelection);
+    onWorktreeModeChange(previousSelection.worktreeMode);
+  }, [restoreWorktreeSelectionToken, onWorktreeModeChange]);
 
   // A composer seed (e.g. "New thread from a to-do / selected note text") inserts
   // its text into the input at the caret, preserving anything the user already
