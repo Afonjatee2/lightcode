@@ -5,6 +5,7 @@ import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { closeDatabase, initDatabase } from "@/main/db/connection";
 import { dbGetProjects, dbUpsertProject } from "@/main/db/projectsThreads";
+import { dbSyncAll } from "@/main/db/sync";
 
 /**
  * Databases stamped by older builds declare projects.purpose as
@@ -58,7 +59,7 @@ describe("legacy NOT NULL projects.purpose", () => {
         created_at TEXT NOT NULL
       , search_settings TEXT, purpose TEXT NOT NULL DEFAULT 'code', campaign_extension TEXT, campaign_group_id TEXT);
       CREATE TABLE app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      INSERT INTO app_state (key, value) VALUES ('schema_version', '30');
+      INSERT INTO app_state (key, value) VALUES ('schema_version', '1');
     `);
     seed.close();
   });
@@ -87,5 +88,21 @@ describe("legacy NOT NULL projects.purpose", () => {
     const projects = withNativeBinding(() => dbGetProjects());
     expect(projects).toHaveLength(1);
     expect(projects[0]?.name).toBe("Legacy project");
+  });
+
+  it("dbSyncAll persists purpose-less projects instead of emptying the table", () => {
+    withNativeBinding(() => initDatabase(dbPath));
+    const project = {
+      id: "22222222-2222-4222-8222-222222222222",
+      name: "Synced legacy project",
+      location: { kind: "posix" as const, path: "/tmp/legacy-sync" },
+      createdAt: new Date().toISOString(),
+    };
+    // dbSyncAll deletes rows absent from the snapshot before re-inserting, so a
+    // failed write here is what emptied the projects table on launch.
+    expect(() =>
+      withNativeBinding(() => dbSyncAll([project], [], JSON.stringify({ kind: "home" }))),
+    ).not.toThrow();
+    expect(withNativeBinding(() => dbGetProjects())).toHaveLength(1);
   });
 });

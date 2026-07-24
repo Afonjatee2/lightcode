@@ -148,7 +148,10 @@ function runProjectSync(stmt: SqliteStatement, project: Project, sortOrder: numb
     scripts: project.scripts ? JSON.stringify(project.scripts) : null,
     searchSettings: project.searchSettings ? JSON.stringify(project.searchSettings) : null,
     mcpServers: project.mcpServers ? JSON.stringify(project.mcpServers) : null,
-    purpose: project.purpose ?? null,
+    // Concrete default, never NULL: legacy databases declare projects.purpose
+    // NOT NULL DEFAULT 'code' and SQLite ignores the default for a supplied
+    // NULL, which fails this transaction after the delete pass has already run.
+    purpose: project.purpose ?? "code",
     campaignExtension: project.campaignExtension ? JSON.stringify(project.campaignExtension) : null,
     campaignGroupId: project.campaignExtension?.campaignGroupId ?? null,
     disabled: project.disabled ? 1 : 0,
