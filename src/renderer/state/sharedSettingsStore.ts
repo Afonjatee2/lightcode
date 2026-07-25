@@ -149,6 +149,7 @@ interface SharedSettingsState extends SharedSettings {
     fallbackMode: ThreadPresentationMode,
   ) => boolean;
   setCrossagentRoutingGuide: (value: string) => void;
+  setModelAliases: (aliases: SharedSettings["modelAliases"]) => void;
   setMorningBriefEnabled: (enabled: boolean) => void;
   setMorningBriefTime: (time: string) => void;
   setMorningBriefScheduleId: (id: string | null) => void;
@@ -707,6 +708,23 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ crossagentRoutingGuide });
     persistSettings(selectSharedSettings(get()));
   },
+  setModelAliases: (modelAliases) => {
+    const current = get().modelAliases;
+    if (
+      current.length === modelAliases.length &&
+      current.every(
+        (entry, index) =>
+          entry.alias === modelAliases[index]?.alias &&
+          entry.provider === modelAliases[index]?.provider &&
+          entry.model === modelAliases[index]?.model &&
+          entry.effort === modelAliases[index]?.effort,
+      )
+    ) {
+      return;
+    }
+    set({ modelAliases });
+    persistSettings(selectSharedSettings(get()));
+  },
   setMorningBriefEnabled: (morningBriefEnabled) => {
     if (get().morningBriefEnabled === morningBriefEnabled) return;
     set({ morningBriefEnabled });
@@ -858,6 +876,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     morningBriefScheduleId: state.morningBriefScheduleId,
     morningBriefNotifiedKeys: state.morningBriefNotifiedKeys,
     crossagentRoutingGuide: state.crossagentRoutingGuide,
+    modelAliases: state.modelAliases,
   };
 }
 

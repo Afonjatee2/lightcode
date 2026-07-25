@@ -4,6 +4,7 @@ import {
   type ConsultationRole,
   type MentionParseErrorCode,
 } from "@/shared/consultations";
+import type { ModelAlias } from "@/shared/modelAliases";
 import type {
   ConsultationFinalisePayload,
   ConsultationPanelMemberInput,
@@ -29,6 +30,8 @@ export interface SubmissionHandlerDeps {
   repository: ConsultationRepository;
   /** The actor recorded on created consultations (defaults to the local user). */
   actor?: string;
+  /** User-defined @mention aliases from shared settings. */
+  readModelAliases?: () => readonly ModelAlias[];
 }
 
 const DEFAULT_ACTOR = "poracode-user";
@@ -40,7 +43,11 @@ export const DEFAULT_PANEL_MEMBERS: PanelMemberSpec[] = [
   { role: "challenger", requiredOrOptional: "optional" },
 ];
 
-function parserErrorToSubmitError(code: MentionParseErrorCode, message: string, token: string | null): ConsultationSubmitResult {
+function parserErrorToSubmitError(
+  code: MentionParseErrorCode,
+  message: string,
+  token: string | null,
+): ConsultationSubmitResult {
   const mapped: ConsultationSubmitErrorCode =
     code === "unknown_mention"
       ? "unknown_mention"
@@ -64,7 +71,9 @@ export class ConsultationSubmissionHandler {
     const contextCheck = this.validateCampaignContext(payload.campaignGroupId);
     if (contextCheck) return contextCheck;
 
-    const parsed = parseMention(payload.message);
+    const parsed = parseMention(payload.message, {
+      modelAliases: this.deps.readModelAliases?.() ?? [],
+    });
     if (isMentionParseError(parsed)) {
       return parserErrorToSubmitError(parsed.code, parsed.message, parsed.token);
     }
@@ -94,6 +103,8 @@ export class ConsultationSubmissionHandler {
         role: parsed.resolvedRole,
         mode: parsed.consultationMode,
         ...(parsed.requestedProvider ? { requestedProvider: parsed.requestedProvider } : {}),
+        ...(parsed.requestedModel ? { requestedModel: parsed.requestedModel } : {}),
+        ...(parsed.requestedEffort ? { requestedEffort: parsed.requestedEffort } : {}),
       });
       return { ok: true, consultation };
     } catch (error) {
@@ -153,7 +164,8 @@ export class ConsultationSubmissionHandler {
         parentThreadId: payload.parentThreadId,
         campaignGroupId: payload.campaignGroupId,
         originalMention: "@finalise",
-        instruction: instruction.length > 0 ? instruction : "Synthesise the completed consultations.",
+        instruction:
+          instruction.length > 0 ? instruction : "Synthesise the completed consultations.",
         actor: this.actor,
       },
       null,
@@ -174,7 +186,9 @@ export class ConsultationSubmissionHandler {
   }
 
   private extractInstruction(message: string): string {
-    const parsed = parseMention(message);
+    const parsed = parseMention(message, {
+      modelAliases: this.deps.readModelAliases?.() ?? [],
+    });
     if (!isMentionParseError(parsed)) return parsed.instruction;
     return message.trim();
   }

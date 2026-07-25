@@ -20,6 +20,7 @@ import {
 } from "./contracts";
 import { DEFAULT_SEARCH_EXCLUDE } from "./searchExclude";
 import { AI_LANGUAGE_VALUES, LOCALE_SETTING_VALUES } from "./locale";
+import { modelAliasSchema, normalizeModelAliases, seedModelAliasesIfEmpty } from "./modelAliases";
 
 const modelPickerEntrySchema = z.object({
   agentKind: z.string().min(1),
@@ -452,6 +453,12 @@ export const sharedSettingsSchema = z.object({
    * mention); this is the global guidance text shared across every such thread.
    */
   crossagentRoutingGuide: z.string(),
+  /**
+   * User-defined @mention aliases mapping a single token to provider + model +
+   * optional effort. Consultation composer resolves `@alias` against this list
+   * after built-in mentions (@codex, @verify, …).
+   */
+  modelAliases: z.array(modelAliasSchema).default([]),
 });
 export type SharedSettings = z.infer<typeof sharedSettingsSchema>;
 
@@ -586,6 +593,7 @@ export const defaultSharedSettings: SharedSettings = {
   morningBriefScheduleId: null,
   morningBriefNotifiedKeys: [],
   crossagentRoutingGuide: "",
+  modelAliases: [],
 };
 
 function parseSettingOrDefault<T>(schema: z.ZodType<T>, value: unknown, fallback: T): T {
@@ -623,8 +631,13 @@ export function normalizeSharedSettings(value: unknown): SharedSettings {
     ? z.array(z.string()).safeParse(usage.data.disabledProviders)
     : undefined;
 
+  const modelAliases = seedModelAliasesIfEmpty(
+    normalizeModelAliases(parsed.success ? parsed.data.modelAliases : normalized.modelAliases),
+  );
+
   return {
     ...normalized,
+    modelAliases,
     usage: {
       ...normalized.usage,
       disabledProviders: disabledProviders?.success ? disabledProviders.data : [],

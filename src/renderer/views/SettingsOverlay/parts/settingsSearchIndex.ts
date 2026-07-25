@@ -505,6 +505,13 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsSearchEntry[] = [
     keywords: "reorder rearrange sort providers drag model picker sequence position",
     conditional: true,
   },
+  {
+    section: "agentsGeneral",
+    anchor: "agentsGeneral.modelAliases",
+    title: msg`Model aliases`,
+    description: msg`Type @alias in the campaign composer to run a consultation on a specific provider, model, and effort.`,
+    keywords: "mention alias @codex consultation composer model effort provider",
+  },
   // Dev (only in dev builds)
   {
     section: "dev",

@@ -1,5 +1,9 @@
 import type { Thread } from "@/shared/contracts";
-import { isMentionParseError, parseMention } from "@/shared/consultations";
+import {
+  isMentionParseError,
+  parseMention,
+  type ParseMentionOptions,
+} from "@/shared/consultations";
 
 export type CampaignComposerRouteResult =
   | { kind: "consultation"; message: string }
@@ -25,11 +29,12 @@ export function resolvePrimaryCampaignThread(threads: Thread[]): Thread | undefi
 export function routeCampaignComposerMessage(
   input: string,
   defaultProvider: string,
+  options?: ParseMentionOptions,
 ): CampaignComposerRouteResult {
   const trimmed = input.trim();
   if (!trimmed) return { kind: "empty" };
 
-  const parsed = parseMention(trimmed);
+  const parsed = parseMention(trimmed, options);
   if (!isMentionParseError(parsed)) {
     return { kind: "consultation", message: trimmed };
   }

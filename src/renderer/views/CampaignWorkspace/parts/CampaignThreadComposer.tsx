@@ -22,6 +22,7 @@ import {
 } from "./campaignComposerDrop";
 import { routeCampaignComposerMessage } from "./campaignThreadComposerRouting";
 import { useAppStore } from "@/renderer/state/appStore";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { isMediaPlanFilename } from "./mediaPlanAttachment";
 
 const submittingThreads = new Set<string>();
@@ -49,6 +50,7 @@ export function CampaignThreadComposer(props: CampaignThreadComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingPrefill = useAppStore((s) => s.pendingCampaignComposerPrefill);
   const setPendingCampaignComposerPrefill = useAppStore((s) => s.setPendingCampaignComposerPrefill);
+  const modelAliases = useSharedSettings((s) => s.modelAliases);
 
   useEffect(() => {
     if (!pendingPrefill || pendingPrefill.projectId !== props.projectId) return;
@@ -84,7 +86,9 @@ export function CampaignThreadComposer(props: CampaignThreadComposerProps) {
         input,
         copied.map((copy) => copy.relativePath),
       );
-      const route = routeCampaignComposerMessage(messageWithAttachments, props.defaultProvider);
+      const route = routeCampaignComposerMessage(messageWithAttachments, props.defaultProvider, {
+        modelAliases,
+      });
       if (route.kind === "empty") return;
       if (route.kind === "parse_error") {
         toast.warning(route.message);

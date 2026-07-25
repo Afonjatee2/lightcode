@@ -488,6 +488,7 @@ export class SupervisorRuntime {
     this.consultationSubmissionHandler = new ConsultationSubmissionHandler({
       coordinator: this.consultationCoordinator,
       repository: consultationRepository,
+      readModelAliases: () => this.sharedSettingsCache.read().modelAliases,
     });
     this.threadSessionManager = new ThreadSessionManager({
       // Tap the outbound stream so the consultation child-thread lane can track

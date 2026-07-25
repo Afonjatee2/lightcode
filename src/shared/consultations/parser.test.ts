@@ -388,3 +388,58 @@ describe("mention parser — originalMention round-trip", () => {
     expect(r.originalMention).toBe("@codex @verify the CTR is dropping");
   });
 });
+
+const TEST_MODEL_ALIASES = [
+  {
+    alias: "gpt-5.6-sol-high",
+    provider: "codex",
+    model: "gpt-5.6-sol",
+    effort: "high",
+  },
+] as const;
+
+describe("mention parser — user model aliases", () => {
+  it("@alias resolves case-insensitively", () => {
+    const r = parseMention("@GPT-5.6-SOL-HIGH verify this", {
+      modelAliases: TEST_MODEL_ALIASES,
+    });
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    expect(r.requestedProvider).toBe("codex");
+    expect(r.requestedModel).toBe("gpt-5.6-sol");
+    expect(r.requestedEffort).toBe("high");
+    expect(r.instruction).toBe("verify this");
+  });
+
+  it("built-in mentions take precedence over registry aliases", () => {
+    const r = parseMention("@codex verify spend", {
+      modelAliases: [{ alias: "codex", provider: "claude", model: "claude-opus" }],
+    });
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    expect(r.requestedProvider).toBe("codex");
+    expect(r.requestedModel).toBeNull();
+  });
+
+  it("unknown alias falls through to existing behaviour", () => {
+    const r = parseMention("@unknown_alias do something", {
+      modelAliases: TEST_MODEL_ALIASES,
+    });
+    expect(r.success).toBe(false);
+    if (r.success) return;
+    expect(r.code).toBe("unknown_mention");
+  });
+
+  it("alias with model and effort populates consultation request fields", () => {
+    const r = parseMention("@gpt-5.6-sol-high pull the latest number", {
+      modelAliases: TEST_MODEL_ALIASES,
+    });
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    expect(r.requestedProvider).toBe("codex");
+    expect(r.requestedModel).toBe("gpt-5.6-sol");
+    expect(r.requestedEffort).toBe("high");
+    expect(r.resolvedRole).toBe("daily_operator");
+    expect(r.consultationMode).toBe("standard");
+  });
+});

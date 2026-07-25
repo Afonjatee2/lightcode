@@ -74,6 +74,24 @@ describe("routeCampaignComposerMessage", () => {
     expect(result.kind).toBe("parse_error");
   });
 
+  it("accepts a configured model alias mention", () => {
+    expect(
+      routeCampaignComposerMessage("@gpt-5.6-sol-high verify this", "claude", {
+        modelAliases: [
+          {
+            alias: "gpt-5.6-sol-high",
+            provider: "codex",
+            model: "gpt-5.6-sol",
+            effort: "high",
+          },
+        ],
+      }),
+    ).toEqual({
+      kind: "consultation",
+      message: "@gpt-5.6-sol-high verify this",
+    });
+  });
+
   it("returns a parse error when the mention is malformed", () => {
     const result = routeCampaignComposerMessage("@codex", "codex");
     expect(result).toMatchObject({
