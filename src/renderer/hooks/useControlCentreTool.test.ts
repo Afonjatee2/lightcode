@@ -50,6 +50,13 @@ describe("resolveControlCentreServer", () => {
     expect(resolveControlCentreServer(project, [])?.name).toBe("Control-Centre");
   });
 
+  it("finds the control-centre server when underscores separate the words", () => {
+    const project = campaignProject({
+      mcpServers: [{ ...controlCentreServer, name: "Control_Centre" }],
+    });
+    expect(resolveControlCentreServer(project, [])?.name).toBe("Control_Centre");
+  });
+
   it("returns undefined when no project is given", () => {
     expect(resolveControlCentreServer(undefined, [controlCentreServer])).toBeUndefined();
   });
@@ -180,6 +187,7 @@ describe("useControlCentreTool", () => {
     await waitFor(() =>
       expect(result.current.state).toEqual({
         status: "unavailable",
+        reason: "connection-failed",
         message: "Could not connect to the MCP server.",
       }),
     );
@@ -228,6 +236,38 @@ describe("useControlCentreTool", () => {
     );
 
     await waitFor(() => expect(result.current.state.status).toBe("unavailable"));
+    expect(result.current.state).toMatchObject({
+      status: "unavailable",
+      reason: "not-configured",
+    });
+    expect(mocks.callMcpTool).not.toHaveBeenCalled();
+  });
+
+  it("reports disabled when a matching Control Centre MCP server is turned off", async () => {
+    useAppStore.setState((state) => ({
+      ...state,
+      projects: [
+        campaignProject({
+          mcpServers: [{ ...controlCentreServer, name: "Control_Centre", enabled: false }],
+        }),
+      ],
+    }));
+
+    const { result } = renderHook(() =>
+      useControlCentreTool({
+        projectId: "project-1",
+        toolName: "get_campaign_context",
+        args: {},
+        schema,
+        skip: false,
+      }),
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("unavailable"));
+    expect(result.current.state).toMatchObject({
+      status: "unavailable",
+      reason: "disabled",
+    });
     expect(mocks.callMcpTool).not.toHaveBeenCalled();
   });
 

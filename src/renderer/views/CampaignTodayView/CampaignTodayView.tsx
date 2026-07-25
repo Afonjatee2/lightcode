@@ -14,7 +14,11 @@ import {
 } from "lucide-react";
 import type { OperationsTodayCampaignViewModel } from "@/renderer/adapters/campaignViewModels";
 import { getProjectPurpose } from "@/shared/contracts/project";
-import { findCampaignProjectByGroupId } from "@/renderer/campaign/resolveTodayDataSource";
+import {
+  findCampaignProjectByGroupId,
+  diagnoseTodayControlCentreSetup,
+} from "@/renderer/campaign/resolveTodayDataSource";
+import { controlCentreUnavailableMessage } from "@/renderer/campaign/controlCentreAvailabilityCopy";
 import {
   dayPeriodGreeting,
   greetingAllClear,
@@ -278,6 +282,7 @@ export function CampaignTodayView() {
   const displayName = useProfileDisplayName();
   const [askText, setAskText] = useState("");
   const projects = useAppStore((state) => state.projects);
+  const userMcpServers = useSharedSettings((s) => s.mcpServers);
   const { projectId, operationsToday } = useCampaignTodayOperations();
   const openDraft = useAppStore((state) => state.openDraft);
   const setPendingCampaignComposerPrefill = useAppStore(
@@ -289,6 +294,9 @@ export function CampaignTodayView() {
   const hasCampaignProjects = projects.some((project) => getProjectPurpose(project) === "campaign");
   const showNoProjectsSetupState = !hasCampaignProjects;
   const showNoControlCentreSetupState = hasCampaignProjects && !projectId;
+  const controlCentreSetupReason = showNoControlCentreSetupState
+    ? diagnoseTodayControlCentreSetup(projects, userMcpServers)
+    : null;
 
   const morningBriefEnabled = useSharedSettings((s) => s.morningBriefEnabled);
   const latestBrief = useMorningBriefStore((s) => s.latestBrief);
@@ -467,9 +475,7 @@ export function CampaignTodayView() {
         {showNoControlCentreSetupState ? (
           <section className="rounded-2xl border border-[var(--hairline)] px-4 py-6 text-center">
             <p className="text-sm text-muted">
-              <Trans>
-                Add Control Centre MCP to a campaign project to load your operations overview.
-              </Trans>
+              {t(controlCentreUnavailableMessage(controlCentreSetupReason ?? "not-configured"))}
             </p>
           </section>
         ) : null}

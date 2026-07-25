@@ -9,24 +9,11 @@ import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { mergeMcpServers, type McpServer } from "@/shared/contracts";
+import { mergeMcpServers, diagnoseControlCentreMcpSetup, type McpServer } from "@/shared/contracts";
+import { CONTROL_CENTRE_MCP_SERVER_NAME } from "@/shared/contracts/campaign/campaignMcpLaunch";
 import { terminateProcessTree } from "@/shared/processTree";
 
-/**
- * TEMPORARY PHASE 3 BOUNDARY (Part 4).
- *
- * The completed Phase 3 integration owns the canonical Control Centre MCP
- * tool-call path (`callMcpTool` / `McpToolCallService`) and the exact CC wire
- * schemas. That work is not yet merged into this branch, so this narrow gateway
- * performs a single `tools/call` against the project's Control Centre MCP server
- * using the same SDK connection lifecycle as `probeMcpServer`. It deliberately
- * does NOT copy the CC wire schemas — mapping into the consultation shape lives
- * in `poracodeCampaignContextProvider.ts`. When Phase 3 merges, delete this file
- * and point the provider at the Phase 3 adapter.
- */
-
-/** Provider-visible name of the Control Centre MCP server (matches Phase 3). */
-export const CONTROL_CENTRE_MCP_SERVER_NAME = "control-centre";
+export { CONTROL_CENTRE_MCP_SERVER_NAME };
 
 export type ControlCentreToolOutcome =
   | { status: "ok"; content: unknown }
@@ -130,7 +117,8 @@ async function settleWithin(promise: Promise<unknown>, timeoutMs: number): Promi
 function isAuthFailure(error: unknown, observation: AuthObservation): boolean {
   return (
     error instanceof UnauthorizedError ||
-    (error instanceof McpError && /unauthori[sz]ed|authentication required/iu.test(error.message)) ||
+    (error instanceof McpError &&
+      /unauthori[sz]ed|authentication required/iu.test(error.message)) ||
     observation.status === 401 ||
     observation.status === 403 ||
     (error instanceof StreamableHTTPError && error.code === 401) ||
@@ -163,7 +151,10 @@ function toolErrorMessage(result: CallToolResult): string {
     (block): block is Extract<CallToolResult["content"][number], { type: "text" }> =>
       block.type === "text",
   );
-  const text = textBlocks.map((block) => block.text).join("\n").trim();
+  const text = textBlocks
+    .map((block) => block.text)
+    .join("\n")
+    .trim();
   return text || "The Control Centre tool reported an error.";
 }
 
@@ -171,10 +162,20 @@ export class McpControlCentreGateway implements ControlCentreGateway {
   constructor(private readonly deps: McpControlCentreGatewayDeps) {}
 
   private resolveControlCentreServer(projectId: string): McpServer | undefined {
-    const merged = mergeMcpServers(this.deps.getSharedMcpServers(), this.deps.getProjectMcpServers(projectId));
-    return merged.find(
-      (server) => server.enabled && server.name.trim().toLowerCase() === CONTROL_CENTRE_MCP_SERVER_NAME,
+    const merged = mergeMcpServers(
+      this.deps.getSharedMcpServers(),
+      this.deps.getProjectMcpServers(projectId),
     );
+    const setup = diagnoseControlCentreMcpSetup(merged);
+    return setup.kind === "ready" ? setup.server : undefined;
+  }
+
+  private diagnoseControlCentreSetup(projectId: string) {
+    const merged = mergeMcpServers(
+      this.deps.getSharedMcpServers(),
+      this.deps.getProjectMcpServers(projectId),
+    );
+    return diagnoseControlCentreMcpSetup(merged);
   }
 
   async callTool(
@@ -183,13 +184,20 @@ export class McpControlCentreGateway implements ControlCentreGateway {
     args: Record<string, unknown>,
     signal?: AbortSignal,
   ): Promise<ControlCentreToolOutcome> {
-    let server = this.resolveControlCentreServer(projectId);
-    if (!server) {
+    const setup = this.diagnoseControlCentreSetup(projectId);
+    if (setup.kind === "not-configured") {
       return {
         status: "not-configured",
-        message: "No Control Centre MCP server is configured for this project.",
+        message: `No MCP server named "${CONTROL_CENTRE_MCP_SERVER_NAME}" is configured for this project.`,
       };
     }
+    if (setup.kind === "disabled") {
+      return {
+        status: "not-configured",
+        message: "The Control Centre MCP server is disabled.",
+      };
+    }
+    let server = setup.server;
 
     // Apply stored OAuth authorization before constructing the transport.
     if (this.deps.applyAuthorization) {
@@ -233,11 +241,11 @@ export class McpControlCentreGateway implements ControlCentreGateway {
       if (transport instanceof StdioClientTransport) stdioPid = transport.pid;
 
       const result = (await raceWithAbort(
-        client.callTool(
-          { name: toolName, arguments: args },
-          undefined,
-          { signal: controller.signal, timeout: server.timeoutMs, maxTotalTimeout: server.timeoutMs },
-        ),
+        client.callTool({ name: toolName, arguments: args }, undefined, {
+          signal: controller.signal,
+          timeout: server.timeoutMs,
+          maxTotalTimeout: server.timeoutMs,
+        }),
         controller.signal,
       )) as CallToolResult;
 
@@ -259,13 +267,19 @@ export class McpControlCentreGateway implements ControlCentreGateway {
         transport.sessionId &&
         !controller.signal.aborted
       ) {
-        await settleWithin(transport.terminateSession().catch(() => undefined), 250);
+        await settleWithin(
+          transport.terminateSession().catch(() => undefined),
+          250,
+        );
       }
       if (transport instanceof StdioClientTransport) {
         stdioPid ??= transport.pid;
         if (stdioPid) terminateProcessTree(stdioPid);
       }
-      await settleWithin(client.close().catch(() => undefined), 1_000);
+      await settleWithin(
+        client.close().catch(() => undefined),
+        1_000,
+      );
       if (stdioPid) terminateProcessTree(stdioPid);
     }
   }

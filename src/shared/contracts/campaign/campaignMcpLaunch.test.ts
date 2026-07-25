@@ -4,6 +4,8 @@ import {
   applyCampaignMcpProfile,
   CONTROL_CENTRE_MCP_PROFILE_ENV_VAR,
   CONTROL_CENTRE_MCP_PROFILE_HEADER,
+  isControlCentreMcpServerName,
+  normalizeControlCentreMcpServerName,
 } from "./campaignMcpLaunch";
 
 function stdioServer(overrides: Partial<McpServer> = {}): McpServer {
@@ -29,6 +31,26 @@ function httpServer(overrides: Partial<McpServer> = {}): McpServer {
     ...overrides,
   };
 }
+
+describe("normalizeControlCentreMcpServerName", () => {
+  it.each([
+    "control-centre",
+    "Control-Centre",
+    "Control_Centre",
+    "control centre",
+    "  CONTROL CENTRE  ",
+  ])("treats %j as the Control Centre server name", (name) => {
+    expect(isControlCentreMcpServerName(name)).toBe(true);
+    expect(normalizeControlCentreMcpServerName(name)).toBe("controlcentre");
+  });
+
+  it.each(["control-centre-2", "my-control-centre", "controlcentrebackup", "control"])(
+    "rejects near-miss %j",
+    (name) => {
+      expect(isControlCentreMcpServerName(name)).toBe(false);
+    },
+  );
+});
 
 describe("applyCampaignMcpProfile", () => {
   it("injects the profile env var into a stdio control-centre server", () => {

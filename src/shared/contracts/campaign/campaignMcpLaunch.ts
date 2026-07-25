@@ -15,8 +15,47 @@ export const CONTROL_CENTRE_MCP_PROFILE_ENV_VAR = "CONTROL_CENTRE_MCP_PROFILE";
 /** HTTP/SSE header equivalent, for non-stdio Control Centre connections. */
 export const CONTROL_CENTRE_MCP_PROFILE_HEADER = "x-control-centre-mcp-profile";
 
+/**
+ * Folds case and treats `-`, `_`, and spaces as equivalent so real-world MCP
+ * server names like `Control_Centre` match the canonical `control-centre`.
+ */
+export function normalizeControlCentreMcpServerName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[-_\s]+/g, "");
+}
+
+const NORMALIZED_CONTROL_CENTRE_MCP_SERVER_NAME = normalizeControlCentreMcpServerName(
+  CONTROL_CENTRE_MCP_SERVER_NAME,
+);
+
+export function isControlCentreMcpServerName(name: string): boolean {
+  return normalizeControlCentreMcpServerName(name) === NORMALIZED_CONTROL_CENTRE_MCP_SERVER_NAME;
+}
+
+export type ControlCentreMcpSetup =
+  | { kind: "not-configured" }
+  | { kind: "disabled" }
+  | { kind: "ready"; server: McpServer };
+
+/** Resolves whether a merged MCP server list includes a usable Control Centre server. */
+export function diagnoseControlCentreMcpSetup(
+  servers: readonly McpServer[],
+): ControlCentreMcpSetup {
+  const matching = servers.filter((server) => isControlCentreMcpServerName(server.name));
+  if (matching.length === 0) {
+    return { kind: "not-configured" };
+  }
+  const enabled = matching.find((server) => server.enabled);
+  if (!enabled) {
+    return { kind: "disabled" };
+  }
+  return { kind: "ready", server: enabled };
+}
+
 function isControlCentreServer(server: McpServer): boolean {
-  return server.name.trim().toLowerCase() === CONTROL_CENTRE_MCP_SERVER_NAME;
+  return isControlCentreMcpServerName(server.name);
 }
 
 /**

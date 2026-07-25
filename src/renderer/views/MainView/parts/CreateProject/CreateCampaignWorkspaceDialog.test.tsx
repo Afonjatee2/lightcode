@@ -63,6 +63,7 @@ function mockOpsReady(
 
 const mockOpsUnavailable = {
   status: "unavailable" as const,
+  reason: "connection-failed" as const,
   message: "MCP not connected",
   refetch: vi.fn<() => void>(),
 };
@@ -226,13 +227,25 @@ describe("CreateCampaignWorkspaceDialog", () => {
     mocks.useOperationsToday.mockReturnValue(
       mockOpsReady({
         needsAttention: [
-          ccCampaign({ campaignGroupId: "cg-na", clientName: "NA Client", campaignName: "NA Camp" }),
+          ccCampaign({
+            campaignGroupId: "cg-na",
+            clientName: "NA Client",
+            campaignName: "NA Camp",
+          }),
         ],
         waitingForApproval: [
-          ccCampaign({ campaignGroupId: "cg-wf", clientName: "WF Client", campaignName: "WF Camp" }),
+          ccCampaign({
+            campaignGroupId: "cg-wf",
+            clientName: "WF Client",
+            campaignName: "WF Camp",
+          }),
         ],
         otherLive: [
-          ccCampaign({ campaignGroupId: "cg-ol", clientName: "OL Client", campaignName: "OL Camp" }),
+          ccCampaign({
+            campaignGroupId: "cg-ol",
+            clientName: "OL Client",
+            campaignName: "OL Camp",
+          }),
         ],
       }),
     );
@@ -253,13 +266,13 @@ describe("CreateCampaignWorkspaceDialog", () => {
     usePanelStore.getState().openCreateCampaignProjectModal();
     render(<CreateCampaignWorkspaceDialog />);
 
-    await waitFor(() =>
-      expect(screen.getByText(/Control Centre is not available/)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/MCP not connected/)).toBeInTheDocument());
 
     fireEvent.change(screen.getByLabelText("Client name"), { target: { value: "Manual Client" } });
     fireEvent.change(screen.getByLabelText("Campaign name"), { target: { value: "Manual Camp" } });
-    fireEvent.change(screen.getByLabelText("Campaign group ID"), { target: { value: "cg-manual" } });
+    fireEvent.change(screen.getByLabelText("Campaign group ID"), {
+      target: { value: "cg-manual" },
+    });
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Create Campaign Workspace$/ }));
@@ -328,9 +341,7 @@ describe("CreateCampaignWorkspaceDialog", () => {
   // ── 8. Thrown failure (finding: component has no try/catch) ─────
 
   test("pending submission keeps dialog open with values preserved (thrown-error finding)", async () => {
-    mocks.createCampaignWorkspace.mockReturnValue(
-      new Promise(() => {}),
-    );
+    mocks.createCampaignWorkspace.mockReturnValue(new Promise(() => {}));
 
     usePanelStore.getState().openCreateCampaignProjectModal();
     render(<CreateCampaignWorkspaceDialog />);
@@ -419,7 +430,9 @@ describe("CreateCampaignWorkspaceDialog", () => {
 
     fireEvent.change(screen.getByLabelText("Client name"), { target: { value: "  Acme  " } });
     fireEvent.change(screen.getByLabelText("Campaign name"), { target: { value: "  Q4  " } });
-    fireEvent.change(screen.getByLabelText("Campaign group ID"), { target: { value: "  cg-kb  " } });
+    fireEvent.change(screen.getByLabelText("Campaign group ID"), {
+      target: { value: "  cg-kb  " },
+    });
     fireEvent.change(screen.getByLabelText("Job number"), { target: { value: "  J-42  " } });
 
     const form = screen.getByLabelText("Client name").closest("form");
@@ -456,7 +469,9 @@ describe("CreateCampaignWorkspaceDialog", () => {
     expect(screen.getByLabelText("Default model")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Add Alias/ }));
-    expect(screen.getAllByRole("button", { name: "Remove alias" }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByRole("button", { name: "Remove alias" }).length).toBeGreaterThanOrEqual(
+      1,
+    );
   });
 
   // ── 13. Both entry points set the same panel-store flag ─────────
@@ -480,9 +495,8 @@ describe("CreateCampaignWorkspaceDialog", () => {
   });
 
   test("CampaignWorkspaceShell entry point dispatches the same store action", async () => {
-    const { CampaignWorkspaceShell } = await import(
-      "@/renderer/views/CampaignWorkspace/CampaignWorkspaceShell"
-    );
+    const { CampaignWorkspaceShell } =
+      await import("@/renderer/views/CampaignWorkspace/CampaignWorkspaceShell");
 
     mocks.useOperationsToday.mockReturnValue(mockOpsReady({}));
 

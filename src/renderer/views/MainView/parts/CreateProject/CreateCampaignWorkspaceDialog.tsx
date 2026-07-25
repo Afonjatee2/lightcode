@@ -9,6 +9,7 @@ import { useAppStore } from "@/renderer/state/appStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { useOperationsToday } from "@/renderer/hooks/useOperationsToday";
 import { createCampaignWorkspace } from "@/renderer/actions/campaignProjectActions";
+import { controlCentreManualWorkspaceSuffix } from "@/renderer/campaign/controlCentreAvailabilityCopy";
 
 const MCP_PROFILE_OPTIONS = MCP_PROFILES.map((profile) => ({
   id: profile,
@@ -39,9 +40,7 @@ export function CreateCampaignWorkspaceDialog() {
   const [defaultAgentKind, setDefaultAgentKind] = useState("");
   const [defaultModel, setDefaultModel] = useState("");
   const [mcpProfile, setMcpProfile] = useState<McpProfile>("monitoring");
-  const [resourceAliases, setResourceAliases] = useState<ResourceAlias[]>([
-    { key: "", value: "" },
-  ]);
+  const [resourceAliases, setResourceAliases] = useState<ResourceAlias[]>([{ key: "", value: "" }]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCampaignFromCC, setSelectedCampaignFromCC] = useState<string | null>(null);
@@ -164,8 +163,7 @@ export function CreateCampaignWorkspaceDialog() {
 
   const existingProject = projects.find(
     (p) =>
-      p.purpose === "campaign" &&
-      p.campaignExtension?.campaignGroupId === campaignGroupId.trim(),
+      p.purpose === "campaign" && p.campaignExtension?.campaignGroupId === campaignGroupId.trim(),
   );
 
   return (
@@ -187,45 +185,51 @@ export function CreateCampaignWorkspaceDialog() {
             </Modal.Heading>
           </Modal.Header>
           <Modal.Body>
-            <form id="create-campaign-form" onSubmit={(e) => { e.preventDefault(); void handleSubmit(e); }} className="space-y-4">
-              {operationsToday.status === "ready" &&
-                operationsToday.data.counts.total > 0 && (
-                  <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted">
-                      <Trans>Or pick from Control Centre</Trans>
-                    </Label>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        ...operationsToday.data.needsAttention,
-                        ...operationsToday.data.waitingForApproval,
-                        ...operationsToday.data.otherLive,
-                      ].map((campaign) => (
-                        <button
-                          key={campaign.campaignGroupId}
-                          type="button"
-                          onClick={() => setSelectedCampaignFromCC(campaign.campaignGroupId)}
-                          className={`rounded-medium border px-3 py-2 text-left transition-colors ${
-                            selectedCampaignFromCC === campaign.campaignGroupId
-                              ? "border-primary bg-primary/10"
-                              : "border-divider bg-content2 hover:bg-content3"
-                          }`}
-                        >
-                          <p className="text-small font-medium">{campaign.clientName}</p>
-                          <p className="text-tiny text-default-500">{campaign.campaignName}</p>
-                        </button>
-                      ))}
-                    </div>
+            <form
+              id="create-campaign-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSubmit(e);
+              }}
+              className="space-y-4"
+            >
+              {operationsToday.status === "ready" && operationsToday.data.counts.total > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-muted">
+                    <Trans>Or pick from Control Centre</Trans>
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      ...operationsToday.data.needsAttention,
+                      ...operationsToday.data.waitingForApproval,
+                      ...operationsToday.data.otherLive,
+                    ].map((campaign) => (
+                      <button
+                        key={campaign.campaignGroupId}
+                        type="button"
+                        onClick={() => setSelectedCampaignFromCC(campaign.campaignGroupId)}
+                        className={`rounded-medium border px-3 py-2 text-left transition-colors ${
+                          selectedCampaignFromCC === campaign.campaignGroupId
+                            ? "border-primary bg-primary/10"
+                            : "border-divider bg-content2 hover:bg-content3"
+                        }`}
+                      >
+                        <p className="text-small font-medium">{campaign.clientName}</p>
+                        <p className="text-tiny text-default-500">{campaign.campaignName}</p>
+                      </button>
+                    ))}
                   </div>
-                )}
+                </div>
+              )}
 
               {operationsToday.status === "unavailable" && (
                 <div className="flex items-start gap-2 rounded-medium border border-warning/40 bg-warning/5 p-3">
                   <WifiOff className="size-4 shrink-0 text-warning mt-0.5" />
                   <p className="text-small text-foreground">
-                    <Trans>
-                      Control Centre is not available. You can still create a campaign workspace
-                      manually, but live campaign context will not load until the MCP connection works.
-                    </Trans>
+                    {operationsToday.message}
+                    {operationsToday.reason !== "connection-failed"
+                      ? ` ${t(controlCentreManualWorkspaceSuffix)}`
+                      : null}
                   </p>
                 </div>
               )}
@@ -356,11 +360,7 @@ export function CreateCampaignWorkspaceDialog() {
                     )}
                   </div>
                 ))}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onPress={addResourceAlias}
-                >
+                <Button size="sm" variant="ghost" onPress={addResourceAlias}>
                   <Plus className="size-4" />
                   <Trans>Add Alias</Trans>
                 </Button>
@@ -377,17 +377,11 @@ export function CreateCampaignWorkspaceDialog() {
                 </div>
               )}
 
-              {submitError && (
-                <p className="text-small text-danger">{submitError}</p>
-              )}
+              {submitError && <p className="text-small text-danger">{submitError}</p>}
             </form>
           </Modal.Body>
           <Modal.Footer>
-            <Button
-              variant="ghost"
-              onPress={handleClose}
-              isDisabled={isSubmitting}
-            >
+            <Button variant="ghost" onPress={handleClose} isDisabled={isSubmitting}>
               <Trans>Cancel</Trans>
             </Button>
             <Button
