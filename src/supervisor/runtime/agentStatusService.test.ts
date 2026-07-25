@@ -284,3 +284,27 @@ HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\{333}
     );
   });
 });
+
+describe("awaitPendingDetection timeout bound", () => {
+  it("resolves within the timeout even when a detection pass never settles", async () => {
+    const { service } = makeService(
+      vi.fn<AgentAdapter["detectInstall"]>().mockResolvedValue(makeStatus()),
+    );
+    // Simulate a wedged adapter probe: a detection promise that never settles.
+    (service as unknown as { pendingDetection: Promise<unknown> }).pendingDetection = new Promise(
+      () => {},
+    );
+    const started = Date.now();
+    await service.awaitPendingDetection(100);
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
+
+  it("returns immediately when no detection is pending", async () => {
+    const { service } = makeService(
+      vi.fn<AgentAdapter["detectInstall"]>().mockResolvedValue(makeStatus()),
+    );
+    const started = Date.now();
+    await service.awaitPendingDetection(5_000);
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+});

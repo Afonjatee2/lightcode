@@ -68,6 +68,7 @@ export type PanelCompletionRule =
 export const CONSULTATION_FAILURE_CODES = [
   "context_retrieval_failed",
   "provider_unavailable",
+  "provider_warming_up",
   "auth_failure",
   "child_launch_failed",
   "execution_failed",

@@ -16,6 +16,7 @@ import type {
   EvidenceFreshnessSummary,
 } from "@/shared/consultations";
 import { isTerminalStatus } from "@/shared/consultations";
+import { msg } from "@/shared/messages";
 import { Button } from "@/renderer/components/common/Button";
 import { ContextWarnings, EvidenceFreshnessIndicator } from "./ContextWarnings";
 
@@ -163,8 +164,8 @@ export function ConsultationCard({
             <XCircle size={14} />
             <Trans>Consultation failed</Trans>
           </div>
-          {record.safeFailureMessage ? (
-            <p className="text-xs text-muted-foreground">{record.safeFailureMessage}</p>
+          {failureDisplayMessage(record) ? (
+            <p className="text-xs text-muted-foreground">{failureDisplayMessage(record)}</p>
           ) : null}
           {canRetry ? (
             <Button
@@ -188,6 +189,25 @@ export function ConsultationCard({
       ) : null}
     </div>
   );
+}
+
+/**
+ * Provider-resolution failures are recomposed here from the failure CODE so the
+ * text localizes — the supervisor stores `safeFailureMessage` in English only
+ * (the shared-message resolver exists solely in the renderer process). Other
+ * failure codes fall back to the stored message.
+ */
+function failureDisplayMessage(record: ConsultationRecord): string | null {
+  const provider = record.requestedProvider;
+  if (provider) {
+    if (record.failureCode === "provider_warming_up") {
+      return msg("consultation.providerWarmingUp", { provider });
+    }
+    if (record.failureCode === "provider_unavailable") {
+      return msg("consultation.providerUnavailable", { provider });
+    }
+  }
+  return record.safeFailureMessage;
 }
 
 function CompletionResult({ result }: { result: ConsultationResultAttachment }) {

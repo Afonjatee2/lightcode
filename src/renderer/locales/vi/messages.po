@@ -992,6 +992,10 @@ msgstr "Tác nhân"
 msgid "Agent ({subagent}): {description}"
 msgstr "Tác nhân ({subagent}): {description}"
 
+#: src/renderer/i18n/sharedMessages.ts
+msgid "Agent catalog is still warming up for provider \"{provider}\" — please retry in a moment"
+msgstr "Danh mục agent cho nhà cung cấp \"{provider}\" vẫn đang khởi động — vui lòng thử lại sau giây lát"
+
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
 msgstr "Trò chuyện tác nhân (ACP / markdown). Các hàng lệnh dùng kích thước này trừ 1 px; dòng công cụ và dòng kế hoạch trừ 2 px."
@@ -8462,6 +8466,10 @@ msgstr "nhà cung cấp"
 #: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 msgid "Provider"
 msgstr "nhà cung cấp"
+
+#: src/renderer/i18n/sharedMessages.ts
+msgid "Provider \"{provider}\" is not installed or cannot host a consultation thread"
+msgstr "Nhà cung cấp \"{provider}\" chưa được cài đặt hoặc không thể chạy luồng tư vấn"
 
 #: src/renderer/components/thread/ThreadContextDock.tsx
 #: src/renderer/components/thread/threadContextUsage.ts

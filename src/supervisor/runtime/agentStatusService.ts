@@ -267,9 +267,25 @@ export class AgentStatusService {
     }
   }
 
-  async awaitPendingDetection(): Promise<void> {
-    if (this.pendingDetection) {
-      await this.pendingDetection.catch(() => ({ windows: [], wsl: [] }));
+  /**
+   * Waits for an in-flight background detection pass, bounded by a timeout so
+   * a wedged adapter probe can never hang a caller (consultation submits wait
+   * on this during cold boot). Resolves silently on timeout — callers proceed
+   * with whatever the cache holds at that point.
+   */
+  async awaitPendingDetection(timeoutMs = 15_000): Promise<void> {
+    if (!this.pendingDetection) return;
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        this.pendingDetection.catch(() => undefined),
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, timeoutMs);
+          timer.unref?.();
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
