@@ -11,8 +11,18 @@ import {
 import type { AvailableProvider } from "./resolve";
 
 const catalog: AvailableProvider[] = [
-  { provider: "claude", models: ["claude-fast", "claude-max"], authenticated: true, roles: ["strategic_reviewer"] },
-  { provider: "codex", models: ["codex-balanced"], authenticated: true, roles: ["figures_auditor"] },
+  {
+    provider: "claude",
+    models: ["claude-fast", "claude-max"],
+    authenticated: true,
+    roles: ["strategic_reviewer"],
+  },
+  {
+    provider: "codex",
+    models: ["codex-balanced"],
+    authenticated: true,
+    roles: ["figures_auditor"],
+  },
   { provider: "gemini", models: ["gemini-1"], authenticated: false },
 ];
 
@@ -47,7 +57,10 @@ describe("resolveCampaignGroupId", () => {
 describe("command resolution", () => {
   it("maps role names and aliases to a role + mode", () => {
     expect(resolveCommand("daily_operator")).toEqual({ role: "daily_operator", mode: "standard" });
-    expect(resolveCommand("@strategic_reviewer")).toEqual({ role: "strategic_reviewer", mode: "standard" });
+    expect(resolveCommand("@strategic_reviewer")).toEqual({
+      role: "strategic_reviewer",
+      mode: "standard",
+    });
     expect(resolveCommand("auditor")).toEqual({ role: "figures_auditor", mode: "standard" });
     expect(resolveCommand("research")).toEqual({ role: "researcher", mode: "standard" });
   });
@@ -95,30 +108,77 @@ describe("provider resolution", () => {
   });
 
   it("throws ProviderUnavailableError for an uninstalled provider", () => {
-    expect(() =>
-      resolveProvider({ role: "researcher", requestedProvider: "openai", requestedModel: null, catalog }),
-    ).toThrow(ProviderUnavailableError);
+    let thrown: unknown;
+    try {
+      resolveProvider({
+        role: "researcher",
+        requestedProvider: "openai",
+        requestedModel: null,
+        catalog,
+      });
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(ProviderUnavailableError);
+    expect((thrown as ProviderUnavailableError).reason).toBe("not_detected");
+  });
+
+  it("throws ProviderUnavailableError with warming_up reason when catalog is empty", () => {
+    let thrown: unknown;
+    try {
+      resolveProvider({
+        role: "researcher",
+        requestedProvider: "claude",
+        requestedModel: null,
+        catalog: [],
+      });
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(ProviderUnavailableError);
+    expect((thrown as ProviderUnavailableError).reason).toBe("warming_up");
+    expect((thrown as ProviderUnavailableError).message).toContain("warming up");
   });
 
   it("throws ProviderAuthError for an installed-but-unauthenticated provider", () => {
     expect(() =>
-      resolveProvider({ role: "researcher", requestedProvider: "gemini", requestedModel: null, catalog }),
+      resolveProvider({
+        role: "researcher",
+        requestedProvider: "gemini",
+        requestedModel: null,
+        catalog,
+      }),
     ).toThrow(ProviderAuthError);
   });
 
   it("prefers a role-matching authenticated provider when none is requested", () => {
-    const result = resolveProvider({ role: "figures_auditor", requestedProvider: null, requestedModel: null, catalog });
+    const result = resolveProvider({
+      role: "figures_auditor",
+      requestedProvider: null,
+      requestedModel: null,
+      catalog,
+    });
     expect(result.actualProvider).toBe("codex");
   });
 
   it("falls back to the first authenticated provider when no role match exists", () => {
-    const result = resolveProvider({ role: "challenger", requestedProvider: null, requestedModel: null, catalog });
+    const result = resolveProvider({
+      role: "challenger",
+      requestedProvider: null,
+      requestedModel: null,
+      catalog,
+    });
     expect(result.actualProvider).toBe("claude");
   });
 
   it("throws NoProviderForRoleError when nothing is authenticated", () => {
     expect(() =>
-      resolveProvider({ role: "researcher", requestedProvider: null, requestedModel: null, catalog: [{ provider: "x", models: ["m"], authenticated: false }] }),
+      resolveProvider({
+        role: "researcher",
+        requestedProvider: null,
+        requestedModel: null,
+        catalog: [{ provider: "x", models: ["m"], authenticated: false }],
+      }),
     ).toThrow(NoProviderForRoleError);
   });
 });

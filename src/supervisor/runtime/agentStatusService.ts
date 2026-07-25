@@ -267,6 +267,12 @@ export class AgentStatusService {
     }
   }
 
+  async awaitPendingDetection(): Promise<void> {
+    if (this.pendingDetection) {
+      await this.pendingDetection.catch(() => ({ windows: [], wsl: [] }));
+    }
+  }
+
   async getAgentStatuses(payload: GetAgentStatusesPayload): Promise<AgentStatusesResponse> {
     const wslDistros = [...new Set(payload.wslDistros)];
     const cached = this.readCachedStatuses(wslDistros);
@@ -287,11 +293,13 @@ export class AgentStatusService {
    */
   getCachedCapabilities(kind: AgentKind): AgentCapability | undefined {
     const { windows, fromCache } = this.readCachedStatuses([]);
-    if (!fromCache) return undefined;
+    if (!fromCache) {
+      return this.options.adapters.get(kind)?.capabilities;
+    }
     const status = windows.find(
       (s) => s.kind === kind && s.installed && s.authState === "authenticated",
     );
-    return status?.capabilities;
+    return status?.capabilities ?? this.options.adapters.get(kind)?.capabilities;
   }
 
   /** Return the last detected installed version for one native or WSL provider. */
