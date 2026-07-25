@@ -13,6 +13,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import type { OperationsTodayCampaignViewModel } from "@/renderer/adapters/campaignViewModels";
+import { getProjectPurpose } from "@/shared/contracts/project";
 import { findCampaignProjectByGroupId } from "@/renderer/campaign/resolveTodayDataSource";
 import {
   dayPeriodGreeting,
@@ -285,7 +286,9 @@ export function CampaignTodayView() {
   const setPendingCampaignApprovalsFocus = useAppStore(
     (state) => state.setPendingCampaignApprovalsFocus,
   );
-  const showSetupState = !projectId;
+  const hasCampaignProjects = projects.some((project) => getProjectPurpose(project) === "campaign");
+  const showNoProjectsSetupState = !hasCampaignProjects;
+  const showNoControlCentreSetupState = hasCampaignProjects && !projectId;
 
   const morningBriefEnabled = useSharedSettings((s) => s.morningBriefEnabled);
   const latestBrief = useMorningBriefStore((s) => s.latestBrief);
@@ -442,10 +445,13 @@ export function CampaignTodayView() {
           </div>
         </section>
 
-        {showSetupState ? (
+        {showNoProjectsSetupState ? (
           <section className="rounded-2xl border border-[var(--hairline)] px-4 py-6 text-center">
             <p className="text-sm text-muted">
-              <Trans>Create a campaign project to see your operations overview.</Trans>
+              <Trans>
+                A campaign workspace links Poracode to your Control Centre campaigns — approvals,
+                plan intelligence, and daily operations in one place.
+              </Trans>
             </p>
             <Button
               className="mt-4 bg-[var(--cockpit-accent)] text-[#0e0e14]"
@@ -455,6 +461,16 @@ export function CampaignTodayView() {
             >
               <Trans>New Campaign Project</Trans>
             </Button>
+          </section>
+        ) : null}
+
+        {showNoControlCentreSetupState ? (
+          <section className="rounded-2xl border border-[var(--hairline)] px-4 py-6 text-center">
+            <p className="text-sm text-muted">
+              <Trans>
+                Add Control Centre MCP to a campaign project to load your operations overview.
+              </Trans>
+            </p>
           </section>
         ) : null}
 

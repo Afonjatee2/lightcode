@@ -694,6 +694,10 @@ msgstr "7日"
 msgid "A campaign workspace for \"{0}\" already exists with this campaign group ID. Opening it will switch to the existing workspace."
 msgstr "このキャンペーングループIDのキャンペーンワークスペースは\"{0}\"に既に存在します。開くと既存のワークスペースに切り替わります。"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "A campaign workspace links Poracode to your Control Centre campaigns — approvals, plan intelligence, and daily operations in one place."
+msgstr "キャンペーンワークスペースは、PoracodeをControl Centreのキャンペーンに接続し、承認、プランインテリジェンス、日次オペレーションを一か所で管理できます。"
+
 #: src/renderer/actions/experimentDecisionActions.ts
 #: src/renderer/actions/experimentWorktreeActions.ts
 msgid "A candidate is no longer on its experiment branch."
@@ -909,6 +913,10 @@ msgstr "候補を追加"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Add Claude profile"
 msgstr "Claude プロファイルを追加"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Add Control Centre MCP to a campaign project to load your operations overview."
+msgstr "キャンペーンプロジェクトにControl Centre MCPを追加すると、オペレーション概要を読み込めます。"
 
 #: src/renderer/components/thread/ThreadAuthRequiredDock.tsx
 msgid "Add credentials before this thread can run."
@@ -3460,8 +3468,8 @@ msgid "Create"
 msgstr "作成"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Create a campaign project to see your operations overview."
-msgstr "運用概要を表示するにはキャンペーンプロジェクトを作成してください。"
+#~ msgid "Create a campaign project to see your operations overview."
+#~ msgstr "運用概要を表示するにはキャンペーンプロジェクトを作成してください。"
 
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
