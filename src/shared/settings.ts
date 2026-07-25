@@ -631,9 +631,14 @@ export function normalizeSharedSettings(value: unknown): SharedSettings {
     ? z.array(z.string()).safeParse(usage.data.disabledProviders)
     : undefined;
 
-  const modelAliases = seedModelAliasesIfEmpty(
-    normalizeModelAliases(parsed.success ? parsed.data.modelAliases : normalized.modelAliases),
-  );
+  // Seed defaults only when the field is absent entirely (fresh install / first
+  // run on an older settings file). An explicit empty array means the user
+  // deleted every alias — reseeding here would resurrect them on each restart.
+  const rawModelAliases = parsed.data.modelAliases;
+  const modelAliases =
+    rawModelAliases === undefined
+      ? seedModelAliasesIfEmpty([])
+      : normalizeModelAliases(rawModelAliases);
 
   return {
     ...normalized,

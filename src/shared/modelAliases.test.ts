@@ -49,3 +49,13 @@ describe("model alias registry", () => {
     expect(seeded.every((entry) => entry.provider === "codex")).toBe(true);
   });
 });
+
+describe("model alias seeding through shared settings", () => {
+  it("seeds defaults when the field is absent, but preserves an explicit empty array", async () => {
+    const { normalizeSharedSettings } = await import("./settings");
+    // Fresh install / older settings file: no modelAliases key at all → seeded.
+    expect(normalizeSharedSettings({}).modelAliases.length).toBeGreaterThan(0);
+    // User deleted every alias: explicit [] must NOT resurrect the defaults.
+    expect(normalizeSharedSettings({ modelAliases: [] }).modelAliases).toEqual([]);
+  });
+});
