@@ -120,6 +120,38 @@ describe("CampaignTodayView", () => {
     expect(usePanelStore.getState().createCampaignProjectModalOpen).toBe(true);
   });
 
+  it("fills ask-anything from a suggestion chip and routes on submit", async () => {
+    useAppStore.setState((state) => ({
+      ...state,
+      projects: [],
+      view: { kind: "campaignToday" },
+    }));
+    useSharedSettings.setState({ mcpServers: [controlCentreServer] });
+
+    render(<CampaignTodayView />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Needs attention/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /What is the current spend and pacing across Meta and Google Ads\?/i,
+      }),
+    );
+
+    const input = screen.getByLabelText("Ask anything about your campaigns");
+    expect(input).toHaveValue("What is the current spend and pacing across Meta and Google Ads?");
+
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+
+    await waitFor(() => expect(mocks.ensureCampaignsHubProject).toHaveBeenCalledTimes(1));
+    expect(useAppStore.getState().pendingCampaignComposerPrefill).toEqual({
+      projectId: "hub-project",
+      text: "What is the current spend and pacing across Meta and Google Ads?",
+    });
+  });
+
   it("routes zero-project ask-anything through the auto-created campaigns hub", async () => {
     useAppStore.setState((state) => ({
       ...state,

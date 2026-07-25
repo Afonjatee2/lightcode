@@ -1209,8 +1209,8 @@ msgid "Antigravity"
 msgstr "Antigravity"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Any sources stale right now?"
-msgstr "Sind gerade Quellen veraltet?"
+#~ msgid "Any sources stale right now?"
+#~ msgstr "Sind gerade Quellen veraltet?"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "API_KEY=value"
@@ -2100,6 +2100,10 @@ msgstr "{serverName} erneut prüfen"
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Check again"
 msgstr "Erneut prüfen"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Check all non-approved campaigns are paused and confirm targeting parameters."
+msgstr "Prüfe, dass alle nicht genehmigten Kampagnen pausiert sind, und bestätige die Targeting-Parameter."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Check for updates"
@@ -4091,6 +4095,10 @@ msgstr "Sprachmodell wird heruntergeladen..."
 msgid "Draft"
 msgstr "Entwurf"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Draft the client media rationale document from the latest performance data."
+msgstr "Erstelle das Media-Rationale-Dokument für den Kunden anhand der neuesten Performance-Daten."
+
 #: src/renderer/views/SettingsOverlay/parts/ModelOrderSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Drag to reorder how providers appear in the model picker."
@@ -5663,6 +5671,10 @@ msgstr "Unterbrochen"
 #: src/renderer/state/slices/runtimeEventSlice.ts
 msgid "Interrupted: agent session ended before completion."
 msgstr "Unterbrochen: Agentensitzung wurde vorzeitig beendet."
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Is one ad taking the whole budget? Find and pause budget-hogging creatives."
+msgstr "Verbraucht eine Anzeige das gesamte Budget? Finde und pausiere Creatives, die das Budget blockieren."
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/NotesEditor.tsx
 msgid "Italic"
@@ -8428,6 +8440,10 @@ msgstr "Von {sourceBranch} ({sourceAhead}) pullen"
 msgid "Pull from Source ({0})"
 msgstr "Aus Quelle ziehen ({0})"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Pull GA4 key events and conversion attribution for this campaign."
+msgstr "Rufe GA4-Schlüsselereignisse und Conversion-Attribution für diese Kampagne ab."
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Pull Rebase ({behind})"
 msgstr "Pull Rebase ({behind})"
@@ -8546,6 +8562,10 @@ msgstr "Erneut anmelden"
 #: src/mobile/views/PortsView.tsx
 msgid "Re-pair this connection to grant access to port forwarding."
 msgstr "Koppeln Sie diese Verbindung erneut, um Zugriff auf die Portweiterleitung zu gewähren."
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Re-plan the remaining budget and propose updated daily budgets."
+msgstr "Plane das verbleibende Budget neu und schlage aktualisierte Tagesbudgets vor."
 
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
 msgid "Reading each candidate's changes…"
@@ -10587,8 +10607,8 @@ msgid "Summarize this week's progress, unfinished work, and the most important r
 msgstr "Fasse den Fortschritt dieser Woche, unerledigte Arbeit und die wichtigsten Risiken für nächste Woche zusammen."
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Summarize what needs approval today"
-msgstr "Fassen Sie zusammen, was heute freigegeben werden muss"
+#~ msgid "Summarize what needs approval today"
+#~ msgstr "Fassen Sie zusammen, was heute freigegeben werden muss"
 
 #: src/renderer/components/providers/composerControlBuilders.tsx
 msgid "Supervised"
@@ -12267,6 +12287,10 @@ msgstr "Wochenrückblick"
 msgid "What did you decide?"
 msgstr "Was haben Sie entschieden?"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "What is the current spend and pacing across Meta and Google Ads?"
+msgstr "Wie hoch sind die aktuellen Ausgaben und das Pacing bei Meta und Google Ads?"
+
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "What should the remote agent work on?"
 msgstr "Woran soll der Remote-Agent arbeiten?"
@@ -12340,8 +12364,8 @@ msgid "Where the terminal panel appears."
 msgstr "Wo das Terminal-Panel erscheint."
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Which campaigns are off pace this week?"
-msgstr "Welche Kampagnen liegen diese Woche hinter dem Plan?"
+#~ msgid "Which campaigns are off pace this week?"
+#~ msgstr "Welche Kampagnen liegen diese Woche hinter dem Plan?"
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Why is this the right call?"

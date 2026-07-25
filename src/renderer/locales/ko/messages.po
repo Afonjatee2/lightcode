@@ -1209,8 +1209,8 @@ msgid "Antigravity"
 msgstr "Antigravity"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Any sources stale right now?"
-msgstr "지금 오래된 소스가 있나요?"
+#~ msgid "Any sources stale right now?"
+#~ msgstr "지금 오래된 소스가 있나요?"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "API_KEY=value"
@@ -2100,6 +2100,10 @@ msgstr "{serverName} 다시 확인"
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Check again"
 msgstr "다시 확인"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Check all non-approved campaigns are paused and confirm targeting parameters."
+msgstr "승인되지 않은 모든 캠페인이 일시 중지되었는지 확인하고 타겟팅 매개변수를 검증하세요."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Check for updates"
@@ -4091,6 +4095,10 @@ msgstr "음성 모델 다운로드 중..."
 msgid "Draft"
 msgstr "초안"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Draft the client media rationale document from the latest performance data."
+msgstr "최신 성과 데이터를 바탕으로 클라이언트 미디어 근거 문서를 작성하세요."
+
 #: src/renderer/views/SettingsOverlay/parts/ModelOrderSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Drag to reorder how providers appear in the model picker."
@@ -5663,6 +5671,10 @@ msgstr "중단됨"
 #: src/renderer/state/slices/runtimeEventSlice.ts
 msgid "Interrupted: agent session ended before completion."
 msgstr "중단됨: 에이전트 세션이 완료되기 전에 종료되었습니다."
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Is one ad taking the whole budget? Find and pause budget-hogging creatives."
+msgstr "한 광고가 예산을 모두 쓰고 있나요? 예산을 독점하는 소재를 찾아 일시 중지하세요."
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/NotesEditor.tsx
 msgid "Italic"
@@ -8428,6 +8440,10 @@ msgstr "{sourceBranch}({sourceAhead})에서 풀"
 msgid "Pull from Source ({0})"
 msgstr "소스에서 풀({0})"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Pull GA4 key events and conversion attribution for this campaign."
+msgstr "이 캠페인의 GA4 주요 이벤트와 전환 기여를 가져오세요."
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Pull Rebase ({behind})"
 msgstr "풀 리베이스({behind})"
@@ -8546,6 +8562,10 @@ msgstr "재로그인"
 #: src/mobile/views/PortsView.tsx
 msgid "Re-pair this connection to grant access to port forwarding."
 msgstr "포트 포워딩 액세스 권한을 부여하려면 이 연결을 다시 페어링하세요."
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Re-plan the remaining budget and propose updated daily budgets."
+msgstr "남은 예산을 재계획하고 업데이트된 일일 예산을 제안하세요."
 
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
 msgid "Reading each candidate's changes…"
@@ -10587,8 +10607,8 @@ msgid "Summarize this week's progress, unfinished work, and the most important r
 msgstr "이번 주의 진행 상황, 미완료 작업, 다음 주의 가장 중요한 위험을 요약해 주세요."
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Summarize what needs approval today"
-msgstr "오늘 승인이 필요한 내용 요약"
+#~ msgid "Summarize what needs approval today"
+#~ msgstr "오늘 승인이 필요한 내용 요약"
 
 #: src/renderer/components/providers/composerControlBuilders.tsx
 msgid "Supervised"
@@ -12267,6 +12287,10 @@ msgstr "주간 검토"
 msgid "What did you decide?"
 msgstr "무엇을 결정했나요?"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "What is the current spend and pacing across Meta and Google Ads?"
+msgstr "Meta와 Google Ads의 현재 지출과 페이싱은 어떻게 되나요?"
+
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "What should the remote agent work on?"
 msgstr "원격 에이전트가 어떤 작업을 수행해야 하나요?"
@@ -12340,8 +12364,8 @@ msgid "Where the terminal panel appears."
 msgstr "터미널 패널이 나타나는 위치."
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Which campaigns are off pace this week?"
-msgstr "이번 주 페이스가 느린 캠페인은?"
+#~ msgid "Which campaigns are off pace this week?"
+#~ msgstr "이번 주 페이스가 느린 캠페인은?"
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Why is this the right call?"

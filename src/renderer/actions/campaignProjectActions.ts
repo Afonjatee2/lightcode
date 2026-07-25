@@ -244,6 +244,11 @@ export async function createCampaignWorkspace(
     const result = await readBridge().ensureCampaignWorkspaceDir({
       projectId,
       name: input.name,
+      clientName: input.campaignExtension.clientName,
+      campaignName: input.campaignExtension.campaignName,
+      ...(input.campaignExtension.jobNumber
+        ? { jobNumber: input.campaignExtension.jobNumber }
+        : {}),
     });
     location = result.location;
   } catch {

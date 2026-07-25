@@ -89,6 +89,9 @@ export interface CreateProjectDirectoryResult {
 export const ensureCampaignWorkspaceDirPayloadSchema = z.object({
   projectId: z.string().min(1),
   name: z.string().optional(),
+  clientName: z.string().optional(),
+  campaignName: z.string().optional(),
+  jobNumber: z.string().optional(),
 });
 export type EnsureCampaignWorkspaceDirPayload = z.infer<
   typeof ensureCampaignWorkspaceDirPayloadSchema

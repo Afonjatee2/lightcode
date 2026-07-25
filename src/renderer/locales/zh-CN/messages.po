@@ -1209,8 +1209,8 @@ msgid "Antigravity"
 msgstr "Antigravity"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Any sources stale right now?"
-msgstr "现在有数据源过期吗？"
+#~ msgid "Any sources stale right now?"
+#~ msgstr "现在有数据源过期吗？"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "API_KEY=value"
@@ -2100,6 +2100,10 @@ msgstr "再次检查 {serverName}"
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Check again"
 msgstr "再次检查"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Check all non-approved campaigns are paused and confirm targeting parameters."
+msgstr "检查所有未批准的活动是否已暂停，并确认定向参数。"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Check for updates"
@@ -4091,6 +4095,10 @@ msgstr "正在下载语音模型..."
 msgid "Draft"
 msgstr "草稿"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Draft the client media rationale document from the latest performance data."
+msgstr "根据最新效果数据起草客户媒介理由文档。"
+
 #: src/renderer/views/SettingsOverlay/parts/ModelOrderSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Drag to reorder how providers appear in the model picker."
@@ -5663,6 +5671,10 @@ msgstr "已中断"
 #: src/renderer/state/slices/runtimeEventSlice.ts
 msgid "Interrupted: agent session ended before completion."
 msgstr "已中断：代理会话在完成之前结束。"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Is one ad taking the whole budget? Find and pause budget-hogging creatives."
+msgstr "是否有一条广告占用了全部预算？找出并暂停占用预算的创意。"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/NotesEditor.tsx
 msgid "Italic"
@@ -8427,6 +8439,10 @@ msgstr "从{sourceBranch}({sourceAhead}) 拉取"
 msgid "Pull from Source ({0})"
 msgstr "从源拉取 ({0})"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Pull GA4 key events and conversion attribution for this campaign."
+msgstr "拉取此活动的 GA4 关键事件和转化归因。"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Pull Rebase ({behind})"
 msgstr "拉变基 ({behind})"
@@ -8545,6 +8561,10 @@ msgstr "重新登录"
 #: src/mobile/views/PortsView.tsx
 msgid "Re-pair this connection to grant access to port forwarding."
 msgstr "重新配对此连接以授予端口转发的访问权限。"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Re-plan the remaining budget and propose updated daily budgets."
+msgstr "重新规划剩余预算并提议更新后的日预算。"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
 msgid "Reading each candidate's changes…"
@@ -10586,8 +10606,8 @@ msgid "Summarize this week's progress, unfinished work, and the most important r
 msgstr "总结本周进展、未完成的工作以及下周最重要的风险。"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Summarize what needs approval today"
-msgstr "总结今天需要审批的内容"
+#~ msgid "Summarize what needs approval today"
+#~ msgstr "总结今天需要审批的内容"
 
 #: src/renderer/components/providers/composerControlBuilders.tsx
 msgid "Supervised"
@@ -12266,6 +12286,10 @@ msgstr "每周回顾"
 msgid "What did you decide?"
 msgstr "你决定了什么？"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "What is the current spend and pacing across Meta and Google Ads?"
+msgstr "Meta 和 Google Ads 当前的支出与投放节奏如何？"
+
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "What should the remote agent work on?"
 msgstr "要让远程代理处理什么任务？"
@@ -12339,8 +12363,8 @@ msgid "Where the terminal panel appears."
 msgstr "终端面板出现的位置。"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Which campaigns are off pace this week?"
-msgstr "本周哪些广告活动进度落后？"
+#~ msgid "Which campaigns are off pace this week?"
+#~ msgstr "本周哪些广告活动进度落后？"
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Why is this the right call?"

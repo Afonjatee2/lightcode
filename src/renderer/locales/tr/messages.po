@@ -1209,8 +1209,8 @@ msgid "Antigravity"
 msgstr "Antigravity"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Any sources stale right now?"
-msgstr "Şu anda eski kaynak var mı?"
+#~ msgid "Any sources stale right now?"
+#~ msgstr "Şu anda eski kaynak var mı?"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "API_KEY=value"
@@ -2100,6 +2100,10 @@ msgstr "{serverName} sunucusunu tekrar kontrol et"
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Check again"
 msgstr "Tekrar kontrol et"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Check all non-approved campaigns are paused and confirm targeting parameters."
+msgstr "Onaylanmamış tüm kampanyaların duraklatıldığını kontrol edin ve hedefleme parametrelerini doğrulayın."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Check for updates"
@@ -4091,6 +4095,10 @@ msgstr "Ses modeli indiriliyor..."
 msgid "Draft"
 msgstr "Taslak"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Draft the client media rationale document from the latest performance data."
+msgstr "En son performans verilerinden müşteri medya gerekçe belgesini hazırlayın."
+
 #: src/renderer/views/SettingsOverlay/parts/ModelOrderSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Drag to reorder how providers appear in the model picker."
@@ -5663,6 +5671,10 @@ msgstr "Kesintiye uğradı"
 #: src/renderer/state/slices/runtimeEventSlice.ts
 msgid "Interrupted: agent session ended before completion."
 msgstr "Kesintiye uğradı: Ajan oturumu tamamlanmadan sona erdi."
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Is one ad taking the whole budget? Find and pause budget-hogging creatives."
+msgstr "Tek bir reklam tüm bütçeyi mi tüketiyor? Bütçeyi yutan kreatifleri bulun ve duraklatın."
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/NotesEditor.tsx
 msgid "Italic"
@@ -8428,6 +8440,10 @@ msgstr "{sourceBranch} ({sourceAhead}) kaynağından çek"
 msgid "Pull from Source ({0})"
 msgstr "Kaynaktan Çek ({0})"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Pull GA4 key events and conversion attribution for this campaign."
+msgstr "Bu kampanya için GA4 anahtar olaylarını ve dönüşüm atamasını çekin."
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Pull Rebase ({behind})"
 msgstr "Rebase ile Çek ({behind})"
@@ -8546,6 +8562,10 @@ msgstr "Yeniden giriş yap"
 #: src/mobile/views/PortsView.tsx
 msgid "Re-pair this connection to grant access to port forwarding."
 msgstr "Port yönlendirmeye erişim izni vermek için bu bağlantıyı yeniden eşleştirin."
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Re-plan the remaining budget and propose updated daily budgets."
+msgstr "Kalan bütçeyi yeniden planlayın ve güncellenmiş günlük bütçeler önerin."
 
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
 msgid "Reading each candidate's changes…"
@@ -10587,8 +10607,8 @@ msgid "Summarize this week's progress, unfinished work, and the most important r
 msgstr "Bu haftanın ilerlemesini, tamamlanmamış işleri ve gelecek haftanın en önemli risklerini özetle."
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Summarize what needs approval today"
-msgstr "Bugün onay gerekenleri özetle"
+#~ msgid "Summarize what needs approval today"
+#~ msgstr "Bugün onay gerekenleri özetle"
 
 #: src/renderer/components/providers/composerControlBuilders.tsx
 msgid "Supervised"
@@ -12267,6 +12287,10 @@ msgstr "Haftalık değerlendirme"
 msgid "What did you decide?"
 msgstr "Neye karar verdiniz?"
 
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "What is the current spend and pacing across Meta and Google Ads?"
+msgstr "Meta ve Google Ads'teki mevcut harcama ve pacing nedir?"
+
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "What should the remote agent work on?"
 msgstr "Uzak aracı ne üzerinde çalışmalı?"
@@ -12340,8 +12364,8 @@ msgid "Where the terminal panel appears."
 msgstr "Terminal panelinin göründüğü yer."
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Which campaigns are off pace this week?"
-msgstr "Bu hafta temposu geride kalan kampanyalar hangileri?"
+#~ msgid "Which campaigns are off pace this week?"
+#~ msgstr "Bu hafta temposu geride kalan kampanyalar hangileri?"
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Why is this the right call?"

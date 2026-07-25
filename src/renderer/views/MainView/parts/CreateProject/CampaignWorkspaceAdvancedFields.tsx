@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Plus, Trash2 } from "lucide-react";
 import type { CampaignProjectExtension, McpProfile } from "@/shared/contracts";
-import { MCP_PROFILES } from "@/shared/contracts/campaign/mcpProfile";
+import { DEFAULT_MCP_PROFILE, MCP_PROFILES } from "@/shared/contracts/campaign/mcpProfile";
 import { Input, Select } from "@/renderer/components/common";
 
 const MCP_PROFILE_OPTIONS = MCP_PROFILES.map((profile) => ({
@@ -41,7 +41,7 @@ export const EMPTY_ADVANCED_VALUES: CampaignWorkspaceAdvancedValues = {
   jobNumber: "",
   defaultAgentKind: "",
   defaultModel: "",
-  mcpProfile: "monitoring",
+  mcpProfile: DEFAULT_MCP_PROFILE,
   resourceAliases: [{ key: "", value: "" }],
 };
 
