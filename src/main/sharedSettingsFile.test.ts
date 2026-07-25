@@ -159,6 +159,7 @@ describe("sharedSettingsFile", () => {
       morningBriefScheduleId: null,
       morningBriefNotifiedKeys: [],
       crossagentRoutingGuide: "",
+      modelAliases: [],
     });
 
     expect(readSharedSettingsFile(settingsPath)).toEqual({
@@ -282,6 +283,7 @@ describe("sharedSettingsFile", () => {
       morningBriefScheduleId: null,
       morningBriefNotifiedKeys: [],
       crossagentRoutingGuide: "",
+      modelAliases: [],
     });
     expect(readFileSync(settingsPath, "utf8")).toContain('"themeMode": "dark"');
   });

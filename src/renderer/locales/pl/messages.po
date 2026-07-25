@@ -576,6 +576,11 @@ msgstr "Widoczne {visibleCount} z {totalCount}"
 msgid "{workerCount, plural, one {# implementation worker} other {# implementation workers}}"
 msgstr "{workerCount, plural, one {# implementation worker} other {# implementation workers}}"
 
+#. placeholder {0}: error.alias
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "@{0} is reserved for a built-in mention."
+msgstr "@{0} jest zarezerwowane dla wbudowanej wzmianki."
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "@codex check budget pacing, or type a message…"
 msgstr "@codex sprawdź tempo budżetu lub wpisz wiadomość…"
@@ -785,6 +790,7 @@ msgstr "Metryka aktywności"
 #: src/mobile/views/ManageProjectsView.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 msgid "Add"
@@ -1076,6 +1082,23 @@ msgstr "Alert"
 #: src/mobile/settingsSections.ts
 msgid "Alerts when threads need you"
 msgstr "Alerty, gdy wątki wymagają Twojej uwagi"
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Alias"
+msgstr "Alias"
+
+#. placeholder {0}: error.alias
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Alias @{0} is already in use."
+msgstr "Alias @{0} jest już używany."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Alias is required."
+msgstr "Alias jest wymagany."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Alias must be a single token (letters, numbers, hyphens, dots)."
+msgstr "Alias musi być pojedynczym tokenem (litery, cyfry, myślniki, kropki)."
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/skills/SkillsManager.tsx
@@ -4171,6 +4194,10 @@ msgstr "np. Codex GPT-5.5 fast do szybkich wyszukiwań, OpenCode GLM do masowych
 msgid "e.g. Work"
 msgstr "np. Praca"
 
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Each alias needs a provider and model."
+msgstr "Każdy alias wymaga dostawcy i modelu."
+
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
@@ -4226,6 +4253,7 @@ msgid "Effect on monitoring"
 msgstr "Wpływ na monitorowanie"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 msgid "Effort"
 msgstr "Wysiłek"
 
@@ -5249,6 +5277,14 @@ msgstr "Dzień dobry"
 msgid "Got it"
 msgstr "Rozumiem"
 
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "gpt-5.6-sol"
+msgstr "gpt-5.6-sol"
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "gpt-5.6-sol-high"
+msgstr "gpt-5.6-sol-high"
+
 #. placeholder {0}: skill.securityGrade
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Grade {0}"
@@ -5375,6 +5411,10 @@ msgstr "Ukryj umiejętności z {0}"
 #: src/renderer/views/MainView/parts/RightPanel/parts/DevTerminalPanel/parts/RightTerminalLayout.tsx
 msgid "Hide terminal"
 msgstr "Ukryj terminal"
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "high"
+msgstr "high"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "High risk"
@@ -5688,6 +5728,10 @@ msgstr "Przerwano"
 #: src/renderer/state/slices/runtimeEventSlice.ts
 msgid "Interrupted: agent session ended before completion."
 msgstr "Przerwano: sesja agenta zakończyła się przed jej ukończeniem."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Invalid alias."
+msgstr "Nieprawidłowy alias."
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Is one ad taking the whole budget? Find and pause budget-hogging creatives."
@@ -6467,12 +6511,22 @@ msgid "Mode:"
 msgstr "Tryb:"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 msgid "Model"
 msgstr "Model"
 
 #: src/renderer/commands/registry.ts
 msgid "Model added to favorites"
 msgstr "Model dodany do ulubionych"
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Model aliases"
+msgstr "Aliasy modeli"
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Model aliases saved."
+msgstr "Zapisano aliasy modeli."
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Model id"
@@ -6894,6 +6948,10 @@ msgstr "Brak zainstalowanych agentów."
 #: src/renderer/views/ProfileOverlay/parts/AiActions.tsx
 msgid "No AI commits, PRs, or conflict resolutions tracked yet."
 msgstr "Nie zarejestrowano jeszcze żadnych commitów AI, PR ani rozwiązanych konfliktów."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "No aliases yet. Add one to mention a model like @gpt-5.6-sol-high."
+msgstr "Brak aliasów. Dodaj jeden, aby wspomnieć model jak @gpt-5.6-sol-high."
 
 #: src/renderer/views/SettingsOverlay/parts/ArchivedThreadsSettings.tsx
 msgid "No archived threads."
@@ -8393,6 +8451,7 @@ msgid "provider"
 msgstr "dostawca"
 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 msgid "Provider"
 msgstr "Dostawca"
 
@@ -8880,6 +8939,7 @@ msgid "Remove action"
 msgstr "Usuń akcję"
 
 #: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 msgid "Remove alias"
 msgstr "Usuń alias"
 
@@ -9493,6 +9553,10 @@ msgstr "Zapisz"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "Save {0} credentials."
 msgstr "Zapisz dane uwierzytelniające {0}."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Save aliases"
+msgstr "Zapisz aliasy"
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Save changes"
@@ -11511,6 +11575,14 @@ msgstr "Włącz lub wyłącz śledzenie dla każdego dostawcy. Wyłączeni dosta
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Type"
 msgstr "Typ"
+
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Type @alias in the campaign composer to run a consultation on a specific provider, model, and effort."
+msgstr "Wpisz @alias w edytorze kampanii, aby uruchomić konsultację z wybranym dostawcą, modelem i poziomem wysiłku."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Type <0>@alias</0> in the campaign composer to run a consultation on a specific provider, model, and effort."
+msgstr "Wpisz <0>@alias</0> w edytorze kampanii, aby uruchomić konsultację z wybranym dostawcą, modelem i poziomem wysiłku."
 
 #: src/renderer/commands/CommandPalette.tsx
 msgid "Type a command"

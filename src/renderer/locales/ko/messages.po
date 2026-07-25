@@ -576,6 +576,11 @@ msgstr "{totalCount}개 중 {visibleCount}개 표시"
 msgid "{workerCount, plural, one {# implementation worker} other {# implementation workers}}"
 msgstr "{workerCount, plural, one {# implementation worker} other {# implementation workers}}"
 
+#. placeholder {0}: error.alias
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "@{0} is reserved for a built-in mention."
+msgstr "@{0}은(는) 기본 제공 멘션용으로 예약되어 있습니다."
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "@codex check budget pacing, or type a message…"
 msgstr "@codex 예산 진행 속도 확인 또는 메시지 입력…"
@@ -785,6 +790,7 @@ msgstr "활동 지표"
 #: src/mobile/views/ManageProjectsView.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 msgid "Add"
@@ -1076,6 +1082,23 @@ msgstr "알림"
 #: src/mobile/settingsSections.ts
 msgid "Alerts when threads need you"
 msgstr "스레드에 응답이 필요할 때 알림"
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Alias"
+msgstr "별칭"
+
+#. placeholder {0}: error.alias
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Alias @{0} is already in use."
+msgstr "별칭 @{0}은(는) 이미 사용 중입니다."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Alias is required."
+msgstr "별칭이 필요합니다."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Alias must be a single token (letters, numbers, hyphens, dots)."
+msgstr "별칭은 단일 토큰(문자, 숫자, 하이픈, 점)이어야 합니다."
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/skills/SkillsManager.tsx
@@ -4171,6 +4194,10 @@ msgstr "예: 빠른 조회에는 Codex GPT-5.5 fast, 대규모 리팩터링에�
 msgid "e.g. Work"
 msgstr "예: 업무"
 
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Each alias needs a provider and model."
+msgstr "각 별칭에는 제공자와 모델이 필요합니다."
+
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
@@ -4226,6 +4253,7 @@ msgid "Effect on monitoring"
 msgstr "모니터링에 미치는 영향"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 msgid "Effort"
 msgstr "작업 수준"
 
@@ -5249,6 +5277,14 @@ msgstr "좋은 아침입니다"
 msgid "Got it"
 msgstr "확인"
 
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "gpt-5.6-sol"
+msgstr "gpt-5.6-sol"
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "gpt-5.6-sol-high"
+msgstr "gpt-5.6-sol-high"
+
 #. placeholder {0}: skill.securityGrade
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Grade {0}"
@@ -5375,6 +5411,10 @@ msgstr "{0}의 스킬 숨기기"
 #: src/renderer/views/MainView/parts/RightPanel/parts/DevTerminalPanel/parts/RightTerminalLayout.tsx
 msgid "Hide terminal"
 msgstr "터미널 숨기기"
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "high"
+msgstr "high"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "High risk"
@@ -5688,6 +5728,10 @@ msgstr "중단됨"
 #: src/renderer/state/slices/runtimeEventSlice.ts
 msgid "Interrupted: agent session ended before completion."
 msgstr "중단됨: 에이전트 세션이 완료되기 전에 종료되었습니다."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Invalid alias."
+msgstr "유효하지 않은 별칭입니다."
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Is one ad taking the whole budget? Find and pause budget-hogging creatives."
@@ -6467,12 +6511,22 @@ msgid "Mode:"
 msgstr "모드:"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 msgid "Model"
 msgstr "모델"
 
 #: src/renderer/commands/registry.ts
 msgid "Model added to favorites"
 msgstr "모델을 즐겨찾기에 추가함"
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Model aliases"
+msgstr "모델 별칭"
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Model aliases saved."
+msgstr "모델 별칭을 저장했습니다."
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Model id"
@@ -6894,6 +6948,10 @@ msgstr "설치된 에이전트가 없습니다."
 #: src/renderer/views/ProfileOverlay/parts/AiActions.tsx
 msgid "No AI commits, PRs, or conflict resolutions tracked yet."
 msgstr "아직 추적된 AI 커밋, PR, 충돌 해결이 없습니다."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "No aliases yet. Add one to mention a model like @gpt-5.6-sol-high."
+msgstr "아직 별칭이 없습니다. @gpt-5.6-sol-high처럼 모델을 언급하려면 별칭을 추가하세요."
 
 #: src/renderer/views/SettingsOverlay/parts/ArchivedThreadsSettings.tsx
 msgid "No archived threads."
@@ -8393,6 +8451,7 @@ msgid "provider"
 msgstr "공급자"
 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 msgid "Provider"
 msgstr "공급자"
 
@@ -8880,6 +8939,7 @@ msgid "Remove action"
 msgstr "작업 제거"
 
 #: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 msgid "Remove alias"
 msgstr "별칭 제거"
 
@@ -9493,6 +9553,10 @@ msgstr "저장"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "Save {0} credentials."
 msgstr "{0} 자격 증명을 저장합니다."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Save aliases"
+msgstr "별칭 저장"
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Save changes"
@@ -11511,6 +11575,14 @@ msgstr "공급자별로 추적을 켜거나 끕니다. 비활성화된 공급자
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Type"
 msgstr "유형"
+
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Type @alias in the campaign composer to run a consultation on a specific provider, model, and effort."
+msgstr "캠페인 작성기에서 @alias를 입력하면 지정한 제공자, 모델, 추론 강도로 상담을 실행합니다."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Type <0>@alias</0> in the campaign composer to run a consultation on a specific provider, model, and effort."
+msgstr "캠페인 작성기에서 <0>@alias</0>를 입력하면 지정한 제공자, 모델, 추론 강도로 상담을 실행합니다."
 
 #: src/renderer/commands/CommandPalette.tsx
 msgid "Type a command"

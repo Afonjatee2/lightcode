@@ -576,6 +576,11 @@ msgstr "{visibleCount} trong số {totalCount} hiển thị"
 msgid "{workerCount, plural, one {# implementation worker} other {# implementation workers}}"
 msgstr "{workerCount, plural, one {# implementation worker} other {# implementation workers}}"
 
+#. placeholder {0}: error.alias
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "@{0} is reserved for a built-in mention."
+msgstr "@{0} được dành riêng cho lượt nhắc tích hợp."
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
 msgid "@codex check budget pacing, or type a message…"
 msgstr "@codex kiểm tra tiến độ ngân sách hoặc nhập tin nhắn…"
@@ -785,6 +790,7 @@ msgstr "Chỉ số hoạt động"
 #: src/mobile/views/ManageProjectsView.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 msgid "Add"
@@ -1076,6 +1082,23 @@ msgstr "Cảnh báo"
 #: src/mobile/settingsSections.ts
 msgid "Alerts when threads need you"
 msgstr "Cảnh báo khi luồng cần bạn"
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Alias"
+msgstr "Bí danh"
+
+#. placeholder {0}: error.alias
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Alias @{0} is already in use."
+msgstr "Bí danh @{0} đã được sử dụng."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Alias is required."
+msgstr "Bí danh là bắt buộc."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Alias must be a single token (letters, numbers, hyphens, dots)."
+msgstr "Bí danh phải là một mã đơn (chữ cái, số, dấu gạch ngang, dấu chấm)."
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/skills/SkillsManager.tsx
@@ -4171,6 +4194,10 @@ msgstr "ví dụ: Codex GPT-5.5 fast cho các tra cứu nhanh, OpenCode GLM cho 
 msgid "e.g. Work"
 msgstr "ví dụ: Work"
 
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Each alias needs a provider and model."
+msgstr "Mỗi bí danh cần một nhà cung cấp và một mô hình."
+
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
@@ -4226,6 +4253,7 @@ msgid "Effect on monitoring"
 msgstr "Ảnh hưởng đến việc giám sát"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 msgid "Effort"
 msgstr "Mức độ nỗ lực"
 
@@ -5249,6 +5277,14 @@ msgstr "Chào buổi sáng"
 msgid "Got it"
 msgstr "Đã hiểu"
 
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "gpt-5.6-sol"
+msgstr "gpt-5.6-sol"
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "gpt-5.6-sol-high"
+msgstr "gpt-5.6-sol-high"
+
 #. placeholder {0}: skill.securityGrade
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Grade {0}"
@@ -5375,6 +5411,10 @@ msgstr "Ẩn skill từ {0}"
 #: src/renderer/views/MainView/parts/RightPanel/parts/DevTerminalPanel/parts/RightTerminalLayout.tsx
 msgid "Hide terminal"
 msgstr "Ẩn thiết bị đầu cuối"
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "high"
+msgstr "high"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "High risk"
@@ -5688,6 +5728,10 @@ msgstr "Bị gián đoạn"
 #: src/renderer/state/slices/runtimeEventSlice.ts
 msgid "Interrupted: agent session ended before completion."
 msgstr "Bị gián đoạn: phiên tác nhân đã kết thúc trước khi hoàn thành."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Invalid alias."
+msgstr "Bí danh không hợp lệ."
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Is one ad taking the whole budget? Find and pause budget-hogging creatives."
@@ -6467,12 +6511,22 @@ msgid "Mode:"
 msgstr "Chế độ:"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 msgid "Model"
 msgstr "Mô hình"
 
 #: src/renderer/commands/registry.ts
 msgid "Model added to favorites"
 msgstr "Đã thêm mô hình vào mục yêu thích"
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Model aliases"
+msgstr "Bí danh mô hình"
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Model aliases saved."
+msgstr "Đã lưu bí danh mô hình."
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Model id"
@@ -6894,6 +6948,10 @@ msgstr "Không có tác nhân nào được cài đặt."
 #: src/renderer/views/ProfileOverlay/parts/AiActions.tsx
 msgid "No AI commits, PRs, or conflict resolutions tracked yet."
 msgstr "Chưa ghi nhận commit, PR hay giải quyết xung đột nào bằng AI."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "No aliases yet. Add one to mention a model like @gpt-5.6-sol-high."
+msgstr "Chưa có bí danh nào. Thêm một bí danh để nhắc mô hình như @gpt-5.6-sol-high."
 
 #: src/renderer/views/SettingsOverlay/parts/ArchivedThreadsSettings.tsx
 msgid "No archived threads."
@@ -8393,6 +8451,7 @@ msgid "provider"
 msgstr "nhà cung cấp"
 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 msgid "Provider"
 msgstr "nhà cung cấp"
 
@@ -8880,6 +8939,7 @@ msgid "Remove action"
 msgstr "Xóa hành động"
 
 #: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 msgid "Remove alias"
 msgstr "Xóa bí danh"
 
@@ -9493,6 +9553,10 @@ msgstr "Lưu"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "Save {0} credentials."
 msgstr "Lưu thông tin xác thực {0}."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Save aliases"
+msgstr "Lưu bí danh"
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Save changes"
@@ -11511,6 +11575,14 @@ msgstr "Bật hoặc tắt theo dõi cho mỗi nhà cung cấp. Tính năng tự
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Type"
 msgstr "Loại"
+
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Type @alias in the campaign composer to run a consultation on a specific provider, model, and effort."
+msgstr "Nhập @alias trong trình soạn chiến dịch để chạy tư vấn với nhà cung cấp, mô hình và mức nỗ lực cụ thể."
+
+#: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
+msgid "Type <0>@alias</0> in the campaign composer to run a consultation on a specific provider, model, and effort."
+msgstr "Nhập <0>@alias</0> trong trình soạn chiến dịch để chạy tư vấn với nhà cung cấp, mô hình và mức nỗ lực cụ thể."
 
 #: src/renderer/commands/CommandPalette.tsx
 msgid "Type a command"

@@ -8,6 +8,7 @@ import {
   type MentionParseResult,
 } from "@/shared/consultations";
 import { Button } from "@/renderer/components/common/Button";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 
 interface ResolvedMention {
   label: string;
@@ -23,6 +24,7 @@ interface ConsultationComposerProps {
 
 export function ConsultationComposer({ onSubmit, disabled }: ConsultationComposerProps) {
   const { t } = useLingui();
+  const modelAliases = useSharedSettings((state) => state.modelAliases);
   const [input, setInput] = useState("");
   const [resolved, setResolved] = useState<ResolvedMention | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,18 +50,22 @@ export function ConsultationComposer({ onSubmit, disabled }: ConsultationCompose
       kind: "command" as const,
       detail: cmd,
     })),
+    ...modelAliases.map((entry) => ({
+      alias: entry.alias,
+      label: `@${entry.alias}`,
+      kind: "alias" as const,
+      detail: `${entry.provider} · ${entry.model}`,
+    })),
   ];
 
   const filteredMentions =
     autocompleteFilter.length > 0
-      ? allMentions.filter((m) =>
-          m.alias.toLowerCase().includes(autocompleteFilter.toLowerCase()),
-        )
+      ? allMentions.filter((m) => m.alias.toLowerCase().includes(autocompleteFilter.toLowerCase()))
       : allMentions;
 
   function handleInputChange(value: string) {
     setInput(value);
-    const outcome = parseMention(value);
+    const outcome = parseMention(value, { modelAliases });
     if (outcome.success) {
       setResolved({
         label: outcome.commandToken ?? outcome.resolvedRole,
@@ -89,7 +95,7 @@ export function ConsultationComposer({ onSubmit, disabled }: ConsultationCompose
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey && resolved) {
       e.preventDefault();
-      const outcome = parseMention(input);
+      const outcome = parseMention(input, { modelAliases });
       if (outcome.success) {
         onSubmit(outcome);
         setInput("");
@@ -139,9 +145,7 @@ export function ConsultationComposer({ onSubmit, disabled }: ConsultationCompose
                   }}
                 >
                   <span className="font-medium">{m.label}</span>
-                  <span className="text-xs text-muted-foreground capitalize">
-                    {m.kind}
-                  </span>
+                  <span className="text-xs text-muted-foreground capitalize">{m.kind}</span>
                 </button>
               ))}
             </div>
@@ -152,7 +156,7 @@ export function ConsultationComposer({ onSubmit, disabled }: ConsultationCompose
           isDisabled={!resolved || (disabled ?? false)}
           onPress={() => {
             if (resolved) {
-              const outcome = parseMention(input);
+              const outcome = parseMention(input, { modelAliases });
               if (outcome.success) {
                 onSubmit(outcome);
                 setInput("");
@@ -186,9 +190,7 @@ export function ConsultationComposer({ onSubmit, disabled }: ConsultationCompose
         <div className="text-xs text-muted-foreground">
           {error.includes("unknown") ? (
             <span>
-              <Trans>
-                Unknown mention. Try @codex, @claude, @daily-operator, @verify, etc.
-              </Trans>
+              <Trans>Unknown mention. Try @codex, @claude, @daily-operator, @verify, etc.</Trans>
             </span>
           ) : (
             <span>{error}</span>

@@ -1,5 +1,8 @@
 import type { ConsultationMode, ConsultationRole } from "./types";
+import type { ModelAlias } from "@/shared/modelAliases";
+import { buildModelAliasLookup } from "@/shared/modelAliases";
 import { resolveCommand } from "./resolve";
+import { COMMAND_ALIASES, KNOWN_MENTIONS, PROVIDER_ALIASES, ROLE_ALIASES } from "./builtInMentions";
 
 export const MENTION_PARSE_ERROR_CODES = [
   "unknown_mention",
@@ -9,43 +12,12 @@ export const MENTION_PARSE_ERROR_CODES = [
 ] as const;
 export type MentionParseErrorCode = (typeof MENTION_PARSE_ERROR_CODES)[number];
 
-export const PROVIDER_ALIASES: Record<string, string> = {
-  codex: "codex",
-  claude: "claude",
-  kimi: "kimi",
-  qwen: "qwen",
-  deepseek: "deepseek",
-};
-
-export const ROLE_ALIASES: Record<string, ConsultationRole> = {
-  "daily-operator": "daily_operator",
-  daily_operator: "daily_operator",
-  "strategic-reviewer": "strategic_reviewer",
-  strategic_reviewer: "strategic_reviewer",
-  "figures-auditor": "figures_auditor",
-  figures_auditor: "figures_auditor",
-};
-
-export const COMMAND_ALIASES: Record<string, string> = {
-  verify: "verify",
-  challenge: "challenge",
-  research: "research",
-  panel: "panel",
-  finalise: "finalise",
-  finalize: "finalise",
-  handoff: "handoff",
-};
-
-export const KNOWN_MENTIONS: ReadonlySet<string> = new Set([
-  ...Object.keys(PROVIDER_ALIASES),
-  ...Object.keys(ROLE_ALIASES),
-  ...Object.keys(COMMAND_ALIASES),
-]);
-
 export interface MentionParseResult {
   success: true;
   resolvedRole: ConsultationRole;
   requestedProvider: string | null;
+  requestedModel: string | null;
+  requestedEffort: string | null;
   commandToken: string | null;
   consultationMode: ConsultationMode;
   originalMention: string;
@@ -61,6 +33,10 @@ export interface MentionParseError {
 
 export type ParseOutcome = MentionParseResult | MentionParseError;
 
+export interface ParseMentionOptions {
+  modelAliases?: readonly ModelAlias[];
+}
+
 /**
  * Mention precedence rules (highest first):
  * 1. Commands (@verify @challenge @research @panel @finalise @handoff) — set
@@ -73,7 +49,10 @@ export type ParseOutcome = MentionParseResult | MentionParseError;
  * 3. Provider-only (@codex @claude @kimi @qwen @deepseek) — when used without
  *    a role or command, defaults to daily_operator role. Provider-only is
  *    valid as long as an instruction follows.
- * 4. Hyphen and underscore are treated as equivalent for role aliases. Case is
+ * 4. User model aliases (settings registry) — same routing as provider-only,
+ *    but populate requested provider/model/effort from the alias entry. Built-in
+ *    mentions always take precedence over registry aliases.
+ * 5. Hyphen and underscore are treated as equivalent for role aliases. Case is
  *    ignored for all tokens.
  */
 
@@ -81,7 +60,7 @@ const CODE_BLOCK_RE = /```[\s\S]*?```/g;
 const INLINE_CODE_RE = /`[^`]*`/g;
 const QUOTED_LINE_RE = /^[ \t]*>.*$/gm;
 
-const MENTION_PATTERN = /(?:^|\s)@([\w][\w-]*)/;
+const MENTION_PATTERN = /(?:^|\s)@([\w][\w.-]*)/;
 
 function sanitiseInput(input: string): string {
   let sanitised = input.replace(CODE_BLOCK_RE, (m) => " ".repeat(m.length));
@@ -104,7 +83,15 @@ interface RawToken {
   isEmail: boolean;
 }
 
-function extractMentionTokens(input: string): RawToken[] {
+interface ParseContext {
+  aliasLookup: ReadonlyMap<string, ModelAlias>;
+}
+
+function isRecognizedToken(raw: string, context: ParseContext): boolean {
+  return KNOWN_MENTIONS.has(raw) || context.aliasLookup.has(raw);
+}
+
+function extractMentionTokens(input: string, context: ParseContext): RawToken[] {
   const sanitised = sanitiseInput(input);
   const tokens: RawToken[] = [];
   const seen = new Set<string>();
@@ -112,7 +99,7 @@ function extractMentionTokens(input: string): RawToken[] {
   let match: RegExpExecArray | null;
   while ((match = re.exec(sanitised)) !== null) {
     const raw = match[1]!.toLowerCase();
-    if (!KNOWN_MENTIONS.has(raw)) continue;
+    if (!isRecognizedToken(raw, context)) continue;
     const atPos = match.index + match[0].indexOf("@");
     const email = isPartOfEmail(sanitised, atPos);
     if (!seen.has(raw)) {
@@ -123,14 +110,14 @@ function extractMentionTokens(input: string): RawToken[] {
   return tokens;
 }
 
-function extractInstruction(input: string): string {
+function extractInstruction(input: string, context: ParseContext): string {
   const sanitised = sanitiseInput(input);
   const re = new RegExp(MENTION_PATTERN.source, "gi");
   let lastEnd = 0;
   let match: RegExpExecArray | null;
   while ((match = re.exec(sanitised)) !== null) {
     const raw = match[1]!.toLowerCase();
-    if (KNOWN_MENTIONS.has(raw)) {
+    if (isRecognizedToken(raw, context)) {
       const after = match.index + match[0].length;
       if (after > lastEnd) lastEnd = after;
     }
@@ -138,23 +125,62 @@ function extractInstruction(input: string): string {
   return input.slice(lastEnd).trim();
 }
 
-function buildOriginalMention(input: string): string {
+function buildOriginalMention(input: string, context: ParseContext): string {
   const sanitised = sanitiseInput(input);
   const re = new RegExp(MENTION_PATTERN.source, "gi");
   const parts: string[] = [];
   let match: RegExpExecArray | null;
   while ((match = re.exec(sanitised)) !== null) {
     const raw = match[1]!.toLowerCase();
-    if (KNOWN_MENTIONS.has(raw)) {
+    if (isRecognizedToken(raw, context)) {
       parts.push(`@${raw}`);
     }
   }
-  const instruction = extractInstruction(input);
+  const instruction = extractInstruction(input, context);
   const mention = parts.join(" ");
   return instruction ? `${mention} ${instruction}` : mention;
 }
 
-export function parseMention(input: string): ParseOutcome {
+function resolveRoutingFromTokens(input: {
+  commandToken: string | null;
+  roleToken: string | null;
+  providerToken: string | null;
+  userAliasToken: string | null;
+  aliasLookup: ReadonlyMap<string, ModelAlias>;
+}): Pick<MentionParseResult, "requestedProvider" | "requestedModel" | "requestedEffort"> {
+  if (input.userAliasToken) {
+    const alias = input.aliasLookup.get(input.userAliasToken)!;
+    return {
+      requestedProvider: alias.provider,
+      requestedModel: alias.model,
+      requestedEffort: alias.effort ?? null,
+    };
+  }
+  return {
+    requestedProvider: input.providerToken ? PROVIDER_ALIASES[input.providerToken]! : null,
+    requestedModel: null,
+    requestedEffort: null,
+  };
+}
+
+function successResult(
+  input: string,
+  context: ParseContext,
+  fields: Omit<MentionParseResult, "success" | "originalMention" | "instruction">,
+): MentionParseResult {
+  return {
+    success: true,
+    ...fields,
+    originalMention: buildOriginalMention(input, context),
+    instruction: extractInstruction(input, context),
+  };
+}
+
+export function parseMention(input: string, options?: ParseMentionOptions): ParseOutcome {
+  const context: ParseContext = {
+    aliasLookup: buildModelAliasLookup(options?.modelAliases ?? []),
+  };
+
   if (!input || input.trim().length === 0) {
     return {
       success: false,
@@ -164,7 +190,7 @@ export function parseMention(input: string): ParseOutcome {
     };
   }
 
-  const tokens = extractMentionTokens(input);
+  const tokens = extractMentionTokens(input, context);
 
   if (tokens.length === 0) {
     return {
@@ -188,6 +214,7 @@ export function parseMention(input: string): ParseOutcome {
   let commandToken: string | null = null;
   let roleToken: string | null = null;
   let providerToken: string | null = null;
+  let userAliasToken: string | null = null;
 
   for (const { token } of tokens) {
     if (COMMAND_ALIASES[token]) {
@@ -220,8 +247,26 @@ export function parseMention(input: string): ParseOutcome {
         };
       }
       providerToken = token;
+    } else if (context.aliasLookup.has(token)) {
+      if (userAliasToken && userAliasToken !== token) {
+        return {
+          success: false,
+          code: "ambiguous_mention",
+          message: `Multiple model aliases specified: @${userAliasToken} and @${token}`,
+          token,
+        };
+      }
+      userAliasToken = token;
     }
   }
+
+  const routing = resolveRoutingFromTokens({
+    commandToken,
+    roleToken,
+    providerToken,
+    userAliasToken,
+    aliasLookup: context.aliasLookup,
+  });
 
   if (commandToken) {
     const resolved = resolveCommand(commandToken);
@@ -233,7 +278,7 @@ export function parseMention(input: string): ParseOutcome {
         token: commandToken,
       };
     }
-    const instruction = extractInstruction(input);
+    const instruction = extractInstruction(input, context);
     if (instruction.length === 0) {
       return {
         success: false,
@@ -242,21 +287,18 @@ export function parseMention(input: string): ParseOutcome {
         token: commandToken,
       };
     }
-    return {
-      success: true,
+    return successResult(input, context, {
       resolvedRole: resolved.role,
-      requestedProvider: providerToken ? PROVIDER_ALIASES[providerToken]! : null,
+      ...routing,
       commandToken,
       consultationMode: resolved.mode,
-      originalMention: buildOriginalMention(input),
-      instruction,
-    };
+    });
   }
 
   if (roleToken) {
     const role = ROLE_ALIASES[roleToken]!;
     const resolved = resolveCommand(role);
-    const instruction = extractInstruction(input);
+    const instruction = extractInstruction(input, context);
     if (instruction.length === 0) {
       return {
         success: false,
@@ -266,37 +308,31 @@ export function parseMention(input: string): ParseOutcome {
       };
     }
     const mode = resolved?.mode ?? "standard";
-    return {
-      success: true,
+    return successResult(input, context, {
       resolvedRole: role,
-      requestedProvider: providerToken ? PROVIDER_ALIASES[providerToken]! : null,
+      ...routing,
       commandToken: null,
       consultationMode: mode,
-      originalMention: buildOriginalMention(input),
-      instruction,
-    };
+    });
   }
 
-  if (providerToken) {
-    const instruction = extractInstruction(input);
+  if (providerToken || userAliasToken) {
+    const instruction = extractInstruction(input, context);
     if (instruction.length === 0) {
+      const token = providerToken ?? userAliasToken!;
       return {
         success: false,
         code: "missing_instruction",
-        message: `@${providerToken} requires an instruction`,
-        token: providerToken,
+        message: `@${token} requires an instruction`,
+        token,
       };
     }
-    const provider = PROVIDER_ALIASES[providerToken]!;
-    return {
-      success: true,
+    return successResult(input, context, {
       resolvedRole: "daily_operator",
-      requestedProvider: provider,
+      ...routing,
       commandToken: null,
       consultationMode: "standard",
-      originalMention: buildOriginalMention(input),
-      instruction,
-    };
+    });
   }
 
   return {
@@ -310,3 +346,5 @@ export function parseMention(input: string): ParseOutcome {
 export function isMentionParseError(outcome: ParseOutcome): outcome is MentionParseError {
   return outcome.success === false;
 }
+
+export { COMMAND_ALIASES, KNOWN_MENTIONS, PROVIDER_ALIASES, ROLE_ALIASES } from "./builtInMentions";

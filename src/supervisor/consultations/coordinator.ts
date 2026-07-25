@@ -20,7 +20,13 @@ import {
 import { buildConsultationPrompt } from "./prompt";
 import { redactText } from "./redact";
 import { parseConsultationResult } from "./resultParser";
-import type { ChildExecutionPort, ChildOutcome, Clock, IdGenerator, ProviderCatalogPort } from "./ports";
+import type {
+  ChildExecutionPort,
+  ChildOutcome,
+  Clock,
+  IdGenerator,
+  ProviderCatalogPort,
+} from "./ports";
 import type { ConsultationRepository } from "./repository";
 import type { ContextPacketBuilder, BuiltContextPacket } from "./contextPacketBuilder";
 import { panelCompletionMet, synthesisePanel } from "./panel";
@@ -56,6 +62,7 @@ export interface SubmitRequest {
   actor: string;
   requestedProvider?: string;
   requestedModel?: string;
+  requestedEffort?: string;
   mode?: ConsultationMode;
 }
 
@@ -106,6 +113,7 @@ const ACTIVE_STATUSES: readonly ConsultationStatus[] = [
 
 export class ConsultationCoordinator {
   private readonly inflight = new Map<string, AbortController>();
+  private readonly pendingEffortByConsultationId = new Map<string, string>();
   private readonly attached = new Set<string>();
   private readonly listeners = new Set<(record: ConsultationRecord) => void>();
   private readonly panelPollIntervalMs: number;
@@ -137,6 +145,9 @@ export class ConsultationCoordinator {
   /** Submit a standard (single-consultant) consultation; runs asynchronously. */
   async submit(request: SubmitRequest): Promise<ConsultationRecord> {
     const record = this.newRecord(request, request.role, request.mode ?? "standard", null);
+    if (request.requestedEffort) {
+      this.pendingEffortByConsultationId.set(record.id, request.requestedEffort);
+    }
     this.save(record);
     void this.driveStandard(record.id);
     return record;
@@ -195,7 +206,8 @@ export class ConsultationCoordinator {
       actualProvider: null,
       requestedModel: original.requestedModel,
       actualModel: null,
-      consultationMode: original.consultationMode === "panel" ? "standard" : original.consultationMode,
+      consultationMode:
+        original.consultationMode === "panel" ? "standard" : original.consultationMode,
       status: "queued",
       contextPacketId: null,
       permissionPolicyVersion: original.permissionPolicyVersion,
@@ -314,7 +326,13 @@ export class ConsultationCoordinator {
    */
   async reconcileOnStartup(): Promise<ReconciliationReport> {
     if (this.reconcileState === "completed") {
-      return { resumed: [], markedOrphaned: [], markedInterrupted: [], cancelled: [], preservedCompleted: 0 };
+      return {
+        resumed: [],
+        markedOrphaned: [],
+        markedInterrupted: [],
+        cancelled: [],
+        preservedCompleted: 0,
+      };
     }
     if (this.reconcileState === "running" && this.reconcilePromise) {
       return this.reconcilePromise;
@@ -352,14 +370,19 @@ export class ConsultationCoordinator {
         case "building_context":
         case "ready":
           report.markedInterrupted.push(record.id);
-          this.fail(record, "internal_error", "Interrupted by a restart before the child launched; retry to resume.");
+          this.fail(
+            record,
+            "internal_error",
+            "Interrupted by a restart before the child launched; retry to resume.",
+          );
           break;
         case "running":
         case "awaiting_input":
           await this.reconcileRunning(record, report);
           break;
         case "cancel_requested": {
-          if (record.childThreadOrRunId) await this.cancelChildBestEffort(record.childThreadOrRunId);
+          if (record.childThreadOrRunId)
+            await this.cancelChildBestEffort(record.childThreadOrRunId);
           const cancelled = transition(record, "cancelled", this.deps.clock.now());
           this.save(cancelled);
           this.attachToParent(cancelled, null);
@@ -374,10 +397,17 @@ export class ConsultationCoordinator {
     return report;
   }
 
-  private async reconcileRunning(record: ConsultationRecord, report: ReconciliationReport): Promise<void> {
+  private async reconcileRunning(
+    record: ConsultationRecord,
+    report: ReconciliationReport,
+  ): Promise<void> {
     if (!record.childThreadOrRunId) {
       report.markedOrphaned.push(record.id);
-      this.fail(record, "execution_failed", "Child run reference was lost across a restart (orphaned).");
+      this.fail(
+        record,
+        "execution_failed",
+        "Child run reference was lost across a restart (orphaned).",
+      );
       return;
     }
     const state = await this.deps.childExecution.inspect(record.childThreadOrRunId);
@@ -388,7 +418,11 @@ export class ConsultationCoordinator {
       }
     } else {
       report.markedOrphaned.push(record.id);
-      this.fail(record, "execution_failed", "Child run was no longer present after a restart (orphaned).");
+      this.fail(
+        record,
+        "execution_failed",
+        "Child run was no longer present after a restart (orphaned).",
+      );
     }
   }
 
@@ -441,7 +475,10 @@ export class ConsultationCoordinator {
     this.emit(record);
   }
 
-  private persistTransition(record: ConsultationRecord, to: ConsultationStatus): ConsultationRecord {
+  private persistTransition(
+    record: ConsultationRecord,
+    to: ConsultationStatus,
+  ): ConsultationRecord {
     // Honour a concurrent cancellation/terminal state instead of overwriting it
     // with a stale in-flight copy (cancel() may have landed mid-step).
     const latest = this.deps.repository.getConsultation(record.id);
@@ -507,7 +544,11 @@ export class ConsultationCoordinator {
       this.fail(record, code, safeMessage(error));
       return;
     }
-    record = { ...record, actualProvider: resolution.actualProvider, actualModel: resolution.actualModel };
+    record = {
+      ...record,
+      actualProvider: resolution.actualProvider,
+      actualModel: resolution.actualModel,
+    };
     this.save(record);
 
     try {
@@ -532,12 +573,15 @@ export class ConsultationCoordinator {
         instruction: record.originalInstruction,
         body: built.body,
       });
+      const effort = this.pendingEffortByConsultationId.get(id);
+      this.pendingEffortByConsultationId.delete(id);
       const launched = await this.deps.childExecution.launch({
         parentThreadId: record.parentThreadId,
         provider: resolution.actualProvider,
         model: resolution.actualModel,
         prompt,
         title: `Consultation · ${record.resolvedRole}`,
+        ...(effort ? { effort } : {}),
       });
       childThreadOrRunId = launched.childThreadOrRunId;
     } catch (error) {
@@ -590,7 +634,11 @@ export class ConsultationCoordinator {
       return;
     }
     if (outcome.status === "failed") {
-      this.fail(record, "execution_failed", safeMessage(outcome.errorMessage ?? "Child run failed"));
+      this.fail(
+        record,
+        "execution_failed",
+        safeMessage(outcome.errorMessage ?? "Child run failed"),
+      );
       return;
     }
 
@@ -620,7 +668,11 @@ export class ConsultationCoordinator {
     this.attachToParent(cancelled, null);
   }
 
-  private fail(record: ConsultationRecord, code: ConsultationRecord["failureCode"], message: string): void {
+  private fail(
+    record: ConsultationRecord,
+    code: ConsultationRecord["failureCode"],
+    message: string,
+  ): void {
     const current = this.deps.repository.getConsultation(record.id) ?? record;
     if (isTerminalStatus(current.status)) return;
     // A concurrent cancellation wins over a failure arriving at the same moment.
@@ -628,13 +680,20 @@ export class ConsultationCoordinator {
       this.settleCancelled(current);
       return;
     }
-    const withFailure: ConsultationRecord = { ...current, failureCode: code, safeFailureMessage: message };
+    const withFailure: ConsultationRecord = {
+      ...current,
+      failureCode: code,
+      safeFailureMessage: message,
+    };
     const failed = transition(withFailure, "failed", this.deps.clock.now());
     this.save(failed);
     this.attachToParent(failed, null);
   }
 
-  private attachToParent(record: ConsultationRecord, result: ConsultationResultRecord | null): void {
+  private attachToParent(
+    record: ConsultationRecord,
+    result: ConsultationResultRecord | null,
+  ): void {
     if (!this.deps.attachResult) return;
     if (this.attached.has(record.id)) return;
     this.attached.add(record.id);
@@ -654,8 +713,8 @@ export class ConsultationCoordinator {
     if (!panel) return;
     panel = this.persistTransition(panel, "building_context");
 
-    const rule: PanelCompletionRule =
-      panel.panelCompletionRule ?? request.completionRule ?? { kind: "all_required" };
+    const rule: PanelCompletionRule = panel.panelCompletionRule ??
+      request.completionRule ?? { kind: "all_required" };
     let sequence = 0;
     for (const spec of request.members) {
       const memberRecord = this.newRecord(
@@ -750,7 +809,8 @@ export class ConsultationCoordinator {
     if (!record) return;
     record = this.persistTransition(record, "building_context");
 
-    const selected: Array<{ record: ConsultationRecord; result: ConsultationResultRecord | null }> = [];
+    const selected: Array<{ record: ConsultationRecord; result: ConsultationResultRecord | null }> =
+      [];
     const skippedNonCompleted: Array<{ id: string; status: ConsultationStatus }> = [];
     for (const consultationId of request.consultationIds) {
       const consultation = this.deps.repository.getConsultation(consultationId);
