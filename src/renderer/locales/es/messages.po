@@ -1846,6 +1846,10 @@ msgstr "Campaña"
 msgid "Campaign & client"
 msgstr "Campaña y cliente"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "Campaign chats"
+msgstr "Chats de campaña"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Campaign context"
 msgstr "Contexto de campaña"
@@ -2088,6 +2092,10 @@ msgstr "Chat destacado"
 #: src/renderer/commands/registry.ts
 msgid "Chat unstarred"
 msgstr "Destacado del chat quitado"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "Chats"
+msgstr "Chats"
 
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 msgid "Check"
@@ -3254,6 +3262,10 @@ msgstr "No se pudo guardar el hilo del espacio de trabajo de campaña."
 msgid "Could not save the campaigns workspace."
 msgstr "No se pudo guardar el espacio de campañas."
 
+#: src/renderer/actions/campaignChatThreadActions.ts
+msgid "Could not save the chat."
+msgstr "No se pudo guardar el chat."
+
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "Could not save the topic thread."
 msgstr "No se pudo guardar el hilo del tema."
@@ -3440,6 +3452,7 @@ msgstr "Creado {0}"
 msgid "Created a worktree on \"{newBranch}\", but the changes conflicted and remain in a git stash — resolve them in the worktree."
 msgstr "Se creó un worktree en \"{newBranch}\", pero los cambios entraron en conflicto y permanecen en un stash de git: resuélvelos en el worktree."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Creating…"
 msgstr "Creando…"
@@ -4129,6 +4142,10 @@ msgstr "Nombre de servidor duplicado en el análisis"
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "e.g. 30"
 msgstr "p. ej. 30"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "e.g. AIB GAA A55201"
+msgstr "p. ej. AIB GAA A55201"
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "e.g. Allow TikTok to run up to 30% ahead of pace"
@@ -6608,6 +6625,10 @@ msgstr "El nombre es obligatorio."
 msgid "Name your project and choose where to create it."
 msgstr "Nombra tu proyecto y elige dónde crearlo."
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Name your workspace and open it without a Control Centre campaign."
+msgstr "Asigne un nombre al espacio de trabajo y ábralo sin una campaña de Control Centre."
+
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectModal.tsx
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
@@ -6676,6 +6697,11 @@ msgstr "Nombre de la nueva rama..."
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "New Campaign Project"
 msgstr "Nuevo proyecto de campaña"
+
+#: src/renderer/actions/campaignChatThreadActions.ts
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "New chat"
+msgstr "Nuevo chat"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "New Claude profile config directory"
@@ -6845,6 +6871,10 @@ msgstr "No hay perfiles de Claude adicionales."
 msgid "No agent available to generate PR summary"
 msgstr "No hay ningún agente disponible para generar el resumen del PR"
 
+#: src/renderer/actions/campaignChatThreadActions.ts
+msgid "No agent is available to create a chat."
+msgstr "No hay ningún agente disponible para crear un chat."
+
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "No agent is available to create this topic thread."
 msgstr "No hay ningún agente disponible para crear este hilo de tema."
@@ -6916,6 +6946,10 @@ msgstr "Aún no hay cambios"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "No channel executions."
 msgstr "Sin ejecuciones de canal."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "No chats yet"
+msgstr "Aún no hay chats"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrChecksTab.tsx
@@ -7290,6 +7324,10 @@ msgstr "No encontrado"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Not installed"
 msgstr "No instalado"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Not linked to Control Centre — link in Advanced settings when creating a workspace."
+msgstr "Sin vincular a Control Centre — vincule en la configuración avanzada al crear un espacio de trabajo."
 
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Not running"
@@ -10428,6 +10466,10 @@ msgstr "Empieza con una programación"
 msgid "Start Without Context"
 msgstr "Iniciar sin contexto"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Start without linking"
+msgstr "Empezar sin vincular"
+
 #. placeholder {0}: startedAt.toLocaleTimeString()
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Started {0}"
@@ -12490,8 +12532,13 @@ msgid "Workspace MCP servers override user servers with the same name and are ad
 msgstr "Los servidores MCP del espacio de trabajo anulan los servidores de usuario con el mismo nombre y solo se añaden cuando los agentes se inician en este proyecto."
 
 #: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Workspace name"
 msgstr "Nombre del espacio"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Workspace name is required."
+msgstr "El nombre del espacio de trabajo es obligatorio."
 
 #: src/mobile/views/WorkspaceView.tsx
 msgid "Workspace view"

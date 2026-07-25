@@ -17,6 +17,21 @@ vi.mock("@/renderer/bridge", async (importOriginal) => {
     isRemoteSession: () => false,
     readBridge: () => ({
       callMcpTool: mocks.callMcpTool,
+      dbUpsertThread: vi.fn<() => Promise<void>>(async () => {}),
+      consultationListForThread: vi.fn<
+        () => Promise<{
+          consultations: [];
+          results: [];
+          panelMembers: [];
+          contextPackets: [];
+        }>
+      >(async () => ({
+        consultations: [],
+        results: [],
+        panelMembers: [],
+        contextPackets: [],
+      })),
+      onSupervisorEvent: vi.fn<() => () => void>(() => () => {}),
     }),
   };
 });
@@ -179,6 +194,49 @@ describe("CampaignWorkspaceShell", () => {
         screen.getByText(/isn't linked to a Control Centre campaign yet/i),
       ).toBeInTheDocument(),
     );
+  });
+
+  it("shows a quiet unlinked state for campaign projects without a Control Centre group", async () => {
+    useAppStore.setState((state) => ({
+      ...state,
+      projects: [
+        {
+          ...campaignProject(),
+          campaignExtension: {
+            campaignGroupId: "",
+            clientName: "AIB GAA A55201",
+            campaignName: "AIB GAA A55201",
+          },
+        },
+      ],
+      threads: [
+        {
+          id: "thread-unlinked",
+          projectId: "project-1",
+          title: "AIB GAA A55201",
+          agentKind: "claude",
+          config: { model: "claude-sonnet-4" },
+          status: "idle",
+          attention: "none",
+          canResumeWithConfig: false,
+          archived: false,
+          done: false,
+          starred: false,
+          presentationMode: "gui",
+          createdAt: "2026-07-01T00:00:00.000Z",
+          updatedAt: "2026-07-01T00:00:00.000Z",
+        },
+      ],
+    }));
+    mocks.callMcpTool.mockResolvedValue(toolResult(operationsTodayResponse));
+
+    render(<CampaignWorkspaceShell projectId="project-1" />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/Not linked to Control Centre/i)).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("campaign-chats-trigger")).toBeInTheDocument();
+    expect(screen.queryByText(/Could not connect/i)).not.toBeInTheDocument();
   });
 
   it("shows a distinct error state when Control Centre returns an unavailable result", async () => {

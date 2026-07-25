@@ -28,7 +28,7 @@ export function validateCampaignProjectInput(input: CreateCampaignProjectInput):
   const trimmedClient = input.campaignExtension.clientName.trim();
   const trimmedCampaign = input.campaignExtension.campaignName.trim();
 
-  if (!trimmedId) return "Campaign reference is required.";
+  if (!trimmedId) return "Campaign group ID is required.";
   if (!trimmedClient) return "Client name is required.";
   if (!trimmedCampaign) return "Campaign name is required.";
 
@@ -39,6 +39,32 @@ export function validateCampaignProjectInput(input: CreateCampaignProjectInput):
 
   if (input.name.trim().length === 0) return "Workspace name is required.";
 
+  return null;
+}
+
+export function buildUnlinkedCampaignWorkspaceInput(name: string): CreateCampaignProjectInput {
+  const trimmed = name.trim();
+  return {
+    name: trimmed,
+    campaignExtension: {
+      campaignGroupId: "",
+      clientName: trimmed,
+      campaignName: trimmed,
+    },
+  };
+}
+
+export function validateUnlinkedCampaignWorkspaceInput(name: string): string | null {
+  const trimmed = name.trim();
+  if (!trimmed) return "Workspace name is required.";
+  const extResult = campaignProjectExtensionSchema.safeParse({
+    campaignGroupId: "",
+    clientName: trimmed,
+    campaignName: trimmed,
+  });
+  if (!extResult.success) {
+    return extResult.error.issues[0]?.message ?? "Invalid campaign extension.";
+  }
   return null;
 }
 
@@ -126,6 +152,7 @@ function resolveAgentAndModel(
  * Returns undefined when no duplicate exists.
  */
 function findExistingCampaignProject(campaignGroupId: string) {
+  if (!campaignGroupId.trim()) return undefined;
   const store = useAppStore.getState();
   return store.projects.find(
     (p) => p.purpose === "campaign" && p.campaignExtension?.campaignGroupId === campaignGroupId,
@@ -171,8 +198,10 @@ function findExistingGuiThread(projectId: string) {
 export async function createCampaignWorkspace(
   input: CreateCampaignProjectInput,
 ): Promise<CampaignWorkspaceOutcome> {
-  // ── 1. Validate ──────────────────────────────────────────────
-  const validationError = validateCampaignProjectInput(input);
+  const isUnlinked = input.campaignExtension.campaignGroupId.trim().length === 0;
+  const validationError = isUnlinked
+    ? validateUnlinkedCampaignWorkspaceInput(input.name)
+    : validateCampaignProjectInput(input);
   if (validationError) {
     return { ok: false, error: validationError };
   }

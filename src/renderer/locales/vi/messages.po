@@ -1846,6 +1846,10 @@ msgstr "Chiến dịch"
 msgid "Campaign & client"
 msgstr "Chiến dịch và khách hàng"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "Campaign chats"
+msgstr "Cuộc trò chuyện chiến dịch"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Campaign context"
 msgstr "Ngữ cảnh chiến dịch"
@@ -2088,6 +2092,10 @@ msgstr "Đã gắn sao cuộc trò chuyện"
 #: src/renderer/commands/registry.ts
 msgid "Chat unstarred"
 msgstr "Đã bỏ gắn sao cuộc trò chuyện"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "Chats"
+msgstr "Cuộc trò chuyện"
 
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 msgid "Check"
@@ -3254,6 +3262,10 @@ msgstr "Không thể lưu luồng không gian làm việc chiến dịch."
 msgid "Could not save the campaigns workspace."
 msgstr "Không thể lưu không gian chiến dịch."
 
+#: src/renderer/actions/campaignChatThreadActions.ts
+msgid "Could not save the chat."
+msgstr "Không thể lưu cuộc trò chuyện."
+
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "Could not save the topic thread."
 msgstr "Không thể lưu luồng chủ đề."
@@ -3440,6 +3452,7 @@ msgstr "Đã tạo {0}"
 msgid "Created a worktree on \"{newBranch}\", but the changes conflicted and remain in a git stash — resolve them in the worktree."
 msgstr "Đã tạo một cây làm việc trên \"{newBranch}\", nhưng những thay đổi này xung đột và vẫn nằm trong kho lưu trữ git — hãy giải quyết chúng trong cây làm việc."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Creating…"
 msgstr "Đang tạo…"
@@ -4129,6 +4142,10 @@ msgstr "Tên máy chủ bị trùng trong kết quả quét"
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "e.g. 30"
 msgstr "ví dụ: 30"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "e.g. AIB GAA A55201"
+msgstr "vd. AIB GAA A55201"
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "e.g. Allow TikTok to run up to 30% ahead of pace"
@@ -6608,6 +6625,10 @@ msgstr "Bắt buộc phải có tên."
 msgid "Name your project and choose where to create it."
 msgstr "Đặt tên cho dự án của bạn và chọn nơi để tạo nó."
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Name your workspace and open it without a Control Centre campaign."
+msgstr "Đặt tên không gian làm việc và mở mà không cần chiến dịch Control Centre."
+
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectModal.tsx
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
@@ -6676,6 +6697,11 @@ msgstr "Tên chi nhánh mới..."
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "New Campaign Project"
 msgstr "Dự án chiến dịch mới"
+
+#: src/renderer/actions/campaignChatThreadActions.ts
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "New chat"
+msgstr "Cuộc trò chuyện mới"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "New Claude profile config directory"
@@ -6845,6 +6871,10 @@ msgstr "Không có hồ sơ Claude bổ sung."
 msgid "No agent available to generate PR summary"
 msgstr "Không có tác nhân nào để tạo bản tóm tắt PR"
 
+#: src/renderer/actions/campaignChatThreadActions.ts
+msgid "No agent is available to create a chat."
+msgstr "Không có tác nhân nào khả dụng để tạo cuộc trò chuyện."
+
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "No agent is available to create this topic thread."
 msgstr "Không có tác nhân nào khả dụng để tạo luồng chủ đề này."
@@ -6916,6 +6946,10 @@ msgstr "Chưa có thay đổi"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "No channel executions."
 msgstr "Không có kênh thực thi nào."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "No chats yet"
+msgstr "Chưa có cuộc trò chuyện nào"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrChecksTab.tsx
@@ -7290,6 +7324,10 @@ msgstr "Không tìm thấy"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Not installed"
 msgstr "Chưa được cài đặt"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Not linked to Control Centre — link in Advanced settings when creating a workspace."
+msgstr "Chưa liên kết với Control Centre — liên kết trong cài đặt Nâng cao khi tạo không gian làm việc."
 
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Not running"
@@ -10428,6 +10466,10 @@ msgstr "Bắt đầu bằng một lịch"
 msgid "Start Without Context"
 msgstr "Bắt đầu không có bối cảnh"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Start without linking"
+msgstr "Bắt đầu không liên kết"
+
 #. placeholder {0}: startedAt.toLocaleTimeString()
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Started {0}"
@@ -12490,8 +12532,13 @@ msgid "Workspace MCP servers override user servers with the same name and are ad
 msgstr "Máy chủ MCP trong không gian làm việc sẽ ghi đè máy chủ người dùng có cùng tên và chỉ được thêm khi tác nhân khởi động trong dự án này."
 
 #: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Workspace name"
 msgstr "Tên không gian"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Workspace name is required."
+msgstr "Tên không gian làm việc là bắt buộc."
 
 #: src/mobile/views/WorkspaceView.tsx
 msgid "Workspace view"

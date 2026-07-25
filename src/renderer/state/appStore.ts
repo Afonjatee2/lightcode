@@ -59,6 +59,7 @@ export const useAppStore = create<AppStoreState>()(
           view: state.view,
           groupLayouts: state.groupLayouts,
           campaignActiveTopicByKey: state.campaignActiveTopicByKey,
+          campaignActiveChatByKey: state.campaignActiveChatByKey,
           campaignTopicLastViewedAtByThreadId: state.campaignTopicLastViewedAtByThreadId,
         }),
       },

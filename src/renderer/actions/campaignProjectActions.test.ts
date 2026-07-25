@@ -12,10 +12,16 @@ let deleteThreadSpy = vi.fn<(id: string) => void>();
 
 const mocks = vi.hoisted(() => ({
   ensureCampaignWorkspaceDir: vi.fn<
-    (p: { projectId: string; name?: string }) => Promise<{ path: string; location: { kind: "posix"; path: string } }>
+    (p: {
+      projectId: string;
+      name?: string;
+    }) => Promise<{ path: string; location: { kind: "posix"; path: string } }>
   >(async (payload) => {
     captured.dirProjectId = payload.projectId;
-    return { path: "/tmp/camp/" + payload.projectId, location: { kind: "posix", path: "/tmp/camp/" + payload.projectId } };
+    return {
+      path: "/tmp/camp/" + payload.projectId,
+      location: { kind: "posix", path: "/tmp/camp/" + payload.projectId },
+    };
   }),
   dbUpsertProject: vi.fn<() => Promise<void>>(async () => {}),
   dbUpsertThread: vi.fn<() => Promise<void>>(async () => {}),
@@ -72,8 +78,12 @@ let nextThreadId = 0;
 vi.mock("@/renderer/state/appStore", () => ({
   useAppStore: {
     getState: () => ({
-      get projects() { return storeProjects; },
-      get threads() { return storeThreads; },
+      get projects() {
+        return storeProjects;
+      },
+      get threads() {
+        return storeThreads;
+      },
       addCampaignProject(loc: unknown, ext: unknown, name?: string, projectId?: string) {
         const p = {
           id: projectId ?? "gen-" + Math.random().toString(36).slice(2, 10),
@@ -86,16 +96,25 @@ vi.mock("@/renderer/state/appStore", () => ({
         storeProjects = [p, ...storeProjects];
         return p;
       },
-      createThread(input: { projectId: string; agentKind: string; config: unknown; presentationMode?: string; prompt?: string; focus?: boolean }) {
+      createThread(input: {
+        projectId: string;
+        agentKind: string;
+        config: unknown;
+        presentationMode?: string;
+        prompt?: string;
+        focus?: boolean;
+      }) {
         const t = {
-          id: "thread-" + (++nextThreadId),
+          id: "thread-" + ++nextThreadId,
           projectId: input.projectId,
           title: "Campaign Workspace",
           agentKind: input.agentKind,
           config: input.config,
           status: "inactive" as const,
           attention: "none" as const,
-          archived: false, done: false, starred: false,
+          archived: false,
+          done: false,
+          starred: false,
           presentationMode: (input.presentationMode ?? "gui") as "terminal" | "gui",
           sortOrder: 0,
           createdAt: new Date().toISOString(),
@@ -112,10 +131,8 @@ vi.mock("@/renderer/state/appStore", () => ({
   },
 }));
 
-const {
-  createCampaignWorkspace,
-  validateCampaignProjectInput,
-} = await import("@/renderer/actions/campaignProjectActions");
+const { createCampaignWorkspace, validateCampaignProjectInput } =
+  await import("@/renderer/actions/campaignProjectActions");
 
 const validExt = {
   campaignGroupId: "cg-abc-123",
@@ -168,6 +185,22 @@ describe("validateCampaignProjectInput", () => {
   });
 });
 
+describe("unlinked campaign workspace creation", () => {
+  test("accepts a name-only unlinked workspace input", async () => {
+    const result = await createCampaignWorkspace({
+      name: "AIB GAA A55201",
+      campaignExtension: {
+        campaignGroupId: "",
+        clientName: "AIB GAA A55201",
+        campaignName: "AIB GAA A55201",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.ensureCampaignWorkspaceDir).toHaveBeenCalled();
+  });
+});
+
 // ── Successful creation ──────────────────────────────────────────────
 
 describe("createCampaignWorkspace success", () => {
@@ -205,13 +238,17 @@ describe("createCampaignWorkspace success", () => {
 describe("createCampaignWorkspace structured failures", () => {
   test("returns validation error without touching filesystem", async () => {
     const result = await createCampaignWorkspace({
-      name: "Test",
-      campaignExtension: { ...validExt, campaignGroupId: "" },
+      name: "  ",
+      campaignExtension: {
+        campaignGroupId: "",
+        clientName: "Test",
+        campaignName: "Test",
+      },
     });
 
     expect(result.ok).toBe(false);
     const failResult = result as { ok: false; error: string };
-    expect(failResult.error).toBe("Campaign group ID is required.");
+    expect(failResult.error).toBe("Workspace name is required.");
     expect(mocks.ensureCampaignWorkspaceDir).not.toHaveBeenCalled();
   });
 
@@ -258,22 +295,35 @@ describe("createCampaignWorkspace duplicate handling", () => {
   test("opens existing GUI thread when duplicate project found", async () => {
     const existingId = "dup-project-id";
     const threadId = "gui-thread-1";
-    storeProjects = [{
-      id: existingId, name: "Existing", purpose: "campaign",
-      campaignExtension: validExt,
-      location: { kind: "posix", path: "/tmp/existing" },
-      createdAt: "2026-01-01T00:00:00.000Z",
-    }];
-    storeThreads = [{
-      id: threadId, projectId: existingId, title: "Existing",
-      agentKind: "claude", config: { model: "claude-sonnet-4" },
-      status: "inactive", attention: "none",
-      archived: false, done: false, starred: false,
-      presentationMode: "gui", sortOrder: 0,
-      createdAt: "2026-01-01T00:00:00.000Z",
-      updatedAt: "2026-01-01T00:00:00.000Z",
-      canResumeWithConfig: false,
-    }];
+    storeProjects = [
+      {
+        id: existingId,
+        name: "Existing",
+        purpose: "campaign",
+        campaignExtension: validExt,
+        location: { kind: "posix", path: "/tmp/existing" },
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+    storeThreads = [
+      {
+        id: threadId,
+        projectId: existingId,
+        title: "Existing",
+        agentKind: "claude",
+        config: { model: "claude-sonnet-4" },
+        status: "inactive",
+        attention: "none",
+        archived: false,
+        done: false,
+        starred: false,
+        presentationMode: "gui",
+        sortOrder: 0,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        canResumeWithConfig: false,
+      },
+    ];
 
     const result = await createCampaignWorkspace(validInput());
 
@@ -286,12 +336,16 @@ describe("createCampaignWorkspace duplicate handling", () => {
 
   test("creates new GUI thread for existing project without one", async () => {
     const existingId = "dup-no-thread";
-    storeProjects = [{
-      id: existingId, name: "Existing No Thread", purpose: "campaign",
-      campaignExtension: validExt,
-      location: { kind: "posix", path: "/tmp/existing" },
-      createdAt: "2026-01-01T00:00:00.000Z",
-    }];
+    storeProjects = [
+      {
+        id: existingId,
+        name: "Existing No Thread",
+        purpose: "campaign",
+        campaignExtension: validExt,
+        location: { kind: "posix", path: "/tmp/existing" },
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
     storeThreads = []; // No threads
 
     const result = await createCampaignWorkspace(validInput());
@@ -306,12 +360,16 @@ describe("createCampaignWorkspace duplicate handling", () => {
 
   test("does not create duplicate project on repeated submit", async () => {
     // Set up existing project
-    storeProjects = [{
-      id: "existing-1", name: "Existing", purpose: "campaign",
-      campaignExtension: validExt,
-      location: { kind: "posix", path: "/tmp/existing" },
-      createdAt: "2026-01-01T00:00:00.000Z",
-    }];
+    storeProjects = [
+      {
+        id: "existing-1",
+        name: "Existing",
+        purpose: "campaign",
+        campaignExtension: validExt,
+        location: { kind: "posix", path: "/tmp/existing" },
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
 
     // First call finds existing
     const r1 = await createCampaignWorkspace(validInput());

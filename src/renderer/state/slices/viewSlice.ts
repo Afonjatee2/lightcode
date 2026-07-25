@@ -46,6 +46,8 @@ export interface ViewSlice {
   pendingCampaignWorkspaceSelection: { projectId: string; campaignGroupId: string } | null;
   /** Last selected campaign topic tab per project/campaign workspace key. */
   campaignActiveTopicByKey: Record<string, CampaignTopicId>;
+  /** Active non-topic chat thread per project/campaign workspace key. */
+  campaignActiveChatByKey: Record<string, string>;
   /** Persisted view timestamps for campaign topic unread dots (thread id → ms). */
   campaignTopicLastViewedAtByThreadId: Record<string, number>;
   chatScrollToBottomTokens: Record<string, number>;
@@ -68,6 +70,7 @@ export interface ViewSlice {
     selection: { projectId: string; campaignGroupId: string } | null,
   ) => void;
   setCampaignActiveTopic: (workspaceKey: string, topicId: CampaignTopicId) => void;
+  setCampaignActiveChat: (workspaceKey: string, threadId: string | null) => void;
   markCampaignTopicViewed: (threadId: string) => void;
   requestChatScrollToBottom: (threadId: string) => void;
   setPendingActiveThread: (threadId: string | null) => void;
@@ -122,6 +125,7 @@ export const createViewSlice: SliceCreator<ViewSlice> = (set) => ({
   pendingCampaignApprovalsFocus: null,
   pendingCampaignWorkspaceSelection: null,
   campaignActiveTopicByKey: {},
+  campaignActiveChatByKey: {},
   campaignTopicLastViewedAtByThreadId: {},
   chatScrollToBottomTokens: {},
   pendingActiveThreadId: null,
@@ -147,6 +151,22 @@ export const createViewSlice: SliceCreator<ViewSlice> = (set) => ({
             },
           },
     ),
+  setCampaignActiveChat: (workspaceKey, threadId) =>
+    set((state) => {
+      if (!threadId) {
+        if (!(workspaceKey in state.campaignActiveChatByKey)) return {};
+        const next = { ...state.campaignActiveChatByKey };
+        delete next[workspaceKey];
+        return { campaignActiveChatByKey: next };
+      }
+      if (state.campaignActiveChatByKey[workspaceKey] === threadId) return {};
+      return {
+        campaignActiveChatByKey: {
+          ...state.campaignActiveChatByKey,
+          [workspaceKey]: threadId,
+        },
+      };
+    }),
   markCampaignTopicViewed: (threadId) =>
     set((state) => {
       const now = Date.now();

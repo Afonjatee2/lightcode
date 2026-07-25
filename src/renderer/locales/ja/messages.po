@@ -1845,6 +1845,10 @@ msgstr "キャンペーン"
 msgid "Campaign & client"
 msgstr "キャンペーンとクライアント"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "Campaign chats"
+msgstr "キャンペーンチャット"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Campaign context"
 msgstr "キャンペーンコンテキスト"
@@ -2087,6 +2091,10 @@ msgstr "チャットにスターを付けました"
 #: src/renderer/commands/registry.ts
 msgid "Chat unstarred"
 msgstr "チャットのスターを外しました"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "Chats"
+msgstr "チャット"
 
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 msgid "Check"
@@ -3253,6 +3261,10 @@ msgstr "キャンペーンワークスペースのスレッドを保存できま
 msgid "Could not save the campaigns workspace."
 msgstr "キャンペーン ワークスペースを保存できませんでした。"
 
+#: src/renderer/actions/campaignChatThreadActions.ts
+msgid "Could not save the chat."
+msgstr "チャットを保存できませんでした。"
+
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "Could not save the topic thread."
 msgstr "トピックのスレッドを保存できませんでした。"
@@ -3439,6 +3451,7 @@ msgstr "作成: {0}"
 msgid "Created a worktree on \"{newBranch}\", but the changes conflicted and remain in a git stash — resolve them in the worktree."
 msgstr "「{newBranch}」にワークツリーを作成しましたが、変更が競合し、git stash に残っています。ワークツリー内で解決してください。"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Creating…"
 msgstr "作成中…"
@@ -4128,6 +4141,10 @@ msgstr "スキャン内でサーバー名が重複しています"
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "e.g. 30"
 msgstr "例: 30"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "e.g. AIB GAA A55201"
+msgstr "例: AIB GAA A55201"
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "e.g. Allow TikTok to run up to 30% ahead of pace"
@@ -6606,6 +6623,10 @@ msgstr "名前は必須です。"
 msgid "Name your project and choose where to create it."
 msgstr "プロジェクトに名前を付け、作成する場所を選択します。"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Name your workspace and open it without a Control Centre campaign."
+msgstr "ワークスペースに名前を付け、Control Centre のキャンペーンにリンクせずに開きます。"
+
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectModal.tsx
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
@@ -6674,6 +6695,11 @@ msgstr "新しいブランチ名..."
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "New Campaign Project"
 msgstr "新規キャンペーンプロジェクト"
+
+#: src/renderer/actions/campaignChatThreadActions.ts
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "New chat"
+msgstr "新しいチャット"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "New Claude profile config directory"
@@ -6843,6 +6869,10 @@ msgstr "追加の Claude プロファイルはありません。"
 msgid "No agent available to generate PR summary"
 msgstr "PR サマリーを生成できるエージェントがいません"
 
+#: src/renderer/actions/campaignChatThreadActions.ts
+msgid "No agent is available to create a chat."
+msgstr "チャットを作成できるエージェントがありません。"
+
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "No agent is available to create this topic thread."
 msgstr "このトピックスレッドを作成できるエージェントがありません。"
@@ -6914,6 +6944,10 @@ msgstr "まだ変更はありません"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "No channel executions."
 msgstr "チャンネル実行がありません。"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "No chats yet"
+msgstr "チャットはまだありません"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrChecksTab.tsx
@@ -7288,6 +7322,10 @@ msgstr "見つかりません"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Not installed"
 msgstr "インストールされていません"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Not linked to Control Centre — link in Advanced settings when creating a workspace."
+msgstr "Control Centre にリンクされていません — ワークスペース作成時に詳細設定でリンクしてください。"
 
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Not running"
@@ -10426,6 +10464,10 @@ msgstr "スケジュールから始める"
 msgid "Start Without Context"
 msgstr "コンテキストなしで開始"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Start without linking"
+msgstr "リンクせずに開始"
+
 #. placeholder {0}: startedAt.toLocaleTimeString()
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Started {0}"
@@ -12488,8 +12530,13 @@ msgid "Workspace MCP servers override user servers with the same name and are ad
 msgstr "ワークスペースのMCPサーバーは同名のユーザーサーバーより優先され、このプロジェクトでエージェントを起動した場合にのみ追加されます。"
 
 #: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Workspace name"
 msgstr "ワークスペース名"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Workspace name is required."
+msgstr "ワークスペース名は必須です。"
 
 #: src/mobile/views/WorkspaceView.tsx
 msgid "Workspace view"

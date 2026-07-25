@@ -1846,6 +1846,10 @@ msgstr "Кампания"
 msgid "Campaign & client"
 msgstr "Кампания и клиент"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "Campaign chats"
+msgstr "Чаты кампании"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Campaign context"
 msgstr "Контекст кампании"
@@ -2088,6 +2092,10 @@ msgstr "Чат отмечен звездой"
 #: src/renderer/commands/registry.ts
 msgid "Chat unstarred"
 msgstr "Звезда с чата снята"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "Chats"
+msgstr "Чаты"
 
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 msgid "Check"
@@ -3254,6 +3262,10 @@ msgstr "Не удалось сохранить тред рабочей обла�
 msgid "Could not save the campaigns workspace."
 msgstr "Не удалось сохранить рабочую область кампаний."
 
+#: src/renderer/actions/campaignChatThreadActions.ts
+msgid "Could not save the chat."
+msgstr "Не удалось сохранить чат."
+
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "Could not save the topic thread."
 msgstr "Не удалось сохранить тематическую ветку."
@@ -3440,6 +3452,7 @@ msgstr "Создано {0}"
 msgid "Created a worktree on \"{newBranch}\", but the changes conflicted and remain in a git stash — resolve them in the worktree."
 msgstr "Worktree создан на \"{newBranch}\", но изменения вызвали конфликт и остаются в git stash — разрешите их в worktree."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Creating…"
 msgstr "Создание…"
@@ -4129,6 +4142,10 @@ msgstr "Повторяющееся имя сервера в результата
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "e.g. 30"
 msgstr "например, 30"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "e.g. AIB GAA A55201"
+msgstr "напр. AIB GAA A55201"
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "e.g. Allow TikTok to run up to 30% ahead of pace"
@@ -6608,6 +6625,10 @@ msgstr "Имя обязательно."
 msgid "Name your project and choose where to create it."
 msgstr "Назовите проект и выберите, где его создать."
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Name your workspace and open it without a Control Centre campaign."
+msgstr "Назовите рабочее пространство и откройте его без кампании Control Centre."
+
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectModal.tsx
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
@@ -6676,6 +6697,11 @@ msgstr "Имя новой ветки..."
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "New Campaign Project"
 msgstr "Новый проект кампании"
+
+#: src/renderer/actions/campaignChatThreadActions.ts
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "New chat"
+msgstr "Новый чат"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "New Claude profile config directory"
@@ -6845,6 +6871,10 @@ msgstr "Дополнительных профилей Claude нет."
 msgid "No agent available to generate PR summary"
 msgstr "Нет доступного агента для генерации сводки PR"
 
+#: src/renderer/actions/campaignChatThreadActions.ts
+msgid "No agent is available to create a chat."
+msgstr "Нет доступного агента для создания чата."
+
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "No agent is available to create this topic thread."
 msgstr "Нет доступного агента для создания этой тематической ветки."
@@ -6916,6 +6946,10 @@ msgstr "Изменений пока нет"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "No channel executions."
 msgstr "Нет выполнений каналов."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "No chats yet"
+msgstr "Чатов пока нет"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrChecksTab.tsx
@@ -7290,6 +7324,10 @@ msgstr "Не найдено"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Not installed"
 msgstr "Не установлено"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Not linked to Control Centre — link in Advanced settings when creating a workspace."
+msgstr "Не связано с Control Centre — свяжите в расширенных настройках при создании рабочего пространства."
 
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Not running"
@@ -10428,6 +10466,10 @@ msgstr "Начать с расписания"
 msgid "Start Without Context"
 msgstr "Запустить без контекста"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Start without linking"
+msgstr "Начать без привязки"
+
 #. placeholder {0}: startedAt.toLocaleTimeString()
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Started {0}"
@@ -12490,8 +12532,13 @@ msgid "Workspace MCP servers override user servers with the same name and are ad
 msgstr "Серверы MCP рабочей области переопределяют пользовательские серверы с тем же именем и добавляются только при запуске агентов в этом проекте."
 
 #: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Workspace name"
 msgstr "Название области"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Workspace name is required."
+msgstr "Требуется имя рабочего пространства."
 
 #: src/mobile/views/WorkspaceView.tsx
 msgid "Workspace view"

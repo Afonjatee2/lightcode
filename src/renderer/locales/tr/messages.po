@@ -1846,6 +1846,10 @@ msgstr "Kampanya"
 msgid "Campaign & client"
 msgstr "Kampanya ve müşteri"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "Campaign chats"
+msgstr "Kampanya sohbetleri"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Campaign context"
 msgstr "Kampanya bağlamı"
@@ -2088,6 +2092,10 @@ msgstr "Sohbet yıldızlandı"
 #: src/renderer/commands/registry.ts
 msgid "Chat unstarred"
 msgstr "Sohbetin yıldızı kaldırıldı"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "Chats"
+msgstr "Sohbetler"
 
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 msgid "Check"
@@ -3254,6 +3262,10 @@ msgstr "Kampanya çalışma alanı konusu kaydedilemedi."
 msgid "Could not save the campaigns workspace."
 msgstr "Kampanyalar çalışma alanı kaydedilemedi."
 
+#: src/renderer/actions/campaignChatThreadActions.ts
+msgid "Could not save the chat."
+msgstr "Sohbet kaydedilemedi."
+
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "Could not save the topic thread."
 msgstr "Konu iş parçacığı kaydedilemedi."
@@ -3440,6 +3452,7 @@ msgstr "Oluşturuldu {0}"
 msgid "Created a worktree on \"{newBranch}\", but the changes conflicted and remain in a git stash — resolve them in the worktree."
 msgstr "\"{newBranch}\" üzerinde bir çalışma ağacı oluşturuldu, ancak değişiklikler çakıştı ve bir git stash'inde kaldı; bunları çalışma ağacında çözün."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Creating…"
 msgstr "Oluşturuluyor…"
@@ -4129,6 +4142,10 @@ msgstr "Taramada yinelenen sunucu adı"
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "e.g. 30"
 msgstr "örn. 30"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "e.g. AIB GAA A55201"
+msgstr "örn. AIB GAA A55201"
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "e.g. Allow TikTok to run up to 30% ahead of pace"
@@ -6608,6 +6625,10 @@ msgstr "Ad gereklidir."
 msgid "Name your project and choose where to create it."
 msgstr "Projenize bir ad verin ve nerede oluşturulacağını seçin."
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Name your workspace and open it without a Control Centre campaign."
+msgstr "Çalışma alanınıza ad verin ve Control Centre kampanyası olmadan açın."
+
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectModal.tsx
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
@@ -6676,6 +6697,11 @@ msgstr "Yeni şube adı..."
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "New Campaign Project"
 msgstr "Yeni Kampanya Projesi"
+
+#: src/renderer/actions/campaignChatThreadActions.ts
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "New chat"
+msgstr "Yeni sohbet"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "New Claude profile config directory"
@@ -6845,6 +6871,10 @@ msgstr "Ek Claude profili yok."
 msgid "No agent available to generate PR summary"
 msgstr "PR özeti oluşturacak temsilci yok"
 
+#: src/renderer/actions/campaignChatThreadActions.ts
+msgid "No agent is available to create a chat."
+msgstr "Sohbet oluşturmak için kullanılabilir bir aracı yok."
+
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "No agent is available to create this topic thread."
 msgstr "Bu konu iş parçacığını oluşturmak için kullanılabilir bir aracı yok."
@@ -6916,6 +6946,10 @@ msgstr "Henüz değişiklik yok"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "No channel executions."
 msgstr "Kanal yürütmesi yok."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "No chats yet"
+msgstr "Henüz sohbet yok"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrChecksTab.tsx
@@ -7290,6 +7324,10 @@ msgstr "Bulunamadı"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Not installed"
 msgstr "Kurulu değil"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Not linked to Control Centre — link in Advanced settings when creating a workspace."
+msgstr "Control Centre’a bağlı değil — çalışma alanı oluştururken Gelişmiş ayarlardan bağlayın."
 
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Not running"
@@ -10428,6 +10466,10 @@ msgstr "Bir zamanlamayla başlayın"
 msgid "Start Without Context"
 msgstr "Bağlam Olmadan Başlayın"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Start without linking"
+msgstr "Bağlamadan başla"
+
 #. placeholder {0}: startedAt.toLocaleTimeString()
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Started {0}"
@@ -12490,8 +12532,13 @@ msgid "Workspace MCP servers override user servers with the same name and are ad
 msgstr "Çalışma alanı MCP sunucuları aynı adlı kullanıcı sunucularını geçersiz kılar ve yalnızca aracılar bu projede başlatıldığında eklenir."
 
 #: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Workspace name"
 msgstr "Çalışma alanı adı"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Workspace name is required."
+msgstr "Çalışma alanı adı gerekli."
 
 #: src/mobile/views/WorkspaceView.tsx
 msgid "Workspace view"

@@ -7,7 +7,10 @@ import type { ControlCentreCampaignGroup } from "@/shared/contracts/campaign/con
 import { Input } from "@/renderer/components/common";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { useAppStore } from "@/renderer/state/appStore";
-import { createCampaignWorkspace } from "@/renderer/actions/campaignProjectActions";
+import {
+  buildUnlinkedCampaignWorkspaceInput,
+  createCampaignWorkspace,
+} from "@/renderer/actions/campaignProjectActions";
 import { useCampaignGroupList } from "@/renderer/hooks/useCampaignGroupList";
 import {
   campaignGroupToExtension,
@@ -33,6 +36,7 @@ export function CreateCampaignWorkspaceDialog() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [advancedValues, setAdvancedValues] =
     useState<CampaignWorkspaceAdvancedValues>(EMPTY_ADVANCED_VALUES);
+  const [unlinkedName, setUnlinkedName] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -56,6 +60,7 @@ export function CreateCampaignWorkspaceDialog() {
     setSelectedGroupId(null);
     setAdvancedOpen(false);
     setAdvancedValues(EMPTY_ADVANCED_VALUES);
+    setUnlinkedName("");
     setSubmitError(null);
   }
 
@@ -87,6 +92,15 @@ export function CreateCampaignWorkspaceDialog() {
     }
     const extension = campaignGroupToExtension(selectedGroup);
     await submitPayload({ name: selectedGroup.name, campaignExtension: extension });
+  }
+
+  async function handleCreateUnlinked() {
+    const trimmed = unlinkedName.trim();
+    if (!trimmed) {
+      setSubmitError(t`Workspace name is required.`);
+      return;
+    }
+    await submitPayload(buildUnlinkedCampaignWorkspaceInput(trimmed));
   }
 
   async function handleManualSubmit(event: FormEvent) {
@@ -217,6 +231,36 @@ export function CreateCampaignWorkspaceDialog() {
                 </p>
               </div>
             ) : null}
+
+            <div className="rounded-medium border border-divider bg-content2 p-3">
+              <p className="text-sm font-medium text-foreground">
+                <Trans>Start without linking</Trans>
+              </p>
+              <p className="mt-1 text-small text-muted">
+                <Trans>Name your workspace and open it without a Control Centre campaign.</Trans>
+              </p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <Input
+                  aria-label={t`Workspace name`}
+                  placeholder={t`e.g. AIB GAA A55201`}
+                  value={unlinkedName}
+                  data-testid="unlinked-workspace-name"
+                  onChange={(event) => {
+                    setUnlinkedName(event.target.value);
+                    setSubmitError(null);
+                  }}
+                  disabled={isSubmitting}
+                  className="min-w-0 flex-1"
+                />
+                <Button
+                  variant="secondary"
+                  isDisabled={isSubmitting || unlinkedName.trim().length === 0}
+                  onPress={() => void handleCreateUnlinked()}
+                >
+                  {isSubmitting ? <Trans>Creating…</Trans> : <Trans>Start without linking</Trans>}
+                </Button>
+              </div>
+            </div>
 
             <Disclosure isExpanded={advancedOpen} onExpandedChange={setAdvancedOpen}>
               <Disclosure.Heading>

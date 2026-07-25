@@ -73,8 +73,8 @@ export type ProjectPurpose = z.infer<typeof projectPurposeSchema>;
  * Required when `purpose === "campaign"`.
  */
 export const campaignProjectExtensionSchema = z.object({
-  /** The Control Centre campaign group this project is bound to. */
-  campaignGroupId: z.string().min(1),
+  /** The Control Centre campaign group this project is bound to. Empty when unlinked. */
+  campaignGroupId: z.string(),
   /** Display name of the client. */
   clientName: z.string().min(1),
   /** Display name of the campaign. */

@@ -1846,6 +1846,10 @@ msgstr "캠페인"
 msgid "Campaign & client"
 msgstr "캠페인 및 클라이언트"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "Campaign chats"
+msgstr "캠페인 채팅"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Campaign context"
 msgstr "캠페인 컨텍스트"
@@ -2088,6 +2092,10 @@ msgstr "채팅에 별표 추가됨"
 #: src/renderer/commands/registry.ts
 msgid "Chat unstarred"
 msgstr "채팅 별표 해제됨"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "Chats"
+msgstr "채팅"
 
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 msgid "Check"
@@ -3254,6 +3262,10 @@ msgstr "캠페인 작업 영역 스레드를 저장할 수 없습니다."
 msgid "Could not save the campaigns workspace."
 msgstr "캠페인 워크스페이스를 저장할 수 없습니다."
 
+#: src/renderer/actions/campaignChatThreadActions.ts
+msgid "Could not save the chat."
+msgstr "채팅을 저장할 수 없습니다."
+
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "Could not save the topic thread."
 msgstr "주제 스레드를 저장할 수 없습니다."
@@ -3440,6 +3452,7 @@ msgstr "생성: {0}"
 msgid "Created a worktree on \"{newBranch}\", but the changes conflicted and remain in a git stash — resolve them in the worktree."
 msgstr "\"{newBranch}\"에 작업 트리를 만들었지만 변경 사항이 충돌하여 git stash에 남아 있습니다. 작업 트리에서 해결하세요."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Creating…"
 msgstr "생성 중…"
@@ -4129,6 +4142,10 @@ msgstr "스캔에 중복된 서버 이름이 있습니다"
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "e.g. 30"
 msgstr "예: 30"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "e.g. AIB GAA A55201"
+msgstr "예: AIB GAA A55201"
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "e.g. Allow TikTok to run up to 30% ahead of pace"
@@ -6608,6 +6625,10 @@ msgstr "이름을 입력해야 합니다."
 msgid "Name your project and choose where to create it."
 msgstr "프로젝트 이름을 지정하고 만들 위치를 선택하세요."
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Name your workspace and open it without a Control Centre campaign."
+msgstr "워크스페이스 이름을 지정하고 Control Centre 캠페인 없이 엽니다."
+
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectModal.tsx
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
@@ -6676,6 +6697,11 @@ msgstr "새 브랜치 이름..."
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "New Campaign Project"
 msgstr "새 캠페인 프로젝트"
+
+#: src/renderer/actions/campaignChatThreadActions.ts
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "New chat"
+msgstr "새 채팅"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "New Claude profile config directory"
@@ -6845,6 +6871,10 @@ msgstr "추가 Claude 프로필이 없습니다."
 msgid "No agent available to generate PR summary"
 msgstr "PR 요약을 생성할 수 있는 에이전트가 없습니다."
 
+#: src/renderer/actions/campaignChatThreadActions.ts
+msgid "No agent is available to create a chat."
+msgstr "채팅을 만들 수 있는 에이전트가 없습니다."
+
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "No agent is available to create this topic thread."
 msgstr "이 주제 스레드를 만들 수 있는 에이전트가 없습니다."
@@ -6916,6 +6946,10 @@ msgstr "아직 변경 사항 없음"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "No channel executions."
 msgstr "채널 실행이 없습니다."
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignChatsDropdown.tsx
+msgid "No chats yet"
+msgstr "아직 채팅이 없습니다"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrChecksTab.tsx
@@ -7290,6 +7324,10 @@ msgstr "찾을 수 없음"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Not installed"
 msgstr "설치되지 않음"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Not linked to Control Centre — link in Advanced settings when creating a workspace."
+msgstr "Control Centre에 연결되지 않음 — 워크스페이스 생성 시 고급 설정에서 연결하세요."
 
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Not running"
@@ -10428,6 +10466,10 @@ msgstr "일정으로 시작하기"
 msgid "Start Without Context"
 msgstr "맥락 없이 시작하기"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Start without linking"
+msgstr "연결 없이 시작"
+
 #. placeholder {0}: startedAt.toLocaleTimeString()
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Started {0}"
@@ -12490,8 +12532,13 @@ msgid "Workspace MCP servers override user servers with the same name and are ad
 msgstr "작업 영역 MCP 서버는 이름이 같은 사용자 서버를 재정의하며, 이 프로젝트에서 에이전트가 시작될 때만 추가됩니다."
 
 #: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "Workspace name"
 msgstr "워크스페이스 이름"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Workspace name is required."
+msgstr "워크스페이스 이름은 필수입니다."
 
 #: src/mobile/views/WorkspaceView.tsx
 msgid "Workspace view"
