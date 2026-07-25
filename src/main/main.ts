@@ -1138,6 +1138,7 @@ if (!hasSingleInstanceLock) {
         quickComposerDismissTimer = null;
         pendingQuickComposerSubmissions.length = 0;
         scheduleService.dispose();
+        performanceSnapshotWatcher.dispose();
         supervisorClient.dispose();
         windowsJobObjectManager?.dispose();
         windowsJobObjectManager = null;

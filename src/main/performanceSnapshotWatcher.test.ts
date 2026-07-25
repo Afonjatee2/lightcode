@@ -100,3 +100,49 @@ describe("PerformanceSnapshotWatcher", () => {
     expect(existsSync(join(workspaceRoot, ".cockpit"))).toBe(true);
   });
 });
+
+describe("PerformanceSnapshotWatcher hardening (W58 audit)", () => {
+  let workspaceRoot: string;
+  let watcher: PerformanceSnapshotWatcher;
+  let listener: ReturnType<typeof vi.fn<PerformanceSnapshotListener>>;
+  let warn: ReturnType<typeof vi.fn<(message: string) => void>>;
+
+  beforeEach(() => {
+    workspaceRoot = mkdtempSync(join(tmpdir(), "lc-perf-snap-hard-"));
+    watcher = new PerformanceSnapshotWatcher();
+    listener = vi.fn<PerformanceSnapshotListener>();
+    warn = vi.fn<(message: string) => void>();
+    watcher.setListener(listener);
+    watcher.setWarnHandler(warn);
+  });
+
+  afterEach(() => {
+    watcher.dispose();
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it("ignores oversized snapshot files instead of reading them into memory", () => {
+    const project = makeCampaignProject("p-big", workspaceRoot);
+    const cockpitDir = join(workspaceRoot, ".cockpit");
+    mkdirSync(cockpitDir, { recursive: true });
+    writeFileSync(
+      join(cockpitDir, "performance-snapshot.json"),
+      `{"pad":"${"x".repeat(1_100_000)}"}`,
+    );
+    watcher.watchProject(project);
+    expect(listener).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("oversized"));
+  });
+
+  it("survives deletion of the watched .cockpit directory without crashing", async () => {
+    const project = makeCampaignProject("p-del", workspaceRoot);
+    watcher.watchProject(project);
+    const cockpitDir = join(workspaceRoot, ".cockpit");
+    expect(existsSync(cockpitDir)).toBe(true);
+    rmSync(cockpitDir, { recursive: true, force: true });
+    // Give fs.watch a beat to emit whatever it will emit; the error handler
+    // (or graceful close) must prevent an uncaught exception.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(true).toBe(true);
+  });
+});

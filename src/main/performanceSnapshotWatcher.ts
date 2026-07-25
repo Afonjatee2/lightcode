@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, watch, type FSWatcher } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, watch, type FSWatcher } from "node:fs";
 import type { Project } from "@/shared/contracts";
 import type { PerformanceSnapshot } from "@/shared/contracts/campaign/performanceSnapshot";
 import {
@@ -13,6 +13,13 @@ import {
 } from "./performanceSnapshotPaths";
 
 const DEBOUNCE_MS = 300;
+
+/**
+ * Agents write this file; treat it as untrusted input. A snapshot is a small
+ * JSON document — anything above this size is malformed or hostile, and an
+ * uncapped readFileSync of a huge file would balloon main-process memory.
+ */
+const MAX_SNAPSHOT_FILE_BYTES = 1_000_000;
 
 export type PerformanceSnapshotListener = (
   projectId: string,
@@ -95,6 +102,13 @@ export class PerformanceSnapshotWatcher {
         if (filename !== PERFORMANCE_SNAPSHOT_FILENAME) return;
         this.scheduleRead(entry);
       });
+      // Without a handler, a watcher error (dir deleted, EPERM, EBADF) is an
+      // unhandled 'error' event and crashes the main process. Tear the entry
+      // down instead; the next syncProjects pass re-establishes it.
+      entry.watcher.on("error", () => {
+        this.warn(`[performance-snapshot] watcher error for project ${project.id}; unwatching`);
+        this.unwatch(project.id);
+      });
     } catch {
       return;
     }
@@ -134,6 +148,13 @@ export class PerformanceSnapshotWatcher {
 
     let contents: string;
     try {
+      const { size } = statSync(snapshotPath);
+      if (size > MAX_SNAPSHOT_FILE_BYTES) {
+        this.warn(
+          `[performance-snapshot] ignoring oversized snapshot for project ${projectId} (${size} bytes)`,
+        );
+        return;
+      }
       contents = readFileSync(snapshotPath, "utf8");
     } catch {
       this.warn(`[performance-snapshot] failed to read ${snapshotPath}`);
