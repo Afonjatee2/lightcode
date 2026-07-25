@@ -2643,6 +2643,10 @@ msgstr "Recolher erro"
 msgid "Collapse group"
 msgstr "Recolher grupo"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Collapse instances"
+msgstr "Ocultar instâncias"
+
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Collapse terminal composer"
@@ -4567,6 +4571,10 @@ msgstr "Expandir erro"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 msgid "Expand group"
 msgstr "Expandir grupo"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Expand instances"
+msgstr "Expandir instâncias"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Expand to review or revoke access."
@@ -8743,7 +8751,7 @@ msgstr "Registrar"
 msgid "Record a decision"
 msgstr "Registrar uma decisão"
 
-#. placeholder {0}: alert.title
+#. placeholder {0}: alertGroup.title
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Record a decision for {0}"
 msgstr "Registrar uma decisão para {0}"
@@ -9977,6 +9985,7 @@ msgid "Show a projectless Home scope for OS-level agent sessions."
 msgstr "Mostre um escopo inicial sem projeto para sessões de agente no nível do sistema operacional."
 
 #: src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 #: src/renderer/views/SettingsOverlay/parts/ModelVisibilitySection.tsx
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/ModelVisibilityDropdown.tsx
@@ -10020,6 +10029,7 @@ msgstr "Mostrar no explorador de arquivos"
 
 #: src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/UserMessage.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
 msgid "Show less"
 msgstr "Mostrar menos"
@@ -10889,6 +10899,11 @@ msgstr "Branch de destino"
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Target provider"
 msgstr "Provedor de destino"
+
+#. placeholder {0}: kpi.targetValue
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Target: {0}"
+msgstr "Meta: {0}"
 
 #: src/renderer/components/providers/qwen/index.tsx
 #: src/renderer/views/SwarmView/SwarmTaskPanel.tsx

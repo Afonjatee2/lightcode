@@ -2643,6 +2643,10 @@ msgstr "Свернуть ошибку"
 msgid "Collapse group"
 msgstr "Свернуть группу"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Collapse instances"
+msgstr "Свернуть экземпляры"
+
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Collapse terminal composer"
@@ -4567,6 +4571,10 @@ msgstr "Развернуть ошибку"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 msgid "Expand group"
 msgstr "Развернуть группу"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Expand instances"
+msgstr "Развернуть экземпляры"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Expand to review or revoke access."
@@ -8743,7 +8751,7 @@ msgstr "Записать"
 msgid "Record a decision"
 msgstr "Записать решение"
 
-#. placeholder {0}: alert.title
+#. placeholder {0}: alertGroup.title
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Record a decision for {0}"
 msgstr "Записать решение для {0}"
@@ -9977,6 +9985,7 @@ msgid "Show a projectless Home scope for OS-level agent sessions."
 msgstr "Показывать домашнюю область без проекта для сессий агентов на уровне OS."
 
 #: src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 #: src/renderer/views/SettingsOverlay/parts/ModelVisibilitySection.tsx
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/ModelVisibilityDropdown.tsx
@@ -10020,6 +10029,7 @@ msgstr "Показать в проводнике"
 
 #: src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/UserMessage.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
 msgid "Show less"
 msgstr "Показать меньше"
@@ -10889,6 +10899,11 @@ msgstr "Целевая ветка"
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Target provider"
 msgstr "Целевой провайдер"
+
+#. placeholder {0}: kpi.targetValue
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Target: {0}"
+msgstr "Цель: {0}"
 
 #: src/renderer/components/providers/qwen/index.tsx
 #: src/renderer/views/SwarmView/SwarmTaskPanel.tsx

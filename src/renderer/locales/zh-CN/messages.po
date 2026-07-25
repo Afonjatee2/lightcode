@@ -2643,6 +2643,10 @@ msgstr "折叠错误"
 msgid "Collapse group"
 msgstr "折叠分组"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Collapse instances"
+msgstr "折叠实例"
+
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Collapse terminal composer"
@@ -4567,6 +4571,10 @@ msgstr "展开错误"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 msgid "Expand group"
 msgstr "展开分组"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Expand instances"
+msgstr "展开实例"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Expand to review or revoke access."
@@ -8742,7 +8750,7 @@ msgstr "记录"
 msgid "Record a decision"
 msgstr "记录一个决策"
 
-#. placeholder {0}: alert.title
+#. placeholder {0}: alertGroup.title
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Record a decision for {0}"
 msgstr "为 {0} 记录决策"
@@ -9976,6 +9984,7 @@ msgid "Show a projectless Home scope for OS-level agent sessions."
 msgstr "为操作系统级别的代理会话显示一个无项目的主页范围。"
 
 #: src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 #: src/renderer/views/SettingsOverlay/parts/ModelVisibilitySection.tsx
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/ModelVisibilityDropdown.tsx
@@ -10019,6 +10028,7 @@ msgstr "在文件资源管理器中显示"
 
 #: src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/UserMessage.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
 msgid "Show less"
 msgstr "显示较少"
@@ -10888,6 +10898,11 @@ msgstr "目标分支"
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Target provider"
 msgstr "目标提供商"
+
+#. placeholder {0}: kpi.targetValue
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Target: {0}"
+msgstr "目标: {0}"
 
 #: src/renderer/components/providers/qwen/index.tsx
 #: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
