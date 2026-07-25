@@ -1,6 +1,8 @@
 import type { McpServer, Project, Thread } from "@/shared/contracts";
+import { diagnoseControlCentreMcpSetup, mergeMcpServers } from "@/shared/contracts";
 import { getProjectPurpose } from "@/shared/contracts/project";
 import { resolveControlCentreServer } from "@/renderer/hooks/useControlCentreTool";
+import type { ControlCentreUnavailableReason } from "@/renderer/campaign/controlCentreAvailabilityCopy";
 
 /** Latest thread activity for a project, falling back to project creation time. */
 export function projectActivityTimestamp(project: Project, threads: readonly Thread[]): string {
@@ -41,6 +43,36 @@ export function selectTodayDataProject(
     projectActivityTimestamp(b, threads).localeCompare(projectActivityTimestamp(a, threads)),
   );
   return sorted[0]?.id;
+}
+
+/**
+ * When Today has campaign projects but none with an enabled Control Centre MCP
+ * server, distinguishes a missing server from a disabled one.
+ */
+export function diagnoseTodayControlCentreSetup(
+  projects: readonly Project[],
+  userMcpServers: readonly McpServer[],
+): Exclude<ControlCentreUnavailableReason, "connection-failed"> {
+  let sawDisabled = false;
+  for (const project of projects) {
+    if (getProjectPurpose(project) !== "campaign") continue;
+    const setup = diagnoseControlCentreMcpSetup(
+      mergeMcpServers(userMcpServers, project.mcpServers ?? []),
+    );
+    if (setup.kind === "ready") {
+      continue;
+    }
+    if (setup.kind === "disabled") {
+      sawDisabled = true;
+    }
+  }
+
+  const globalSetup = diagnoseControlCentreMcpSetup(userMcpServers);
+  if (globalSetup.kind === "disabled") {
+    sawDisabled = true;
+  }
+
+  return sawDisabled ? "disabled" : "not-configured";
 }
 
 /** Maps a Control Centre campaign group id to a local campaign project, if any. */

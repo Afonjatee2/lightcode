@@ -17,10 +17,6 @@ msgstr ""
 msgid "-y @modelcontextprotocol/server-memory"
 msgstr "-y @modelcontextprotocol/server-memory"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-#~ msgid "(coming in Phase 4)"
-#~ msgstr "(sắp có trong Giai đoạn 4)"
-
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "(Draft)"
 msgstr "(Bản nháp)"
@@ -112,16 +108,6 @@ msgstr "{0} mục cần chú ý"
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "{0, plural, one {# tool} other {# tools}}"
 msgstr "{0, plural, one {# công cụ} other {# công cụ}}"
-
-#. placeholder {0}: state.iterations ?? 0
-#: src/renderer/components/thread/ThreadGoalDock.tsx
-#~ msgid "{0, plural, one {# turn} other {# turns}}"
-#~ msgstr "{0, plural, other {# lượt}}"
-
-#. placeholder {0}: candidates.length
-#: src/renderer/components/experiment/NewExperimentModal.tsx
-#~ msgid "{0, plural, one {Candidate (#)} other {Candidates (#)}}"
-#~ msgstr "{0, plural, one {Ứng viên (#)} other {Ứng viên (#)}}"
 
 #. placeholder {0}: details.patterns.length
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/PermissionDetailsLine.tsx
@@ -233,11 +219,6 @@ msgid "{0} hooks removed for {envName}."
 msgstr "Đã xóa hook {0} cho {envName}."
 
 #. placeholder {0}: agent.label
-#: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
-#~ msgid "{0} install targets"
-#~ msgstr "{0} mục tiêu cài đặt"
-
-#. placeholder {0}: agent.label
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "{0} is already up to date."
 msgstr "{0} đã được cập nhật."
@@ -296,11 +277,6 @@ msgstr "{0} prompt - {when}"
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "{0} proposals awaiting approval"
 msgstr "{0} đề xuất đang chờ phê duyệt"
-
-#. placeholder {0}: formatMoney(budget.remaining, budget.currency)
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "{0} remaining"
-#~ msgstr "Còn lại {0}"
 
 #. placeholder {0}: item.runCount.toLocaleString()
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
@@ -374,12 +350,6 @@ msgstr "Đã dùng {0}"
 msgid "{0}: {stateLabel}"
 msgstr "{0}: {stateLabel}"
 
-#. placeholder {0}: context.pacing.variancePct > 0 ? "+" : ""
-#. placeholder {1}: context.pacing.variancePct
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "{0}{1}% vs expected"
-#~ msgstr "{0}{1}% so với dự kiến"
-
 #. placeholder {0}: selectedRows.length
 #. placeholder {0}: selectedSkills.length
 #. placeholder {1}: importableRows.length
@@ -442,10 +412,6 @@ msgstr "{envOrAgentLabel} cần xác thực."
 msgid "{failed} failed"
 msgstr "{failed} lỗi"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "{failedCount} data sources have failed to sync"
-#~ msgstr "{failedCount} nguồn dữ liệu không đồng bộ được"
-
 #: src/mobile/views/pr/PrOverviewPage.tsx
 msgid "{filesCount, plural, one {# file changed} other {# files changed}}"
 msgstr "{filesCount, plural, one {# tệp đã đổi} other {# tệp đã đổi}}"
@@ -477,14 +443,6 @@ msgstr "{hours} giờ trước"
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "{installedCount, plural, one {# agent ready} other {# agents ready}}"
 msgstr "{installedCount, plural, one {# tác nhân đã sẵn sàng} other {# tác nhân đã sẵn sàng}}"
-
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
-#~ msgid "{judgeLabel} is comparing the anonymized diffs…"
-#~ msgstr "{judgeLabel} đang so sánh các diff đã ẩn danh…"
-
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
-#~ msgid "{judgingLabel} is reviewing each candidate's changes to recommend a winner."
-#~ msgstr "{judgingLabel} đang xem xét các thay đổi của từng ứng viên để đề xuất ứng viên thắng."
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsageProviderCard.tsx
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
@@ -520,10 +478,6 @@ msgstr "{loginLabel} {0} {env}"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
 msgid "{loginLabel} {env}"
 msgstr "{loginLabel} {env}"
-
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
-#~ msgid "{loserCount, plural, one {The other candidate and its worktree will be removed.} other {The other # candidates and their worktrees will be removed.}}"
-#~ msgstr "{loserCount, plural, one {Ứng viên còn lại và cây làm việc của ứng viên đó sẽ bị xóa.} other {# ứng viên còn lại và các cây làm việc của họ sẽ bị xóa.}}"
 
 #: src/renderer/components/thread/threadContextUsage.ts
 msgid "{maxLabel} context"
@@ -576,10 +530,6 @@ msgstr "Cài đặt {projectName}"
 msgid "{provider} does not support one-shot generation"
 msgstr "{provider} không hỗ trợ tạo một lượt"
 
-#: src/renderer/i18n/sharedMessages.ts
-#~ msgid "{provider} does not support text-only one-shot generation"
-#~ msgstr "{provider} không hỗ trợ tạo nội dung một lần ở chế độ chỉ văn bản"
-
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
 msgid "{remaining, plural, one {# open} other {# open}}"
 msgstr "{remaining, plural, one {# mở} other {# mở}}"
@@ -600,10 +550,6 @@ msgstr "{serverName} từ {providerLabel}: {disabledLabel}"
 #: src/renderer/campaign/morningBrief/briefGenerator.ts
 msgid "{stale} stale"
 msgstr "{stale} cũ"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "{staleCount} data sources have stale data"
-#~ msgstr "{staleCount} nguồn dữ liệu có dữ liệu cũ"
 
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "{used} tokens"
@@ -645,10 +591,6 @@ msgstr "@media-plans"
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "/absolute/path/to/project"
 msgstr "/absolute/path/to/project"
-
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "/skill-creator Create a new managed skill for {destination}."
-#~ msgstr "/skill-creator Tạo một skill được quản lý mới cho {destination}."
 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "/skill-creator Create a new managed skill for {destinationLabel}."
@@ -883,10 +825,6 @@ msgstr "Thêm dự án để dùng Swarm"
 msgid "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
 msgstr "Thêm skill vào .agents/skills hoặc .poracode/skills, hoặc nhập từ nhà cung cấp khác."
 
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Add a skill to .agents/skills or import one from another provider."
-#~ msgstr "Thêm một skill vào .agents/skills hoặc nhập skill từ nhà cung cấp khác."
-
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
 msgid "Add a to-do…"
 msgstr "Thêm việc cần làm…"
@@ -915,10 +853,6 @@ msgstr "Thêm ứng viên"
 msgid "Add Claude profile"
 msgstr "Thêm hồ sơ Claude"
 
-#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Add Control Centre MCP to a campaign project to load your operations overview."
-msgstr "Thêm Control Centre MCP vào dự án chiến dịch để tải tổng quan vận hành của bạn."
-
 #: src/renderer/components/thread/ThreadAuthRequiredDock.tsx
 msgid "Add credentials before this thread can run."
 msgstr "Thêm thông tin xác thực trước khi chuỗi này có thể chạy."
@@ -934,10 +868,6 @@ msgstr "Thêm máy chủ MCP"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Add model"
 msgstr "Thêm mô hình"
-
-#: src/renderer/components/mcp/McpServersManager.tsx
-#~ msgid "Add one manually or import a JSON configuration."
-#~ msgstr "Thêm thủ công hoặc nhập cấu hình JSON."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Add one manually or import from another agent."
@@ -1044,11 +974,6 @@ msgstr "Trò chuyện tác nhân (ACP / markdown). Các hàng lệnh dùng kích
 msgid "Agent encountered an error."
 msgstr "Tác nhân đã gặp lỗi."
 
-#. placeholder {0}: index + 1
-#: src/renderer/components/experiment/NewExperimentModal.tsx
-#~ msgid "Agent for candidate {0}"
-#~ msgstr "Tác nhân cho ứng viên {0}"
-
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "Agent is active and ready"
 msgstr "Tác nhân đang hoạt động và sẵn sàng"
@@ -1122,10 +1047,6 @@ msgstr "AI đánh giá"
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "AI providers"
 msgstr "Nhà cung cấp AI"
-
-#: src/mobile/views/MoreView.tsx
-#~ msgid "AI, agents, and archived threads on the paired desktop"
-#~ msgstr "AI, tác nhân và các luồng đã lưu trữ trên máy tính đã ghép nối"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Alert"
@@ -1245,10 +1166,6 @@ msgstr "Luôn bị loại trừ"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "An expected worktree owner requires a branch"
 msgstr "Chủ sở hữu cây làm việc dự kiến yêu cầu một nhánh"
-
-#: src/renderer/components/mcp/McpServersManager.tsx
-#~ msgid "An MCP server with the name {serverName} already exists."
-#~ msgstr "Máy chủ MCP có tên {serverName} đã tồn tại."
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "An MCP server with this name already exists."
@@ -1429,10 +1346,6 @@ msgstr "Hỏi {0} bất cứ điều gì về không gian làm việc này"
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Ask anything about your campaigns"
 msgstr "Hỏi bất cứ điều gì về chiến dịch của bạn"
-
-#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-#~ msgid "Ask anything about your campaigns…"
-#~ msgstr "Hỏi bất cứ điều gì về chiến dịch của bạn…"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Ask anything across your campaigns — grounded in Control Centre data…"
@@ -1619,14 +1532,6 @@ msgstr "Quay lại thay đổi"
 msgid "Back to files"
 msgstr "Quay lại tệp"
 
-#: src/renderer/components/mcp/McpServerEditor.tsx
-#~ msgid "Back to MCP servers"
-#~ msgstr "Quay lại danh sách máy chủ MCP"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
-#~ msgid "Back to monitoring"
-#~ msgstr "Quay lại giám sát"
-
 #: src/mobile/views/pr/PrSubPage.tsx
 msgid "Back to overview"
 msgstr "Quay lại tổng quan"
@@ -1648,14 +1553,6 @@ msgstr "Tiến trình nền không chạy"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Background process restarted"
 msgstr "Tiến trình nền đã được khởi động lại"
-
-#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
-#~ msgid "Background tasks"
-#~ msgstr "Tác vụ nền"
-
-#: src/renderer/components/experiment/NewExperimentModal.tsx
-#~ msgid "Base branch"
-#~ msgstr "Nhánh cơ sở"
 
 #: src/mobile/views/pr/PrOverviewPage.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
@@ -1810,10 +1707,6 @@ msgstr "Trình duyệt"
 msgid "Browser is open in a separate window"
 msgstr "Trình duyệt đang mở trong một cửa sổ riêng"
 
-#: src/renderer/components/composer/MentionPopover.tsx
-#~ msgid "Browser MCP"
-#~ msgstr "MCP trình duyệt"
-
 #: src/renderer/components/thread/ThreadView.tsx
 msgid "Browser MCP enabled for OpenCode"
 msgstr "MCP trình duyệt được bật cho OpenCode"
@@ -1874,17 +1767,9 @@ msgstr "Đang dựng diff…"
 msgid "Built-in"
 msgstr "Tích hợp sẵn"
 
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Built-in and plugin skills"
-#~ msgstr "Skill tích hợp sẵn và skill của plugin"
-
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Built-in MCP servers"
 msgstr "Máy chủ MCP tích hợp sẵn"
-
-#: src/renderer/components/mcp/McpServersManager.tsx
-#~ msgid "Built-in servers are managed by Poracode. They can be disabled globally but cannot be edited or removed."
-#~ msgstr "Các máy chủ tích hợp sẵn do Poracode quản lý. Bạn có thể tắt chúng trên toàn hệ thống nhưng không thể chỉnh sửa hoặc xóa."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Built-in servers are managed by Tee's Cockpit. They can be disabled globally but cannot be edited or removed."
@@ -1939,10 +1824,6 @@ msgstr "Chiến dịch và khách hàng"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Campaign context"
 msgstr "Ngữ cảnh chiến dịch"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Campaign Context"
-#~ msgstr "Ngữ cảnh chiến dịch"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Campaign event"
@@ -2270,10 +2151,6 @@ msgstr "Choose a model for every worker."
 msgid "Choose a parent folder"
 msgstr "Chọn một thư mục cha"
 
-#: src/renderer/components/mcp/McpServersManager.tsx
-#~ msgid "Choose an MCP server configuration file"
-#~ msgstr "Chọn tệp cấu hình máy chủ MCP"
-
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Choose an orchestrator and reviewer."
 msgstr "Chọn bộ điều phối và người đánh giá."
@@ -2300,11 +2177,6 @@ msgstr "Chọn tệp danh tính SSH"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "Choose the display language for Poracode's interface."
-#~ msgstr "Chọn ngôn ngữ hiển thị cho giao diện của Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Choose the display language for Tee's Cockpit's interface."
 msgstr "Chọn ngôn ngữ hiển thị cho giao diện của Tee's Cockpit."
 
@@ -2315,11 +2187,6 @@ msgstr "Chọn chủ đề để đính kèm"
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Choose what this applies to."
 msgstr "Chọn phạm vi áp dụng."
-
-#: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "Choose whether links from Poracode and browser popups stay in Poracode or open externally."
-#~ msgstr "Chọn xem các liên kết từ Poracode và cửa sổ bật lên của trình duyệt vẫn ở trong Poracode hay mở bên ngoài."
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -2703,10 +2570,6 @@ msgstr "Thu gọn bảng ngữ cảnh"
 msgid "Collapse error"
 msgstr "Thu gọn lỗi"
 
-#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
-#~ msgid "Collapse experiment"
-#~ msgstr "Thu gọn thí nghiệm"
-
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 msgid "Collapse group"
@@ -2822,10 +2685,6 @@ msgstr "So sánh dấu vân tay này với dấu vân tay hiển thị trên má
 msgid "Compare to published plan"
 msgstr "So sánh với kế hoạch đã xuất bản"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
-#~ msgid "Comparing candidates…"
-#~ msgstr "Đang so sánh các ứng viên…"
-
 #: src/renderer/views/CampaignWorkspace/parts/PlanIntelligencePane.tsx
 msgid "Comparing plan versions…"
 msgstr "Đang so sánh phiên bản kế hoạch…"
@@ -2901,14 +2760,6 @@ msgstr "Điều khiển trình soạn thảo"
 msgid "Computer Use"
 msgstr "Sử dụng máy tính"
 
-#: src/renderer/components/composer/ComputerUseOverlay.tsx
-#~ msgid "Computer Use can take over the desktop. Don't use this machine while the agent is clicking or typing."
-#~ msgstr "Computer Use có thể chiếm quyền điều khiển máy tính. Đừng dùng máy này khi agent đang nhấp hoặc gõ."
-
-#: src/renderer/components/composer/ComputerUseOverlay.tsx
-#~ msgid "Computer Use controls the paired desktop. Don't use that machine while the agent is clicking or typing."
-#~ msgstr "Computer Use điều khiển máy tính đã ghép nối. Đừng dùng máy đó khi agent đang nhấp hoặc gõ."
-
 #: src/renderer/components/composer/AttachmentBar.tsx
 msgid "Computer Use enabled — controls the paired desktop; don't use that machine while the agent is controlling it"
 msgstr "Computer Use đã bật — điều khiển máy tính đã ghép nối; đừng dùng máy đó khi agent đang điều khiển"
@@ -2917,21 +2768,9 @@ msgstr "Computer Use đã bật — điều khiển máy tính đã ghép nối;
 msgid "Computer Use enabled — interactive actions take over the desktop; don't use the machine while the agent is controlling it"
 msgstr "Computer Use đã bật — thao tác tương tác chiếm quyền điều khiển máy tính; đừng dùng máy khi agent đang điều khiển"
 
-#: src/renderer/components/composer/AttachmentBar.tsx
-#~ msgid "Computer Use enabled for this thread"
-#~ msgstr "Đã bật sử dụng máy tính cho chủ đề này"
-
-#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
-#~ msgid "Computing changes…"
-#~ msgstr "Đang tính toán các thay đổi…"
-
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Config directory"
 msgstr "Thư mục cấu hình"
-
-#: src/renderer/components/mcp/McpServerEditor.tsx
-#~ msgid "Configure the server Poracode will add when supported agents start."
-#~ msgstr "Cấu hình máy chủ mà Poracode sẽ thêm khi khởi động các tác nhân được hỗ trợ."
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Configure the server Tee's Cockpit will add when supported agents start."
@@ -2972,10 +2811,6 @@ msgstr "Xung đột với một skill được quản lý"
 msgid "Connect"
 msgstr "Kết nối"
 
-#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-#~ msgid "Connect a server"
-#~ msgstr "Kết nối máy chủ"
-
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Connect an agent to create schedules."
 msgstr "Kết nối một tác nhân để tạo lịch."
@@ -2983,10 +2818,6 @@ msgstr "Kết nối một tác nhân để tạo lịch."
 #: src/mobile/setupEmptyState.tsx
 msgid "Connect desktop"
 msgstr "Kết nối máy tính"
-
-#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-#~ msgid "Connect directly, through a relay, or over SSH. Every transport uses the same Poracode remote protocol, projects, threads, and agent runtimes."
-#~ msgstr "Kết nối trực tiếp, qua trạm chuyển tiếp hoặc qua SSH. Mọi phương thức truyền đều dùng cùng giao thức từ xa Poracode, dự án, luồng và môi trường chạy tác tử."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Connect directly, through a relay, or over SSH. Every transport uses the same Tee's Cockpit remote protocol, projects, threads, and agent runtimes."
@@ -3003,10 +2834,6 @@ msgstr "Kết nối Poracode trên máy tính trước khi bắt đầu một lu
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Connect the AI providers OpenCode can use and sign out of them here."
 msgstr "Kết nối các nhà cung cấp AI mà OpenCode có thể dùng và đăng xuất khỏi chúng tại đây."
-
-#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-#~ msgid "Connect to another Poracode desktop or a headless server to browse and manage its projects from here. Get its endpoint and pairing token from Settings → Remote Access on that machine."
-#~ msgstr "Kết nối tới một máy Poracode khác hoặc máy chủ không giao diện để duyệt và quản lý các dự án của nó tại đây. Lấy endpoint và mã ghép nối trong Cài đặt → Truy cập từ xa trên máy đó."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Connected"
@@ -3146,20 +2973,12 @@ msgid "Control Centre \"{toolName}\" returned a response that was too large or m
 msgstr "Trung tâm điều khiển \"{toolName}\" đã trả về phản hồi quá lớn hoặc không đúng định dạng. Hãy thử làm mới."
 
 #: src/renderer/hooks/useControlCentreTool.ts
-#~ msgid "Control Centre \"{toolName}\" returned a response this version of Poracode doesn't understand."
-#~ msgstr "Trung tâm điều khiển \"{toolName}\" đã trả về phản hồi mà phiên bản Poracode này không hiểu được."
-
-#: src/renderer/hooks/useControlCentreTool.ts
 msgid "Control Centre \"{toolName}\" returned a response this version of Tee's Cockpit doesn't understand."
 msgstr "Trung tâm điều khiển \"{toolName}\" đã trả về phản hồi mà phiên bản Tee's Cockpit này không hiểu được."
 
 #: src/renderer/components/consultations/ContextWarnings.tsx
 msgid "Control Centre connection unavailable"
 msgstr "Trung tâm điều khiển không khả dụng"
-
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Control Centre is not available. You can still create a campaign workspace manually, but live campaign context will not load until the MCP connection works."
-msgstr "Trung tâm điều khiển không khả dụng. Bạn vẫn có thể tạo không gian làm việc chiến dịch theo cách thủ công, nhưng ngữ cảnh chiến dịch trực tiếp sẽ không tải cho đến khi kết nối MCP hoạt động."
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Control Centre isn't connected for this project yet."
@@ -3237,10 +3056,6 @@ msgstr "Sao chép (khuyên dùng)"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Copy {0} device code {1}"
 msgstr "Sao chép {0} mã thiết bị {1}"
-
-#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-#~ msgid "Copy all Lightcode data into Poracode. Poracode restarts and keeps a complete backup of its current data."
-#~ msgstr "Sao chép toàn bộ dữ liệu Lightcode vào Poracode. Poracode sẽ khởi động lại và giữ một bản sao lưu đầy đủ của dữ liệu hiện tại."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Copy all Lightcode data into Tee's Cockpit. Tee's Cockpit restarts and keeps a complete backup of its current data."
@@ -3355,10 +3170,6 @@ msgstr "Không thể tạo thông báo commit: {detail}"
 msgid "Could not load pull requests for {0}."
 msgstr "Không thể tải pull request cho {0}."
 
-#: src/renderer/components/pdf/PdfViewer.tsx
-#~ msgid "Could not open this PDF."
-#~ msgstr "Không thể mở tệp PDF này."
-
 #: src/renderer/hooks/useControlCentreTool.ts
 msgid "Could not reach the MCP runtime."
 msgstr "Không thể kết nối đến runtime MCP."
@@ -3468,10 +3279,6 @@ msgstr "Không thể cập nhật skill."
 msgid "Create"
 msgstr "Tạo"
 
-#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-#~ msgid "Create a campaign project to see your operations overview."
-#~ msgstr "Tạo dự án chiến dịch để xem tổng quan vận hành."
-
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Create a pull request for candidate {0} ({label})"
@@ -3548,14 +3355,6 @@ msgstr "Tạo nhiệm vụ"
 msgid "Create with Agent"
 msgstr "Tạo bằng tác nhân"
 
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Create your first scheduled task."
-#~ msgstr "Tạo tác vụ đã lên lịch đầu tiên."
-
-#: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
-#~ msgid "Create:"
-#~ msgstr "Tạo:"
-
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Created"
 msgstr "Đã tạo"
@@ -3601,10 +3400,6 @@ msgstr "Crossagent"
 msgid "Crossagent ({subagent}): {description}"
 msgstr "Crossagent ({subagent}): {description}"
 
-#: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
-#~ msgid "Crossagent not found."
-#~ msgstr "Không tìm thấy Crossagent."
-
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
 msgid "Crossagent Result"
 msgstr "Kết quả Crossagent"
@@ -3613,10 +3408,6 @@ msgstr "Kết quả Crossagent"
 #: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
 msgid "Crossagent routing guide"
 msgstr "Hướng dẫn định tuyến Crossagents"
-
-#: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
-#~ msgid "Crossagent runs"
-#~ msgstr "Lượt chạy Crossagents"
 
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Crossagent: {description}"
@@ -3656,18 +3447,10 @@ msgstr "Dùng AI chọn ứng viên thắng"
 msgid "Crowned"
 msgstr "Đã chọn là ứng viên thắng"
 
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "Curated free and premium skills managed by MCP Market."
-#~ msgstr "Các skill miễn phí và cao cấp được tuyển chọn, do MCP Market quản lý."
-
 #: src/mobile/views/ThreadsView.tsx
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Current"
 msgstr "Gần đây"
-
-#: src/renderer/components/skills/SkillImportModal.tsx
-#~ msgid "Current project"
-#~ msgstr "Dự án hiện tại"
 
 #: src/renderer/views/ProfileOverlay/parts/ShareCard.tsx
 msgid "current streak"
@@ -3722,14 +3505,6 @@ msgstr "Bản tóm tắt hằng ngày"
 msgid "Dark"
 msgstr "Tối"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Dates"
-#~ msgstr "Ngày"
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Days"
-#~ msgstr "Ngày"
-
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Decided at"
 msgstr "Quyết định lúc"
@@ -3757,10 +3532,6 @@ msgstr "Nội dung quyết định"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Decisions & proposals"
 msgstr "Quyết định & đề xuất"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Decisions & Proposals"
-#~ msgstr "Quyết định & Đề xuất"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 msgid "Decline"
@@ -3889,17 +3660,9 @@ msgstr "Xóa lịch"
 msgid "Delete schedule?"
 msgstr "Xóa lịch?"
 
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Delete scheduled task?"
-#~ msgstr "Xóa tác vụ đã lên lịch?"
-
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Delete skill"
 msgstr "Xóa skill"
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Delete task"
-#~ msgstr "Xóa tác vụ"
 
 #: src/mobile/views/SettingsView.tsx
 #: src/renderer/views/SettingsOverlay/parts/ArchivedThreadsSettings.tsx
@@ -3934,10 +3697,6 @@ msgstr "Xóa worktree"
 msgid "Delete worktree {0}"
 msgstr "Xóa worktree {0}"
 
-#: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
-#~ msgid "Delete:"
-#~ msgstr "Xóa:"
-
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "Deleting"
 msgstr "Đang xóa"
@@ -3965,10 +3724,6 @@ msgstr "Mô tả kết quả, ràng buộc và các bước kiểm tra xác đ�
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Describe the task before starting the swarm."
 msgstr "Mô tả tác vụ trước khi khởi chạy swarm."
-
-#: src/renderer/components/experiment/NewExperimentModal.tsx
-#~ msgid "Describe the task to run with multiple agents…"
-#~ msgstr "Mô tả tác vụ cần chạy với nhiều tác nhân…"
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Describe what the agent should do"
@@ -4003,10 +3758,6 @@ msgstr "Đích"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "detached HEAD"
 msgstr "HEAD tách rời"
-
-#: src/renderer/views/SchedulesView/ScheduleEditor.tsx
-#~ msgid "Details"
-#~ msgstr "Chi tiết"
 
 #: src/mobile/views/PortsView.tsx
 msgid "Detected"
@@ -4070,10 +3821,6 @@ msgstr "Thiết bị được dùng cho nút nhập giọng nói của khung so�
 msgid "Devices can pair while this desktop is reachable."
 msgstr "Thiết bị có thể ghép nối khi máy tính này có thể truy cập được."
 
-#: src/mobile/views/PortsView.tsx
-#~ msgid "Direct connection required"
-#~ msgstr "Cần kết nối trực tiếp"
-
 #. placeholder {0}: skill.name
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Disable {0}"
@@ -4120,10 +3867,6 @@ msgstr "Tắt Crossagents"
 msgid "Disable Project"
 msgstr "Vô hiệu hóa dự án"
 
-#: src/renderer/components/composer/composerMcpServers.ts
-#~ msgid "Disable Subagents"
-#~ msgstr "Tắt tác nhân phụ"
-
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Disable tiers an external provider collapses (e.g. keep only High and Max)."
 msgstr "Tắt các mức mà nhà cung cấp bên ngoài gộp lại (ví dụ chỉ giữ High và Max)."
@@ -4137,10 +3880,6 @@ msgstr "Đã tắt"
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Disabled globally"
 msgstr "Đã tắt trên toàn hệ thống"
-
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Disabling a skill moves it out of active skill folders and removes Poracode-managed provider copies. Its files are preserved so you can enable it again."
-#~ msgstr "Khi tắt một skill, skill đó được chuyển khỏi các thư mục skill đang hoạt động và các bản sao của nhà cung cấp do Poracode quản lý sẽ bị xóa. Các tệp vẫn được giữ lại để bạn có thể bật lại."
 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Disabling a skill moves it out of active skill folders and removes Tee's Cockpit-managed provider copies. Its files are preserved so you can enable it again."
@@ -4366,18 +4105,6 @@ msgstr "Chỉnh sửa hồ sơ"
 msgid "Edit schedule"
 msgstr "Chỉnh sửa lịch"
 
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Edit scheduled task"
-#~ msgstr "Chỉnh sửa tác vụ đã lên lịch"
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Edit task"
-#~ msgstr "Chỉnh sửa tác vụ"
-
-#: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
-#~ msgid "Edit:"
-#~ msgstr "Chỉnh sửa:"
-
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/FileEditorOverlay/FileEditorOverlay.tsx
@@ -4503,10 +4230,6 @@ msgstr "Bật <0>cookie</0> và <1>bộ nhớ</1>. Cookie có thể chứa mã t
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Endpoint"
 msgstr "Endpoint"
-
-#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-#~ msgid "Endpoint, e.g. http://192.168.1.20:38987/"
-#~ msgstr "Endpoint, ví dụ http://192.168.1.20:38987/"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Endpoint, e.g. http://192.168.1.20:49152/"
@@ -4719,10 +4442,6 @@ msgstr "Mở rộng bảng ngữ cảnh"
 msgid "Expand error"
 msgstr "Mở rộng lỗi"
 
-#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
-#~ msgid "Expand experiment"
-#~ msgstr "Mở rộng thí nghiệm"
-
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 msgid "Expand group"
@@ -4850,10 +4569,6 @@ msgstr "Bên ngoài"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "External provider"
 msgstr "Nhà cung cấp bên ngoài"
-
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "External provider skills"
-#~ msgstr "Skill của nhà cung cấp bên ngoài"
 
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "Extra High"
@@ -5066,88 +4781,44 @@ msgid "Finished · Waiting for your input"
 msgstr "Đã hoàn tất · Đang chờ bạn nhập"
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Antigravity CLI integration using Poracode's native runtime."
-#~ msgstr "Tích hợp CLI Antigravity hạng nhất bằng thời gian chạy gốc của Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Antigravity CLI integration using Tee's Cockpit's native runtime."
 msgstr "Tích hợp CLI Antigravity hạng nhất bằng thời gian chạy gốc của Tee's Cockpit."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Claude Code integration using Poracode's native SDK runtime."
-#~ msgstr "Tích hợp Claude Code hạng nhất bằng thời gian chạy SDK gốc của Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Claude Code integration using Tee's Cockpit's native SDK runtime."
 msgstr "Tích hợp Claude Code hạng nhất bằng thời gian chạy SDK gốc của Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Codex CLI integration using Poracode's native app-server runtime."
-#~ msgstr "Tích hợp Codex CLI hạng nhất bằng cách sử dụng thời gian chạy máy chủ ứng dụng gốc của Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Codex CLI integration using Tee's Cockpit's native app-server runtime."
 msgstr "Tích hợp Codex CLI hạng nhất bằng cách sử dụng thời gian chạy máy chủ ứng dụng gốc của Tee's Cockpit."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Command Code CLI integration using Poracode's native runtime."
-#~ msgstr "Tích hợp CLI Command Code hạng nhất bằng thời gian chạy gốc của Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Command Code CLI integration using Tee's Cockpit's native runtime."
 msgstr "Tích hợp CLI Command Code hạng nhất bằng thời gian chạy gốc của Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Cursor Agent integration using Poracode's native runtime."
-#~ msgstr "Tích hợp Cursor Agent hạng nhất bằng runtime gốc của Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Cursor Agent integration using Tee's Cockpit's native runtime."
 msgstr "Tích hợp Cursor Agent hạng nhất bằng runtime gốc của Tee's Cockpit."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Factory Droid integration using Poracode's ACP runtime."
-#~ msgstr "Tích hợp Factory Droid hạng nhất bằng môi trường chạy ACP của Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Factory Droid integration using Tee's Cockpit's ACP runtime."
 msgstr "Tích hợp Factory Droid hạng nhất bằng môi trường chạy ACP của Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Gemini CLI integration using Poracode's native runtime."
-#~ msgstr "Tích hợp Gemini CLI hạng nhất bằng runtime gốc của Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Gemini CLI integration using Tee's Cockpit's native runtime."
 msgstr "Tích hợp Gemini CLI hạng nhất bằng runtime gốc của Tee's Cockpit."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class GitHub Copilot CLI integration using Poracode's native runtime."
-#~ msgstr "Tích hợp GitHub Copilot CLI hạng nhất bằng runtime gốc của Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class GitHub Copilot CLI integration using Tee's Cockpit's native runtime."
 msgstr "Tích hợp GitHub Copilot CLI hạng nhất bằng runtime gốc của Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Grok Build CLI integration using Poracode's native runtime."
-#~ msgstr "Tích hợp Grok Build CLI hạng nhất bằng cách sử dụng thời gian chạy gốc của Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Grok Build CLI integration using Tee's Cockpit's native runtime."
 msgstr "Tích hợp Grok Build CLI hạng nhất bằng cách sử dụng thời gian chạy gốc của Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Kimi Code CLI integration using Poracode's native runtime."
-#~ msgstr "Tích hợp Kimi Code CLI hạng nhất bằng cách sử dụng thời gian chạy gốc của Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Kimi Code CLI integration using Tee's Cockpit's native runtime."
 msgstr "Tích hợp Kimi Code CLI hạng nhất bằng cách sử dụng thời gian chạy gốc của Tee's Cockpit."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class OpenCode integration using Poracode's native SDK runtime."
-#~ msgstr "Tích hợp OpenCode hạng nhất bằng thời gian chạy SDK gốc của Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class OpenCode integration using Tee's Cockpit's native SDK runtime."
@@ -5158,24 +4829,12 @@ msgid "First-class Pi integration using a real terminal and Pi's native SDK runt
 msgstr "Tích hợp Pi hạng nhất với terminal thật và runtime SDK gốc của Pi."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Qoder CLI integration using Poracode's native terminal and ACP runtimes."
-#~ msgstr "Tích hợp Qoder CLI hạng nhất với runtime terminal và ACP gốc của Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Qoder CLI integration using Tee's Cockpit's native terminal and ACP runtimes."
 msgstr "Tích hợp Qoder CLI hạng nhất với runtime terminal và ACP gốc của Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Qwen Code integration using Poracode's native terminal and ACP runtimes."
-#~ msgstr "Tích hợp Qwen Code hạng nhất bằng các môi trường chạy terminal và ACP gốc của Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Qwen Code integration using Tee's Cockpit's native terminal and ACP runtimes."
 msgstr "Tích hợp Qwen Code hạng nhất bằng các môi trường chạy terminal và ACP gốc của Tee's Cockpit."
-
-#: src/renderer/components/pdf/PdfViewer.tsx
-#~ msgid "Fit width"
-#~ msgstr "Vừa chiều rộng"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/ConflictResolutionActions.tsx
 msgid "Fix in Agent"
@@ -5245,15 +4904,6 @@ msgstr "Buộc tải lại trang trình duyệt"
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "Fork"
 msgstr "Fork"
-
-#: src/renderer/components/experiment/NewExperimentModal.tsx
-#~ msgid "Fork from"
-#~ msgstr "Phân nhánh từ"
-
-#. placeholder {0}: props.baseBranch
-#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
-#~ msgid "Fork from <0>{0}</0>"
-#~ msgstr "Phân nhánh từ <0>{0}</0>"
 
 #. placeholder {0}: props.baseBranch
 #: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
@@ -5561,10 +5211,6 @@ msgid "Hello"
 msgstr "Xin chào"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Help me create a schedule. Ask for any missing details, then use the Poracode schedule controls to create it for me."
-#~ msgstr "Hãy giúp tôi tạo lịch. Hỏi những chi tiết còn thiếu, sau đó dùng các điều khiển lịch của Poracode để tạo giúp tôi."
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Help me create a schedule. Ask for any missing details, then use the Tee's Cockpit schedule controls to create it for me."
 msgstr "Hãy giúp tôi tạo lịch. Hỏi những chi tiết còn thiếu, sau đó dùng các điều khiển lịch của Tee's Cockpit để tạo giúp tôi."
 
@@ -5766,16 +5412,6 @@ msgstr "Nhập vào {destinationProjectName}"
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Import to Global"
 msgstr "Nhập vào phạm vi toàn cục"
-
-#: src/renderer/components/mcp/McpExternalImportModal.tsx
-#~ msgid "Import to Project"
-#~ msgstr "Nhập vào dự án"
-
-#. placeholder {0}: selectedSkills.length
-#. placeholder {1}: selectedSkills.length === 1 ? "skill" : "skills"
-#: src/renderer/components/skills/SkillImportModal.tsx
-#~ msgid "Imported {0} {1}."
-#~ msgstr "Đã nhập {0} {1}."
 
 #. placeholder {0}: selectedSkills.length
 #: src/renderer/components/skills/SkillImportModal.tsx
@@ -6002,11 +5638,6 @@ msgstr "Giúp tôi đi đúng hướng"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "Keep Poracode in the system tray when it launches at startup."
-#~ msgstr "Giữ Poracode trong khay hệ thống khi ứng dụng khởi chạy cùng Windows."
-
-#: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Keep Tee's Cockpit in the system tray when it launches at startup."
 msgstr "Giữ Tee's Cockpit trong khay hệ thống khi ứng dụng khởi chạy cùng Windows."
 
@@ -6023,18 +5654,10 @@ msgstr "Phát hiện chính:"
 msgid "Kill bash"
 msgstr "Dừng bash"
 
-#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
-#~ msgid "Kimi"
-#~ msgstr "Kimi"
-
 #: src/renderer/components/providers/kimi/manifest.ts
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
 msgid "Kimi Code"
 msgstr "Kimi Code"
-
-#: src/renderer/i18n/sharedMessages.ts
-#~ msgid "Kimi Code could not update its credentials because another process is using the credential file. Close other Poracode or Kimi Code processes, then retry."
-#~ msgstr "Kimi Code không thể cập nhật thông tin xác thực vì một tiến trình khác đang sử dụng tệp thông tin xác thực. Hãy đóng các tiến trình Poracode hoặc Kimi Code khác rồi thử lại."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Kimi Code could not update its credentials because another process is using the credential file. Close other Tee's Cockpit or Kimi Code processes, then retry."
@@ -6047,10 +5670,6 @@ msgstr "Kimi Code đã kết thúc lượt mà không trả về phản hồi. H
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "KPI health"
 msgstr "Tình trạng KPI"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "KPI Health"
-#~ msgstr "Tình trạng KPI"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -6080,11 +5699,6 @@ msgstr "Công cụ cuối cùng: <0>{0}</0>"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Launch at startup"
 msgstr "Khởi chạy khi khởi động"
-
-#: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "Launch Poracode automatically when you sign in to Windows."
-#~ msgstr "Tự động khởi chạy Poracode khi bạn đăng nhập vào Windows."
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -6218,11 +5832,6 @@ msgstr "Đang tải ghi chú…"
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Loading operations overview…"
 msgstr "Đang tải tổng quan vận hành…"
-
-#: src/renderer/components/pdf/PdfViewer.tsx
-#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
-#~ msgid "Loading PDF…"
-#~ msgstr "Đang tải PDF…"
 
 #: src/renderer/views/PrReviewOverlay/parts/PrReviewSidebar.tsx
 msgid "Loading PR…"
@@ -6385,52 +5994,19 @@ msgstr "Rủi ro thấp"
 msgid "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
 msgstr "Làm thanh bên trong suốt — hiệu ứng làm mờ của hệ thống trên Windows 11, lớp màu mờ trong suốt ở nơi khác."
 
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "Manage global and project agent skills, including skills imported from other providers."
-#~ msgstr "Quản lý skill tác tử toàn cục và theo dự án, bao gồm cả skill được nhập từ nhà cung cấp khác."
-
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarRemoteServers.tsx
 msgid "Manage remote environments"
 msgstr "Quản lý môi trường từ xa"
-
-#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarRemoteServers.tsx
-#~ msgid "Manage remote servers"
-#~ msgstr "Quản lý máy chủ từ xa"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/SkillsSettings.tsx
 msgid "Manage shared skills across global and project scopes."
 msgstr "Quản lý các skill dùng chung trong phạm vi toàn cục và dự án."
 
-#: src/renderer/views/SettingsOverlay/parts/SkillsSettings.tsx
-#~ msgid "Manage shared skills across Linux and projects."
-#~ msgstr "Quản lý các skill dùng chung trên Linux và các dự án."
-
-#: src/renderer/views/SettingsOverlay/parts/SkillsSettings.tsx
-#~ msgid "Manage shared skills across macOS and projects."
-#~ msgstr "Quản lý các skill dùng chung trên macOS và các dự án."
-
-#: src/renderer/views/SettingsOverlay/parts/SkillsSettings.tsx
-#~ msgid "Manage shared skills across Windows, WSL, and projects."
-#~ msgstr "Quản lý các skill dùng chung trên Windows, WSL và các dự án."
-
-#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "Manage the MCP server configurations Poracode adds when starting supported agents. Workspace servers can be configured in each project's settings."
-#~ msgstr "Quản lý cấu hình máy chủ MCP mà Poracode thêm khi khởi động các tác nhân được hỗ trợ. Máy chủ trong không gian làm việc có thể được cấu hình trong phần cài đặt của từng dự án."
-
 #: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Manage the MCP server configurations Tee's Cockpit adds when starting supported agents. Workspace servers can be configured in each project's settings."
 msgstr "Quản lý cấu hình máy chủ MCP mà Tee's Cockpit thêm khi khởi động các tác nhân được hỗ trợ. Máy chủ trong không gian làm việc có thể được cấu hình trong phần cài đặt của từng dự án."
-
-#: src/renderer/views/SettingsOverlay/parts/SkillsSettings.tsx
-#~ msgid "Manage the skills Poracode makes available to supported agents. Project skills can be managed in each project's settings."
-#~ msgstr "Quản lý các skill mà Poracode cung cấp cho những tác tử được hỗ trợ. Có thể quản lý skill dự án trong phần cài đặt của từng dự án."
-
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Managed"
-#~ msgstr "Được quản lý"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Managed by Poracode"
@@ -6439,14 +6015,6 @@ msgstr "Do Poracode quản lý"
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Managed by provider"
 msgstr "Do nhà cung cấp quản lý"
-
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Managed by the provider or plugin."
-#~ msgstr "Do nhà cung cấp hoặc plugin quản lý."
-
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Managed skills"
-#~ msgstr "Skill được quản lý"
 
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Manual only"
@@ -6514,10 +6082,6 @@ msgstr "Tối đa hóa"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Maximize browser"
 msgstr "Tối đa hóa trình duyệt"
-
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "MCP Market"
-#~ msgstr "MCP Market"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "MCP Profile"
@@ -6617,11 +6181,6 @@ msgstr "Hợp nhất các thay đổi của {crownedLabel} vào {mergeTarget}?"
 #: src/renderer/views/MainView/parts/Sidebar/parts/useWorktreeActions.ts
 msgid "Merge & Remove"
 msgstr "Hợp nhất & Xóa"
-
-#. placeholder {0}: props.candidateNumber
-#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
-#~ msgid "Merge candidate {0} ({label}) as experiment winner"
-#~ msgstr "Hợp nhất ứng viên {0} ({label}) với tư cách ứng viên thắng của thử nghiệm"
 
 #: src/mobile/views/pr/PrOverviewPage.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
@@ -6793,10 +6352,6 @@ msgstr "Không thể phản chiếu."
 msgid "Missing data"
 msgstr "Thiếu dữ liệu"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Missing Data"
-#~ msgstr "Dữ liệu bị thiếu"
-
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Mobile push notifications"
 msgstr "Thông báo đẩy trên di động"
@@ -6817,11 +6372,6 @@ msgstr "Mô hình"
 #: src/renderer/commands/registry.ts
 msgid "Model added to favorites"
 msgstr "Đã thêm mô hình vào mục yêu thích"
-
-#. placeholder {0}: index + 1
-#: src/renderer/components/experiment/NewExperimentModal.tsx
-#~ msgid "Model for candidate {0}"
-#~ msgstr "Mô hình cho ứng viên {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Model id"
@@ -6907,10 +6457,6 @@ msgstr "Giờ tóm tắt buổi sáng"
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Most active hour"
 msgstr "Giờ hoạt động nhiều nhất"
-
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "Most installed"
-#~ msgstr "Được cài đặt nhiều nhất"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Most popular"
@@ -7060,10 +6606,6 @@ msgstr "Tên hồ sơ Claude mới"
 msgid "New code"
 msgstr "Mã mới"
 
-#: src/renderer/components/experiment/NewExperimentModal.tsx
-#~ msgid "New experiment"
-#~ msgstr "Thử nghiệm mới"
-
 #: src/mobile/views/FilesView.tsx
 msgid "New file"
 msgstr "Tệp mới"
@@ -7118,10 +6660,6 @@ msgstr "Luồng nhanh mới"
 msgid "New schedule"
 msgstr "Lịch mới"
 
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "New scheduled task"
-#~ msgstr "Tác vụ đã lên lịch mới"
-
 #: src/mobile/views/BrowserView.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
@@ -7131,10 +6669,6 @@ msgstr "Tab mới"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 msgid "New tab in group"
 msgstr "Tab mới trong nhóm"
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "New task"
-#~ msgstr "Tác vụ mới"
 
 #: src/mobile/chrome.ts
 #: src/mobile/views/QuickCompose.tsx
@@ -7155,10 +6689,6 @@ msgstr "Luồng mới"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
 msgid "New thread — {projectName}"
 msgstr "Luồng mới — {projectName}"
-
-#: src/renderer/views/MainView/parts/Sidebar/parts/NewThreadButton.tsx
-#~ msgid "New thread (draft)"
-#~ msgstr "Luồng mới (bản nháp)"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 msgid "New thread from this to-do"
@@ -7190,10 +6720,6 @@ msgstr "Hình ảnh tiếp theo"
 #: src/renderer/components/find/FindBar.tsx
 msgid "Next match"
 msgstr "Kết quả tiếp theo"
-
-#: src/renderer/components/pdf/PdfViewer.tsx
-#~ msgid "Next page"
-#~ msgstr "Trang tiếp theo"
 
 #: src/renderer/commands/registry.ts
 msgid "Next recently viewed chat"
@@ -7321,10 +6847,6 @@ msgstr "Không tìm thấy cam kết nào."
 msgid "No configured MCP servers yet"
 msgstr "Chưa có máy chủ MCP nào được cấu hình"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "No connected sources reported."
-#~ msgstr "Không có nguồn kết nối nào được báo cáo."
-
 #: src/mobile/WideShell.tsx
 msgid "No connection paired"
 msgstr "Chưa ghép đôi kết nối nào"
@@ -7337,7 +6859,6 @@ msgstr "Chưa có kết nối nào"
 msgid "No content streams."
 msgstr "Không có luồng nội dung."
 
-#: src/renderer/hooks/useControlCentreTool.ts
 #: src/renderer/hooks/useRecordCampaignDecision.ts
 msgid "No Control Centre MCP server is configured for this project."
 msgstr "Chưa cấu hình máy chủ MCP Trung tâm điều khiển cho dự án này."
@@ -7416,10 +6937,6 @@ msgstr "Không tìm thấy tài khoản GitHub CLI nào. Đăng nhập bằng <0
 msgid "No history yet"
 msgstr "Chưa có lịch sử"
 
-#: src/renderer/components/experiment/NewExperimentModal.tsx
-#~ msgid "No installed agents with selectable models are available for this project."
-#~ msgstr "Không có tác nhân nào đã cài đặt có mô hình có thể chọn dành cho dự án này."
-
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "No KPI targets set"
 msgstr "Chưa đặt mục tiêu KPI"
@@ -7460,14 +6977,14 @@ msgstr "Không có pull request nào phù hợp."
 msgid "No matching schedules."
 msgstr "Không có lịch phù hợp."
 
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "No matching tasks."
-#~ msgstr "Không có tác vụ phù hợp."
-
 #: src/mobile/views/ThreadsView.tsx
 #: src/renderer/views/ThreadSearchOverlay/ThreadSearchOverlay.tsx
 msgid "No matching threads"
 msgstr "Không có luồng nào phù hợp"
+
+#: src/renderer/campaign/controlCentreAvailabilityCopy.ts
+msgid "No MCP server named \"control-centre\" is configured. Add one in MCP settings."
+msgstr "Chưa có máy chủ MCP nào tên \"control-centre\" được cấu hình. Thêm một máy chủ trong cài đặt MCP."
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "No MCP servers are enabled for this run"
@@ -7565,10 +7082,6 @@ msgstr "Chưa có nhà cung cấp nào sẵn sàng"
 msgid "No pull requests found."
 msgstr "Không tìm thấy pull request."
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "No recent events."
-#~ msgstr "Không có sự kiện gần đây."
-
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
 msgid "No remote configured. Add a remote to enable push and pull."
 msgstr "Không có cấu hình từ xa. Thêm một điều khiển từ xa để kích hoạt tính năng đẩy và kéo."
@@ -7597,10 +7110,6 @@ msgstr "Chưa có lần chạy nào."
 #: src/renderer/components/thread/ChatPane/ChatRuntimeDebugPanel.tsx
 msgid "No runtime items yet for this thread."
 msgstr "Chưa có mục thời gian chạy nào cho luồng này."
-
-#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-#~ msgid "No servers connected yet."
-#~ msgstr "Chưa có máy chủ nào được kết nối."
 
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "No shortcuts found"
@@ -7659,10 +7168,6 @@ msgstr "Chưa có luồng nào."
 #: src/renderer/components/providers/usageFormat.ts
 msgid "No windows reported"
 msgstr "Không có cửa sổ nào được báo cáo"
-
-#: src/renderer/components/thread/WorktreeModeSelect.tsx
-#~ msgid "No worktree"
-#~ msgstr "Không có worktree"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
 msgid "No wrap"
@@ -7861,10 +7366,6 @@ msgstr "Mở một luồng trước để đính kèm vào đó."
 msgid "Open alerts"
 msgstr "Cảnh báo mở"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Open Alerts"
-#~ msgstr "Cảnh báo đang mở"
-
 #: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ExperimentGroupHeader.tsx
@@ -7990,14 +7491,6 @@ msgstr "Bảng xếp hạng mở với số liệu cài đặt và xu hướng."
 msgid "Open links in"
 msgstr "Mở liên kết trong"
 
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "Open marketplace"
-#~ msgstr "Mở marketplace"
-
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "Open MCP Market to browse purchases and downloads without bypassing its account or licensing flow."
-#~ msgstr "Mở MCP Market để duyệt các giao dịch mua và bản tải xuống mà không bỏ qua quy trình tài khoản hoặc cấp phép."
-
 #: src/renderer/commands/composerCommands.ts
 msgid "Open model picker"
 msgstr "Mở bộ chọn mô hình"
@@ -8060,10 +7553,6 @@ msgstr "Mở cài đặt"
 #: src/renderer/components/composer/voiceError.ts
 msgid "Open Settings"
 msgstr "Mở Cài đặt"
-
-#: src/mobile/views/DesktopsView.tsx
-#~ msgid "Open Settings → Remote Access in Poracode on this computer, then paste its pairing token here."
-#~ msgstr "Mở Cài đặt → Truy cập từ xa trong Poracode trên máy tính này, rồi dán mã ghép nối vào đây."
 
 #: src/mobile/views/DesktopsView.tsx
 msgid "Open Settings → Remote Access in Poracode on your desktop, then scan the QR code from here — or enter the endpoint and pairing token manually."
@@ -8192,10 +7681,6 @@ msgstr "Kết quả"
 msgid "Over pace — runs out early"
 msgstr "Vượt nhịp độ — hết sớm"
 
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Overridden by project"
-#~ msgstr "Bị dự án ghi đè"
-
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Override Claude defaults — e.g. ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN."
 msgstr "Ghi đè giá trị mặc định của Claude — ví dụ ANTHROPIC_BASE_URL và ANTHROPIC_AUTH_TOKEN."
@@ -8207,10 +7692,6 @@ msgstr "Ghi đè nơi tạo các cây làm việc của dự án này. Áp dụn
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Overrides {conflict}"
 msgstr "Ghi đè {conflict}"
-
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Overrides global"
-#~ msgstr "Ghi đè skill toàn cục"
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/SearchSection.tsx
 msgid "Overriding the global setting for this project."
@@ -8257,10 +7738,6 @@ msgstr "Ghép đôi điện thoại, máy tính bảng hoặc trình duyệt v�
 #: src/mobile/useRemoteDesktop.ts
 msgid "Pair again"
 msgstr "Ghép đôi lại"
-
-#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-#~ msgid "Pair with Poracode"
-#~ msgstr "Ghép nối với Poracode"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Pair with Tee's Cockpit"
@@ -8402,10 +7879,6 @@ msgid "Paused"
 msgstr "Đã tạm dừng"
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
-#~ msgid "PDF preview opens in the browser panel."
-#~ msgstr "Xem trước PDF mở trong bảng trình duyệt."
-
-#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 msgid "PDF preview opens in the browser."
 msgstr "Xem trước PDF mở trong trình duyệt."
 
@@ -8543,39 +8016,12 @@ msgstr "Trỏ hồ sơ này tới nhà cung cấp ngoài Anthropic (z.ai, …) v
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "Popular editor themes adapted to Poracode. Each follows the light or dark mode above."
-#~ msgstr "Các chủ đề biên tập phổ biến được điều chỉnh cho phù hợp với Poracode. Mỗi cái đều theo chế độ sáng hoặc tối ở trên."
-
-#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Popular editor themes adapted to Tee's Cockpit. Each follows the light or dark mode above."
 msgstr "Các chủ đề biên tập phổ biến được điều chỉnh cho phù hợp với Tee's Cockpit. Mỗi cái đều theo chế độ sáng hoặc tối ở trên."
-
-#: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
-#~ msgid "Poracode and your agents run on the remote machine. SSH is used only to start the remote environment and secure its local tunnel."
-#~ msgstr "Poracode và các tác tử chạy trên máy từ xa. SSH chỉ được dùng để khởi động môi trường từ xa và bảo vệ đường hầm cục bộ của môi trường đó."
-
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "Poracode does not store marketplace credentials in plain settings. Open the catalog to browse its security-scanned skills."
-#~ msgstr "Poracode không lưu thông tin xác thực marketplace dưới dạng văn bản thuần trong phần cài đặt. Mở danh mục để duyệt các skill đã được quét bảo mật."
-
-#: src/renderer/components/skills/SkillImportModal.tsx
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Poracode only"
-#~ msgstr "Chỉ Poracode"
 
 #: src/mobile/views/DesktopsView.tsx
 msgid "Poracode will install or reuse its server on the SSH host and keep credentials in this device's secure storage."
 msgstr "Poracode sẽ cài đặt hoặc tái sử dụng máy chủ trên máy SSH và lưu thông tin xác thực trong bộ nhớ bảo mật của thiết bị này."
-
-#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-#~ msgid "Poracode will restart, back up its current data, and replace it with a complete copy of your Lightcode data."
-#~ msgstr "Poracode sẽ khởi động lại, sao lưu dữ liệu hiện tại và thay thế bằng bản sao đầy đủ của dữ liệu Lightcode."
-
-#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
-#~ msgid "Poracode's built-in browser tools."
-#~ msgstr "Công cụ trình duyệt tích hợp sẵn của Poracode."
 
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/PortsView.tsx
@@ -8595,10 +8041,6 @@ msgstr "Chuyển tiếp cổng không khả dụng trên máy tính này."
 #: src/mobile/views/PortsView.tsx
 msgid "Port forwarding isn't enabled"
 msgstr "Chưa bật chuyển tiếp cổng"
-
-#: src/mobile/views/PortsView.tsx
-#~ msgid "Port forwarding needs a direct connection to the desktop. It isn't available over a relay or tunnel."
-#~ msgstr "Chuyển tiếp cổng cần kết nối trực tiếp đến máy tính. Tính năng này không khả dụng qua relay hoặc tunnel."
 
 #: src/mobile/chrome.ts
 #: src/mobile/NarrowShell.tsx
@@ -8675,17 +8117,9 @@ msgstr "Hình ảnh trước đó"
 msgid "Previous match"
 msgstr "Kết quả trước đó"
 
-#: src/renderer/components/pdf/PdfViewer.tsx
-#~ msgid "Previous page"
-#~ msgstr "Trang trước"
-
 #: src/renderer/commands/registry.ts
 msgid "Previous recently viewed chat"
 msgstr "Cuộc trò chuyện đã xem gần đây trước đó"
-
-#: src/renderer/views/SchedulesView/parts/ScheduleRow.tsx
-#~ msgid "Previous run did not finish."
-#~ msgstr "Lần chạy trước chưa hoàn tất."
 
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 #: src/renderer/views/SchedulesView/parts/ScheduleRow.tsx
@@ -8753,10 +8187,6 @@ msgstr "Cài đặt dự án"
 msgid "Project skills are available only when agents run in this project. Each provider applies its own precedence rules when names overlap."
 msgstr "Skill của dự án chỉ khả dụng khi agent chạy trong dự án này. Mỗi nhà cung cấp áp dụng quy tắc ưu tiên riêng khi các tên trùng nhau."
 
-#: src/renderer/views/ProjectSettingsOverlay/parts/SkillsSection.tsx
-#~ msgid "Project skills override global skills with the same name and are available only when agents run in this project."
-#~ msgstr "Skill dự án ghi đè skill toàn cục có cùng tên và chỉ khả dụng khi tác tử chạy trong dự án này."
-
 #: src/renderer/views/ProjectSettingsOverlay/parts/SearchSection.tsx
 msgid "Project-specific overrides on top of the global search settings."
 msgstr "Ghi đè dành riêng cho dự án ở đầu cài đặt tìm kiếm chung."
@@ -8812,10 +8242,6 @@ msgstr "Kế hoạch đề xuất"
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Provenance"
 msgstr "Nguồn gốc"
-
-#: src/renderer/components/mcp/McpServersManager.tsx
-#~ msgid "Provided and managed by Poracode for supported agents."
-#~ msgstr "Do Poracode cung cấp và quản lý cho các tác nhân được hỗ trợ."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Provided and managed by Tee's Cockpit for supported agents."
@@ -8888,10 +8314,6 @@ msgstr "Kéo ({behind})"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SyncBadge.tsx
 msgid "Pull ↓{behind}"
 msgstr "Kéo ↓{behind}"
-
-#: src/renderer/i18n/sharedMessages.ts
-#~ msgid "Pull did not complete. Your local changes remain in a Poracode stash."
-#~ msgstr "Pull không hoàn tất. Các thay đổi cục bộ của bạn vẫn nằm trong stash của Poracode."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Pull did not complete. Your local changes remain in a Tee's Cockpit stash."
@@ -8993,10 +8415,6 @@ msgstr "Đang chờ"
 msgid "Quota reached"
 msgstr "Đã đạt hạn ngạch"
 
-#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
-#~ msgid "Qwen"
-#~ msgstr "Qwen"
-
 #: src/renderer/components/providers/qwen/manifest.ts
 msgid "Qwen Code"
 msgstr "Qwen Code"
@@ -9074,10 +8492,6 @@ msgstr "Suy luận"
 #: src/renderer/components/common/ProviderModelMenu/parts/buildItems.ts
 msgid "Recent"
 msgstr "Gần đây"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Recent Events"
-#~ msgstr "Sự kiện gần đây"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Recent installs"
@@ -9273,15 +8687,6 @@ msgstr "Máy chủ từ xa"
 #: src/renderer/state/remoteServersStore.ts
 msgid "Remote server not found."
 msgstr "Không tìm thấy máy chủ từ xa."
-
-#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarRemoteServers.tsx
-#~ msgid "Remote servers"
-#~ msgstr "Máy chủ từ xa"
-
-#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
-#~ msgid "Remote Servers"
-#~ msgstr "Máy chủ từ xa"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Remote session"
@@ -9765,10 +9170,6 @@ msgstr "Người đánh giá"
 msgid "Reviewing"
 msgstr "Đang xem xét"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
-#~ msgid "Reviewing each candidate's changes to recommend a winner."
-#~ msgstr "Đang xem xét các thay đổi của từng ứng viên để đề xuất ứng viên thắng."
-
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Revised"
 msgstr "Đã sửa"
@@ -9838,14 +9239,6 @@ msgstr "Chạy {loginCommand} để đăng nhập."
 msgid "Run a new thread on {0}."
 msgstr "Chạy luồng mới trên {0}."
 
-#: src/renderer/components/thread/ThreadDraftComposerArea.tsx
-#~ msgid "Run as experiment"
-#~ msgstr "Chạy dưới dạng thử nghiệm"
-
-#: src/renderer/components/thread/ThreadDraftComposerArea.tsx
-#~ msgid "Run as experiment with multiple agents"
-#~ msgstr "Chạy dưới dạng thử nghiệm với nhiều tác nhân"
-
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Run at"
 msgstr "Chạy lúc"
@@ -9876,24 +9269,12 @@ msgid "Run one prompt with multiple agents, then compare their work."
 msgstr "Chạy một lời nhắc với nhiều tác nhân, rồi so sánh kết quả của họ."
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Run standalone tasks on this device without a project."
-#~ msgstr "Chạy các tác vụ độc lập trên thiết bị này mà không cần dự án."
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Run standalone tasks on this device. Schedules run while the device is awake and Poracode is open."
-#~ msgstr "Chạy các tác vụ độc lập trên thiết bị này. Lịch chạy khi thiết bị đang hoạt động và Poracode đang mở."
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Run standalone tasks on this device. Schedules run while the device is awake and Tee's Cockpit is open."
 msgstr "Chạy các tác vụ độc lập trên thiết bị này. Lịch chạy khi thiết bị đang hoạt động và Tee's Cockpit đang mở."
 
 #: src/renderer/commands/registry.ts
 msgid "Run Terminal Command"
 msgstr "Chạy lệnh Terminal"
-
-#: src/renderer/views/SchedulesView/ScheduleEditor.tsx
-#~ msgid "Run this schedule automatically at the times above."
-#~ msgstr "Tự động chạy lịch này vào các thời điểm ở trên."
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Run this schedule automatically on the schedule below."
@@ -10031,10 +9412,6 @@ msgstr "Tác vụ đã lên lịch"
 #: src/mobile/settingsSections.ts
 msgid "Scheduled tasks on this desktop"
 msgstr "Tác vụ đã lên lịch trên máy tính này"
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Scheduled tasks run only while this device is awake and Poracode is open."
-#~ msgstr "Tác vụ đã lên lịch chỉ chạy khi thiết bị này đang hoạt động và Poracode đang mở."
 
 #: src/mobile/settingsSections.ts
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
@@ -10186,10 +9563,6 @@ msgstr "Đang tìm kiếm..."
 msgid "Searching…"
 msgstr "Đang tìm kiếm…"
 
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "Security-focused directory with verified skill metadata."
-#~ msgstr "Danh mục tập trung vào bảo mật với siêu dữ liệu skill đã được xác minh."
-
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectThreadList.tsx
 msgid "See more"
 msgstr "Xem thêm"
@@ -10227,14 +9600,6 @@ msgstr "Chọn một tập tin để bắt đầu chỉnh sửa."
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Select a platform"
 msgstr "Chọn một nền tảng"
-
-#: src/renderer/components/mcp/McpExternalImportModal.tsx
-#~ msgid "Select a project before importing to Project."
-#~ msgstr "Chọn một dự án trước khi nhập vào dự án."
-
-#: src/renderer/components/mcp/McpExternalImportModal.tsx
-#~ msgid "Select a project to scan project MCP servers."
-#~ msgstr "Chọn một dự án để quét các máy chủ MCP của dự án."
 
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "Select a repository."
@@ -10293,18 +9658,6 @@ msgstr "Chọn dự án"
 #: src/renderer/components/common/Select.tsx
 msgid "Select…"
 msgstr "Chọn…"
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Selected days"
-#~ msgstr "Các ngày đã chọn"
-
-#: src/renderer/components/mcp/McpExternalImportModal.tsx
-#~ msgid "Selected project"
-#~ msgstr "Dự án đã chọn"
-
-#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
-#~ msgid "Selects which Control Centre tool subset the \"control-centre\" MCP server exposes for this campaign project. Changes apply when Poracode next starts or reconnects to a newly launched MCP process."
-#~ msgstr "Chọn tập hợp con công cụ Control Centre mà máy chủ MCP \"control-centre\" hiển thị cho dự án chiến dịch này. Các thay đổi sẽ được áp dụng khi Poracode khởi động lại lần tiếp theo hoặc kết nối lại với tiến trình MCP mới được khởi chạy."
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Selects which Control Centre tool subset the \"control-centre\" MCP server exposes for this campaign project. Changes apply when Tee's Cockpit next starts or reconnects to a newly launched MCP process."
@@ -10687,10 +10040,6 @@ msgstr "Lệnh gạch chéo"
 msgid "Solution {0}"
 msgstr "Giải pháp {0}"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
-#~ msgid "Solution {ordinal}"
-#~ msgstr "Giải pháp {ordinal}"
-
 #: src/mobile/views/pr/PrOverviewPage.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "Some checks are failing or pending."
@@ -10749,14 +10098,6 @@ msgstr "Ô nguồn chưa gán"
 msgid "Source health"
 msgstr "Tình trạng nguồn"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Source Health"
-#~ msgstr "Tình trạng nguồn"
-
-#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-#~ msgid "Source health:"
-#~ msgstr "Tình trạng nguồn:"
-
 #. placeholder {0}: source.label
 #. placeholder {1}: source.freshness
 #: src/renderer/components/campaignDeployment/parts/EvidenceSection.tsx
@@ -10780,10 +10121,6 @@ msgstr "Tách bằng dấu cách; đặt giá trị chứa dấu cách trong d�
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
 msgid "Spend"
 msgstr "Chi tiêu"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Spend vs Budget"
-#~ msgstr "Chi tiêu so với ngân sách"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
 msgid "spent"
@@ -11081,10 +10418,6 @@ msgstr "Lưu dưới dạng bí mật (mã hóa khi lưu trữ)"
 msgid "Stored on this device; the desktop keeps its own values."
 msgstr "Được lưu trên thiết bị này; máy tính để bàn giữ các giá trị riêng."
 
-#: src/mobile/views/MoreView.tsx
-#~ msgid "Stored on this phone; the desktop keeps its own values."
-#~ msgstr "Được lưu trên điện thoại này; desktop giữ các giá trị riêng."
-
 #: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
@@ -11099,11 +10432,6 @@ msgstr "Không tìm thấy tác nhân phụ."
 msgid "Subagent Result"
 msgstr "Kết quả tác nhân phụ"
 
-#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
-#~ msgid "Subagent routing guide"
-#~ msgstr "Hướng dẫn định tuyến tác nhân phụ"
-
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Subagent runs"
 msgstr "Lượt chạy subagent"
@@ -11112,10 +10440,6 @@ msgstr "Lượt chạy subagent"
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Subagents"
 msgstr "Tác nhân phụ"
-
-#: src/renderer/components/composer/composerMcpServers.ts
-#~ msgid "Subagents enabled for this thread"
-#~ msgstr "Đã bật tác nhân phụ cho chủ đề này"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionRows.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
@@ -11146,10 +10470,6 @@ msgstr "Gửi đánh giá"
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "Succeeded"
 msgstr "Thành công"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Suggested Questions"
-#~ msgstr "Câu hỏi gợi ý"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Suggestions"
@@ -11328,14 +10648,6 @@ msgstr "Chiếm quyền điều khiển máy tính khi agent nhấp hoặc gõ"
 msgid "Tap + to add a folder or clone a repository on your desktop."
 msgstr "Nhấn + để thêm một thư mục hoặc sao chép một kho lưu trữ trên máy tính của bạn."
 
-#: src/mobile/views/DesktopsView.tsx
-#~ msgid "Tap + to pair directly or connect to a remote machine over SSH."
-#~ msgstr "Nhấn + để ghép đôi trực tiếp hoặc kết nối với máy từ xa qua SSH."
-
-#: src/mobile/views/DesktopsView.tsx
-#~ msgid "Tap + to pair with Poracode on your desktop."
-#~ msgstr "Nhấn + để ghép đôi với Poracode trên máy tính của bạn."
-
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CreatePrModal.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "Target branch"
@@ -11453,11 +10765,6 @@ msgstr "Mã QR đó không phải là liên kết ghép nối Poracode."
 msgid "That remote session was already gone."
 msgstr "Phiên từ xa đó đã không còn."
 
-#. placeholder {0}: target.wslDistro
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "the {0} WSL user"
-#~ msgstr "người dùng WSL {0}"
-
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "The active remote Control Centre profile is managed by the remote server administrator. Remote servers do not support client-controlled profile reconfiguration."
 msgstr "Hồ sơ Control Centre từ xa đang hoạt động được quản lý bởi quản trị viên máy chủ từ xa. Máy chủ từ xa không hỗ trợ cấu hình lại hồ sơ do máy khách kiểm soát."
@@ -11478,10 +10785,6 @@ msgstr "ứng dụng"
 msgid "The approved change is being applied to the platform."
 msgstr "Thay đổi đã phê duyệt đang được áp dụng lên nền tảng."
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
-#~ msgid "the base branch"
-#~ msgstr "nhánh cơ sở"
-
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "The candidates changed after judging. Compare them again."
 msgstr "Các ứng viên đã thay đổi sau khi đánh giá. Hãy so sánh lại."
@@ -11497,6 +10800,10 @@ msgstr "thư mục đã chọn"
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "The Control Centre campaign group this workspace binds to."
 msgstr "Nhóm chiến dịch Trung tâm điều khiển mà không gian làm việc này liên kết đến."
+
+#: src/renderer/campaign/controlCentreAvailabilityCopy.ts
+msgid "The Control Centre MCP server is disabled. Enable it in MCP settings."
+msgstr "Máy chủ MCP Control Centre đang bị tắt. Bật lại trong cài đặt MCP."
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "The decision could not be submitted"
@@ -11578,14 +10885,6 @@ msgstr "Vị trí của kho lưu trữ trên đĩa. Hãy cập nhật nếu bạ
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "The root and reviewer use the strongest available reasoning tier."
 msgstr "Tác nhân gốc và người đánh giá dùng mức suy luận mạnh nhất hiện có."
-
-#: src/renderer/components/mcp/McpServersManager.tsx
-#~ msgid "The selected file does not contain valid MCP server configurations."
-#~ msgstr "Tệp đã chọn không chứa cấu hình máy chủ MCP hợp lệ."
-
-#: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
-#~ msgid "The selected model compares anonymized snapshots of each candidate's changes. It recommends a winner without merging anything."
-#~ msgstr "Mô hình đã chọn so sánh các bản chụp nhanh ẩn danh về thay đổi của từng ứng viên. Mô hình đề xuất người thắng mà không hợp nhất bất kỳ nội dung nào."
 
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
 msgid "The selected model compares snapshots of each candidate's changes under anonymous labels. It recommends a winner without merging anything."
@@ -11675,21 +10974,9 @@ msgstr "Không thể hoàn tác hành động này. Nhập cụm xác nhận ch�
 msgid "This agent is not installed."
 msgstr "Tác nhân này chưa được cài đặt."
 
-#: src/mobile/routeComponents.tsx
-#~ msgid "This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
-#~ msgstr "Ứng dụng này được phục vụ qua HTTPS nhưng desktop dùng HTTP thường, bị trình duyệt chặn. Mở liên kết ghép đôi trực tiếp từ desktop (LAN), hoặc cung cấp desktop qua HTTPS."
-
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "This browser does not support system notifications here; you will still see in-app toasts."
 msgstr "Trình duyệt này không hỗ trợ thông báo hệ thống ở đây; bạn vẫn sẽ thấy thông báo trong ứng dụng."
-
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "This catalog manages downloads through its website."
-#~ msgstr "Danh mục này quản lý bản tải xuống thông qua trang web."
-
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "This catalog requires its own API key."
-#~ msgstr "Danh mục này yêu cầu khóa API riêng."
 
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "This connection can view projects but not manage them. Re-pair to enable."
@@ -11771,10 +11058,6 @@ msgid "This removes the worktree on \"{0}\", then deletes the branch."
 msgstr "Thao tác này sẽ xóa cây làm việc trên \"{0}\", sau đó xóa nhánh."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
-#~ msgid "This server requires authentication before Poracode can check it."
-#~ msgstr "Máy chủ này yêu cầu xác thực trước khi Poracode có thể kiểm tra máy chủ."
-
-#: src/renderer/components/mcp/McpServersManager.tsx
 msgid "This server requires authentication before Tee's Cockpit can check it."
 msgstr "Máy chủ này yêu cầu xác thực trước khi Tee's Cockpit có thể kiểm tra máy chủ."
 
@@ -11786,11 +11069,6 @@ msgstr "Phím tắt toàn hệ thống này không khả dụng. Hãy chọn t�
 #: src/renderer/views/MainView/parts/Sidebar/parts/DeleteWorktreeDialog.tsx
 msgid "This thread uses worktree <0>{0}</0>. Also remove the worktree directory?"
 msgstr "Luồng này sử dụng cây làm việc <0>{0}</0>. Cũng xóa thư mục cây làm việc?"
-
-#. placeholder {0}: activeDialog.sourceBranch
-#: src/renderer/views/MainView/parts/PullFromSourceDialog.tsx
-#~ msgid "This worktree has local changes. Poracode can temporarily stash them, pull from {0}, then re-apply your changes."
-#~ msgstr "Cây làm việc này có các thay đổi cục bộ. Poracode có thể tạm thời lưu trữ (stash) chúng, kéo (pull) từ {0}, sau đó áp dụng lại các thay đổi của bạn."
 
 #. placeholder {0}: activeDialog.sourceBranch
 #: src/renderer/views/MainView/parts/PullFromSourceDialog.tsx
@@ -11846,10 +11124,6 @@ msgstr "Dock mục tiêu luồng"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Thread is already unloaded."
 msgstr "Luồng đã được dỡ bỏ."
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-#~ msgid "Thread messages will appear here"
-#~ msgstr "Tin nhắn luồng sẽ xuất hiện ở đây"
 
 #: src/renderer/components/thread/PresentationModeTabs.tsx
 msgid "Thread mode"
@@ -12072,10 +11346,6 @@ msgstr "Loại"
 #: src/renderer/commands/CommandPalette.tsx
 msgid "Type a command"
 msgstr "Nhập lệnh"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-#~ msgid "Type a message…"
-#~ msgstr "Nhập tin nhắn…"
 
 #: src/mobile/views/BrowserView.tsx
 msgid "Type into the page"
@@ -12651,10 +11921,6 @@ msgstr "Đã dùng"
 msgid "Used by {conflict}"
 msgstr "Đã được dùng bởi {conflict}"
 
-#: src/renderer/components/mcp/McpServersManager.tsx
-#~ msgid "User"
-#~ msgstr "Người dùng"
-
 #: src/mobile/views/DesktopsView.tsx
 msgid "user@example.com"
 msgstr "user@example.com"
@@ -12728,10 +11994,6 @@ msgstr "Xem văn bản thô"
 msgid "View rendered"
 msgstr "Xem bản kết xuất"
 
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "View skill"
-#~ msgstr "Xem skill"
-
 #: src/renderer/commands/registry.ts
 msgid "View the changelog"
 msgstr "Xem nhật ký thay đổi"
@@ -12772,10 +12034,6 @@ msgstr "Hãy đợi tất cả ứng viên hoàn tất trước khi dọn dẹp.
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "Wait for every candidate to finish before comparing them."
 msgstr "Hãy đợi tất cả ứng viên hoàn tất trước khi so sánh."
-
-#: src/renderer/actions/experimentDecisionActions.ts
-#~ msgid "Wait for every candidate to finish before discarding the experiment."
-#~ msgstr "Hãy đợi tất cả ứng viên hoàn tất trước khi hủy bỏ thử nghiệm."
 
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 msgid "Wait for every candidate to finish before judging."
@@ -12898,10 +12156,6 @@ msgstr "Đánh giá hằng tuần"
 msgid "What did you decide?"
 msgstr "Bạn đã quyết định điều gì?"
 
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "What should the agent do?"
-#~ msgstr "Tác nhân nên làm gì?"
-
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "What should the remote agent work on?"
 msgstr "Tác tử từ xa nên làm gì?"
@@ -12926,21 +12180,12 @@ msgid "What's New"
 msgstr "Có gì mới"
 
 #: src/renderer/views/SettingsOverlay/parts/ChangelogSettings.tsx
-#~ msgid "What's new in Poracode, newest first."
-#~ msgstr "Có gì mới trong Poracode, mới nhất trước."
-
-#: src/renderer/views/SettingsOverlay/parts/ChangelogSettings.tsx
 msgid "What's new in Tee's Cockpit, newest first."
 msgstr "Có gì mới trong Tee's Cockpit, mới nhất trước."
 
 #: src/renderer/views/SettingsOverlay/parts/SearchSettings.tsx
 msgid "When enabled, search respects <0>.gitignore</0> entries."
 msgstr "Khi được bật, tìm kiếm sẽ tôn trọng các mục nhập <0>.gitignore</0>."
-
-#: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "When links open in a Poracode browser tab, choose where the browser is revealed."
-#~ msgstr "Khi các liên kết mở trong tab trình duyệt Poracode, hãy chọn nơi trình duyệt được hiển thị."
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -12958,11 +12203,6 @@ msgstr "Thời điểm hiển thị thông báo nhanh (toast) trong ứng dụng
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "When you close the window, keep Poracode running in the system tray. Disable to quit on close."
-#~ msgstr "Khi bạn đóng cửa sổ, hãy giữ Poracode chạy trong khay hệ thống. Tắt để thoát khi đóng."
-
-#: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "When you close the window, keep Tee's Cockpit running in the system tray. Disable to quit on close."
 msgstr "Khi bạn đóng cửa sổ, hãy giữ Tee's Cockpit chạy trong khay hệ thống. Tắt để thoát khi đóng."
 
@@ -12974,10 +12214,6 @@ msgstr "Nơi lựa chọn từ bộ chọn phần tử trình duyệt được �
 #: src/renderer/views/WelcomeOverlay.tsx
 msgid "Where do you want to begin?"
 msgstr "Bạn muốn bắt đầu từ đâu?"
-
-#: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
-#~ msgid "Where Poracode creates git worktrees for new branches. Changes apply to worktrees created from now on; existing worktrees stay where they are."
-#~ msgstr "Nơi Poracode tạo các cây làm việc git cho các nhánh mới. Các thay đổi áp dụng cho các cây làm việc được tạo từ giờ trở đi; các cây làm việc hiện có vẫn giữ nguyên vị trí."
 
 #: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
 msgid "Where Tee's Cockpit creates git worktrees for new branches. Changes apply to worktrees created from now on; existing worktrees stay where they are."
@@ -13016,10 +12252,6 @@ msgstr "Sẽ chạy trong {0}:"
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "Windows"
 msgstr "cửa sổ"
-
-#: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
-#~ msgid "Windows is not supported yet. Install inside WSL or on macOS/Linux."
-#~ msgstr "Windows chưa được hỗ trợ. Cài đặt bên trong WSL hoặc trên macOS/Linux."
 
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 msgid "Winner merged."
@@ -13222,14 +12454,13 @@ msgstr "WSL ({distro})"
 msgid "WSL base folder"
 msgstr "Thư mục gốc WSL"
 
-#: src/renderer/components/skills/SkillImportModal.tsx
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "WSL user"
-#~ msgstr "Người dùng WSL"
-
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Yes"
 msgstr "Có"
+
+#: src/renderer/campaign/controlCentreAvailabilityCopy.ts
+msgid "You can still create a campaign workspace manually, but live campaign context will not load until Control Centre is connected."
+msgstr "Bạn vẫn có thể tạo không gian làm việc chiến dịch thủ công, nhưng ngữ cảnh chiến dịch trực tiếp sẽ không tải cho đến khi Control Centre được kết nối."
 
 #: src/renderer/campaign/cockpit/cockpitGreeting.ts
 msgid "You're all caught up."
@@ -13250,10 +12481,6 @@ msgstr "Các thay đổi cục bộ của bạn đã được lưu vào stash v�
 #: src/renderer/views/ProfileOverlay/parts/EditProfileDialog.tsx
 msgid "Your name"
 msgstr "Tên của bạn"
-
-#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
-#~ msgid "Your pick"
-#~ msgstr "Lựa chọn của bạn"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Your stashed local changes were re-applied."

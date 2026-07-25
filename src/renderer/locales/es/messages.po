@@ -17,10 +17,6 @@ msgstr ""
 msgid "-y @modelcontextprotocol/server-memory"
 msgstr "-y @modelcontextprotocol/server-memory"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-#~ msgid "(coming in Phase 4)"
-#~ msgstr "(próximamente en la Fase 4)"
-
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "(Draft)"
 msgstr "(Borrador)"
@@ -112,16 +108,6 @@ msgstr "{0, plural, one {# asunto requiere atención} other {# asuntos requieren
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "{0, plural, one {# tool} other {# tools}}"
 msgstr "{0, plural, one {# herramienta} other {# herramientas}}"
-
-#. placeholder {0}: state.iterations ?? 0
-#: src/renderer/components/thread/ThreadGoalDock.tsx
-#~ msgid "{0, plural, one {# turn} other {# turns}}"
-#~ msgstr "{0, plural, one {# turno} other {# turnos}}"
-
-#. placeholder {0}: candidates.length
-#: src/renderer/components/experiment/NewExperimentModal.tsx
-#~ msgid "{0, plural, one {Candidate (#)} other {Candidates (#)}}"
-#~ msgstr "{0, plural, one {Candidato (#)} other {Candidatos (#)}}"
 
 #. placeholder {0}: details.patterns.length
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/PermissionDetailsLine.tsx
@@ -233,11 +219,6 @@ msgid "{0} hooks removed for {envName}."
 msgstr "Hooks de {0} eliminados para {envName}."
 
 #. placeholder {0}: agent.label
-#: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
-#~ msgid "{0} install targets"
-#~ msgstr "{0} objetivos de instalación"
-
-#. placeholder {0}: agent.label
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "{0} is already up to date."
 msgstr "{0} ya está actualizado."
@@ -296,11 +277,6 @@ msgstr "{0} prompts - {when}"
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "{0} proposals awaiting approval"
 msgstr "{0} propuestas pendientes de aprobación"
-
-#. placeholder {0}: formatMoney(budget.remaining, budget.currency)
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "{0} remaining"
-#~ msgstr "{0} restantes"
 
 #. placeholder {0}: item.runCount.toLocaleString()
 #: src/renderer/views/ProfileOverlay/parts/PluginUsage.tsx
@@ -374,12 +350,6 @@ msgstr "{0} usados"
 msgid "{0}: {stateLabel}"
 msgstr "{0}: {stateLabel}"
 
-#. placeholder {0}: context.pacing.variancePct > 0 ? "+" : ""
-#. placeholder {1}: context.pacing.variancePct
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "{0}{1}% vs expected"
-#~ msgstr "{0}{1}% vs esperado"
-
 #. placeholder {0}: selectedRows.length
 #. placeholder {0}: selectedSkills.length
 #. placeholder {1}: importableRows.length
@@ -442,10 +412,6 @@ msgstr "{envOrAgentLabel} necesita autenticación."
 msgid "{failed} failed"
 msgstr "{failed} con errores"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "{failedCount} data sources have failed to sync"
-#~ msgstr "{failedCount} fuentes de datos no se han podido sincronizar"
-
 #: src/mobile/views/pr/PrOverviewPage.tsx
 msgid "{filesCount, plural, one {# file changed} other {# files changed}}"
 msgstr "{filesCount, plural, one {# archivo cambiado} other {# archivos cambiados}}"
@@ -477,14 +443,6 @@ msgstr "hace {hours}h"
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "{installedCount, plural, one {# agent ready} other {# agents ready}}"
 msgstr "{installedCount, plural, one {# agente listo} other {# agentes listos}}"
-
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
-#~ msgid "{judgeLabel} is comparing the anonymized diffs…"
-#~ msgstr "{judgeLabel} está comparando los diffs anonimizados…"
-
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
-#~ msgid "{judgingLabel} is reviewing each candidate's changes to recommend a winner."
-#~ msgstr "{judgingLabel} está revisando los cambios de cada candidato para recomendar un ganador."
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsageProviderCard.tsx
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
@@ -520,10 +478,6 @@ msgstr "{loginLabel} {0} {env}"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
 msgid "{loginLabel} {env}"
 msgstr "{loginLabel} {env}"
-
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
-#~ msgid "{loserCount, plural, one {The other candidate and its worktree will be removed.} other {The other # candidates and their worktrees will be removed.}}"
-#~ msgstr "{loserCount, plural, one {Se eliminarán el otro candidato y su worktree.} other {Se eliminarán los otros # candidatos y sus worktrees.}}"
 
 #: src/renderer/components/thread/threadContextUsage.ts
 msgid "{maxLabel} context"
@@ -576,10 +530,6 @@ msgstr "Ajustes de {projectName}"
 msgid "{provider} does not support one-shot generation"
 msgstr "{provider} no admite la generación de una sola ejecución"
 
-#: src/renderer/i18n/sharedMessages.ts
-#~ msgid "{provider} does not support text-only one-shot generation"
-#~ msgstr "{provider} no admite la generación puntual solo de texto"
-
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
 msgid "{remaining, plural, one {# open} other {# open}}"
 msgstr "{remaining, plural, one {# abierto} other {# abiertos}}"
@@ -600,10 +550,6 @@ msgstr "{serverName} de {providerLabel}: {disabledLabel}"
 #: src/renderer/campaign/morningBrief/briefGenerator.ts
 msgid "{stale} stale"
 msgstr "{stale} obsoletas"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "{staleCount} data sources have stale data"
-#~ msgstr "{staleCount} fuentes de datos tienen datos obsoletos"
 
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "{used} tokens"
@@ -645,10 +591,6 @@ msgstr "@media-plans"
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "/absolute/path/to/project"
 msgstr "/absolute/path/to/project"
-
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "/skill-creator Create a new managed skill for {destination}."
-#~ msgstr "/skill-creator Crea una nueva skill administrada para {destination}."
 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "/skill-creator Create a new managed skill for {destinationLabel}."
@@ -883,10 +825,6 @@ msgstr "Añade un proyecto para usar Swarm"
 msgid "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
 msgstr "Añade un skill a .agents/skills o .poracode/skills, o impórtalo desde otro proveedor."
 
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Add a skill to .agents/skills or import one from another provider."
-#~ msgstr "Añade un skill a .agents/skills o importa uno de otro proveedor."
-
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
 msgid "Add a to-do…"
 msgstr "Agregar una tarea…"
@@ -915,10 +853,6 @@ msgstr "Añadir candidato"
 msgid "Add Claude profile"
 msgstr "Agregar perfil de Claude"
 
-#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "Add Control Centre MCP to a campaign project to load your operations overview."
-msgstr "Agrega Control Centre MCP a un proyecto de campaña para cargar tu resumen de operaciones."
-
 #: src/renderer/components/thread/ThreadAuthRequiredDock.tsx
 msgid "Add credentials before this thread can run."
 msgstr "Agrega credenciales antes de que este hilo pueda ejecutarse."
@@ -934,10 +868,6 @@ msgstr "Añadir servidor MCP"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Add model"
 msgstr "Añadir modelo"
-
-#: src/renderer/components/mcp/McpServersManager.tsx
-#~ msgid "Add one manually or import a JSON configuration."
-#~ msgstr "Añade uno manualmente o importa una configuración JSON."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Add one manually or import from another agent."
@@ -1044,11 +974,6 @@ msgstr "Chat del agente (ACP / markdown). Las filas de comandos usan este tamañ
 msgid "Agent encountered an error."
 msgstr "El agente encontró un error."
 
-#. placeholder {0}: index + 1
-#: src/renderer/components/experiment/NewExperimentModal.tsx
-#~ msgid "Agent for candidate {0}"
-#~ msgstr "Agente para el candidato {0}"
-
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "Agent is active and ready"
 msgstr "El agente está activo y listo"
@@ -1122,10 +1047,6 @@ msgstr "Juez de IA"
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "AI providers"
 msgstr "Proveedores de IA"
-
-#: src/mobile/views/MoreView.tsx
-#~ msgid "AI, agents, and archived threads on the paired desktop"
-#~ msgstr "IA, agentes e hilos archivados en el escritorio emparejado"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Alert"
@@ -1245,10 +1166,6 @@ msgstr "Siempre excluido"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "An expected worktree owner requires a branch"
 msgstr "Un propietario de worktree esperado requiere una rama"
-
-#: src/renderer/components/mcp/McpServersManager.tsx
-#~ msgid "An MCP server with the name {serverName} already exists."
-#~ msgstr "Ya existe un servidor MCP con el nombre {serverName}."
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "An MCP server with this name already exists."
@@ -1429,10 +1346,6 @@ msgstr "Pregunta a {0} cualquier cosa sobre este espacio de trabajo"
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Ask anything about your campaigns"
 msgstr "Pregunta lo que quieras sobre tus campañas"
-
-#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-#~ msgid "Ask anything about your campaigns…"
-#~ msgstr "Pregunta lo que quieras sobre tus campañas…"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Ask anything across your campaigns — grounded in Control Centre data…"
@@ -1619,14 +1532,6 @@ msgstr "Volver a cambios"
 msgid "Back to files"
 msgstr "Volver a los archivos"
 
-#: src/renderer/components/mcp/McpServerEditor.tsx
-#~ msgid "Back to MCP servers"
-#~ msgstr "Volver a los servidores MCP"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
-#~ msgid "Back to monitoring"
-#~ msgstr "Volver al monitoreo"
-
 #: src/mobile/views/pr/PrSubPage.tsx
 msgid "Back to overview"
 msgstr "Volver al resumen"
@@ -1648,14 +1553,6 @@ msgstr "El proceso en segundo plano no está en ejecución"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Background process restarted"
 msgstr "El proceso en segundo plano se reinició"
-
-#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
-#~ msgid "Background tasks"
-#~ msgstr "Tareas en segundo plano"
-
-#: src/renderer/components/experiment/NewExperimentModal.tsx
-#~ msgid "Base branch"
-#~ msgstr "Rama base"
 
 #: src/mobile/views/pr/PrOverviewPage.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
@@ -1810,10 +1707,6 @@ msgstr "Navegador"
 msgid "Browser is open in a separate window"
 msgstr "El navegador está abierto en una ventana separada"
 
-#: src/renderer/components/composer/MentionPopover.tsx
-#~ msgid "Browser MCP"
-#~ msgstr "Browser MCP"
-
 #: src/renderer/components/thread/ThreadView.tsx
 msgid "Browser MCP enabled for OpenCode"
 msgstr "Browser MCP habilitado para OpenCode"
@@ -1874,17 +1767,9 @@ msgstr "Generando diff…"
 msgid "Built-in"
 msgstr "Integrado"
 
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Built-in and plugin skills"
-#~ msgstr "Skills integrados y de plugins"
-
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Built-in MCP servers"
 msgstr "Servidores MCP integrados"
-
-#: src/renderer/components/mcp/McpServersManager.tsx
-#~ msgid "Built-in servers are managed by Poracode. They can be disabled globally but cannot be edited or removed."
-#~ msgstr "Poracode administra los servidores integrados. Se pueden deshabilitar globalmente, pero no se pueden editar ni eliminar."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Built-in servers are managed by Tee's Cockpit. They can be disabled globally but cannot be edited or removed."
@@ -1939,10 +1824,6 @@ msgstr "Campaña y cliente"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Campaign context"
 msgstr "Contexto de campaña"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Campaign Context"
-#~ msgstr "Contexto de campaña"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Campaign event"
@@ -2270,10 +2151,6 @@ msgstr "Choose a model for every worker."
 msgid "Choose a parent folder"
 msgstr "Elige una carpeta principal"
 
-#: src/renderer/components/mcp/McpServersManager.tsx
-#~ msgid "Choose an MCP server configuration file"
-#~ msgstr "Elegir un archivo de configuración de servidor MCP"
-
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Choose an orchestrator and reviewer."
 msgstr "Elige un orquestador y un revisor."
@@ -2300,11 +2177,6 @@ msgstr "Elegir archivo de identidad SSH"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "Choose the display language for Poracode's interface."
-#~ msgstr "Elige el idioma de visualización de la interfaz de Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Choose the display language for Tee's Cockpit's interface."
 msgstr "Elige el idioma de visualización de la interfaz de Tee's Cockpit."
 
@@ -2315,11 +2187,6 @@ msgstr "Elige el hilo al que adjuntar"
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Choose what this applies to."
 msgstr "Elige a qué se aplica."
-
-#: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "Choose whether links from Poracode and browser popups stay in Poracode or open externally."
-#~ msgstr "Elige si los enlaces de Poracode y las ventanas emergentes del navegador permanecen en Poracode o se abren de forma externa."
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -2703,10 +2570,6 @@ msgstr "Contraer panel de contexto"
 msgid "Collapse error"
 msgstr "Contraer error"
 
-#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
-#~ msgid "Collapse experiment"
-#~ msgstr "Contraer experimento"
-
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 msgid "Collapse group"
@@ -2822,10 +2685,6 @@ msgstr "Compara esta huella digital con la que aparece en tu servidor."
 msgid "Compare to published plan"
 msgstr "Comparar con el plan publicado"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
-#~ msgid "Comparing candidates…"
-#~ msgstr "Comparando candidatos…"
-
 #: src/renderer/views/CampaignWorkspace/parts/PlanIntelligencePane.tsx
 msgid "Comparing plan versions…"
 msgstr "Comparando versiones del plan…"
@@ -2901,14 +2760,6 @@ msgstr "Controles del Redactor"
 msgid "Computer Use"
 msgstr "Uso del ordenador"
 
-#: src/renderer/components/composer/ComputerUseOverlay.tsx
-#~ msgid "Computer Use can take over the desktop. Don't use this machine while the agent is clicking or typing."
-#~ msgstr "Computer Use puede tomar el control del escritorio. No uses esta máquina mientras el agente hace clic o escribe."
-
-#: src/renderer/components/composer/ComputerUseOverlay.tsx
-#~ msgid "Computer Use controls the paired desktop. Don't use that machine while the agent is clicking or typing."
-#~ msgstr "Computer Use controla el escritorio emparejado. No uses esa máquina mientras el agente hace clic o escribe."
-
 #: src/renderer/components/composer/AttachmentBar.tsx
 msgid "Computer Use enabled — controls the paired desktop; don't use that machine while the agent is controlling it"
 msgstr "Computer Use activado: controla el escritorio emparejado; no uses esa máquina mientras el agente la controla"
@@ -2917,21 +2768,9 @@ msgstr "Computer Use activado: controla el escritorio emparejado; no uses esa m�
 msgid "Computer Use enabled — interactive actions take over the desktop; don't use the machine while the agent is controlling it"
 msgstr "Computer Use activado: las acciones interactivas toman el control del escritorio; no uses la máquina mientras el agente la controla"
 
-#: src/renderer/components/composer/AttachmentBar.tsx
-#~ msgid "Computer Use enabled for this thread"
-#~ msgstr "Uso del ordenador habilitado para este hilo"
-
-#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
-#~ msgid "Computing changes…"
-#~ msgstr "Calculando cambios…"
-
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Config directory"
 msgstr "Directorio de configuración"
-
-#: src/renderer/components/mcp/McpServerEditor.tsx
-#~ msgid "Configure the server Poracode will add when supported agents start."
-#~ msgstr "Configura el servidor que Poracode añadirá cuando se inicien agentes compatibles."
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Configure the server Tee's Cockpit will add when supported agents start."
@@ -2972,10 +2811,6 @@ msgstr "Entra en conflicto con un skill gestionado"
 msgid "Connect"
 msgstr "Conectar"
 
-#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-#~ msgid "Connect a server"
-#~ msgstr "Conectar un servidor"
-
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Connect an agent to create schedules."
 msgstr "Conecta un agente para crear programaciones."
@@ -2983,10 +2818,6 @@ msgstr "Conecta un agente para crear programaciones."
 #: src/mobile/setupEmptyState.tsx
 msgid "Connect desktop"
 msgstr "Conectar escritorio"
-
-#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-#~ msgid "Connect directly, through a relay, or over SSH. Every transport uses the same Poracode remote protocol, projects, threads, and agent runtimes."
-#~ msgstr "Conéctate directamente, mediante un relé o por SSH. Todos los transportes usan el mismo protocolo remoto de Poracode, los mismos proyectos, hilos y entornos de ejecución de agentes."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Connect directly, through a relay, or over SSH. Every transport uses the same Tee's Cockpit remote protocol, projects, threads, and agent runtimes."
@@ -3003,10 +2834,6 @@ msgstr "Conecta Poracode en tu escritorio antes de iniciar un hilo."
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Connect the AI providers OpenCode can use and sign out of them here."
 msgstr "Conecta los proveedores de IA que OpenCode puede usar y cierra sesión en ellos aquí."
-
-#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-#~ msgid "Connect to another Poracode desktop or a headless server to browse and manage its projects from here. Get its endpoint and pairing token from Settings → Remote Access on that machine."
-#~ msgstr "Conéctate a otro escritorio de Poracode o a un servidor headless para explorar y gestionar sus proyectos desde aquí. Consigue su endpoint y token de emparejamiento en Ajustes → Acceso remoto en esa máquina."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Connected"
@@ -3146,20 +2973,12 @@ msgid "Control Centre \"{toolName}\" returned a response that was too large or m
 msgstr "Centro de control \"{toolName}\" devolvió una respuesta demasiado grande o mal formada. Intente actualizar."
 
 #: src/renderer/hooks/useControlCentreTool.ts
-#~ msgid "Control Centre \"{toolName}\" returned a response this version of Poracode doesn't understand."
-#~ msgstr "Centro de control \"{toolName}\" devolvió una respuesta que esta versión de Poracode no entiende."
-
-#: src/renderer/hooks/useControlCentreTool.ts
 msgid "Control Centre \"{toolName}\" returned a response this version of Tee's Cockpit doesn't understand."
 msgstr "Centro de control \"{toolName}\" devolvió una respuesta que esta versión de Tee's Cockpit no entiende."
 
 #: src/renderer/components/consultations/ContextWarnings.tsx
 msgid "Control Centre connection unavailable"
 msgstr "Centro de Control no disponible"
-
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Control Centre is not available. You can still create a campaign workspace manually, but live campaign context will not load until the MCP connection works."
-msgstr "El Centro de control no está disponible. Aún puede crear un espacio de trabajo de campaña manualmente, pero el contexto de campaña en vivo no se cargará hasta que la conexión MCP funcione."
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Control Centre isn't connected for this project yet."
@@ -3237,10 +3056,6 @@ msgstr "Copiar (recomendado)"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Copy {0} device code {1}"
 msgstr "Copiar el código de dispositivo de {0} {1}"
-
-#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-#~ msgid "Copy all Lightcode data into Poracode. Poracode restarts and keeps a complete backup of its current data."
-#~ msgstr "Copia todos los datos de Lightcode en Poracode. Poracode se reiniciará y conservará una copia de seguridad completa de sus datos actuales."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Copy all Lightcode data into Tee's Cockpit. Tee's Cockpit restarts and keeps a complete backup of its current data."
@@ -3355,10 +3170,6 @@ msgstr "No se pudo generar el mensaje de confirmación: {detail}"
 msgid "Could not load pull requests for {0}."
 msgstr "No se pudieron cargar las pull requests de {0}."
 
-#: src/renderer/components/pdf/PdfViewer.tsx
-#~ msgid "Could not open this PDF."
-#~ msgstr "No se pudo abrir este PDF."
-
 #: src/renderer/hooks/useControlCentreTool.ts
 msgid "Could not reach the MCP runtime."
 msgstr "No se pudo contactar con el entorno de ejecución MCP."
@@ -3468,10 +3279,6 @@ msgstr "No se pudo actualizar el skill."
 msgid "Create"
 msgstr "Crear"
 
-#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-#~ msgid "Create a campaign project to see your operations overview."
-#~ msgstr "Crea un proyecto de campaña para ver tu resumen operativo."
-
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Create a pull request for candidate {0} ({label})"
@@ -3548,14 +3355,6 @@ msgstr "Crear tarea"
 msgid "Create with Agent"
 msgstr "Crear con un agente"
 
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Create your first scheduled task."
-#~ msgstr "Crea tu primera tarea programada."
-
-#: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
-#~ msgid "Create:"
-#~ msgstr "Crear:"
-
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Created"
 msgstr "Creado"
@@ -3601,10 +3400,6 @@ msgstr "Crossagent"
 msgid "Crossagent ({subagent}): {description}"
 msgstr "Crossagent ({subagent}): {description}"
 
-#: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
-#~ msgid "Crossagent not found."
-#~ msgstr "No se encontró Crossagent."
-
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
 msgid "Crossagent Result"
 msgstr "Resultado de Crossagent"
@@ -3613,10 +3408,6 @@ msgstr "Resultado de Crossagent"
 #: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
 msgid "Crossagent routing guide"
 msgstr "Guía de enrutamiento de Crossagents"
-
-#: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
-#~ msgid "Crossagent runs"
-#~ msgstr "Ejecuciones de Crossagents"
 
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Crossagent: {description}"
@@ -3656,18 +3447,10 @@ msgstr "Coronar con IA"
 msgid "Crowned"
 msgstr "Coronado"
 
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "Curated free and premium skills managed by MCP Market."
-#~ msgstr "Skills gratuitas y premium seleccionadas y gestionadas por MCP Market."
-
 #: src/mobile/views/ThreadsView.tsx
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Current"
 msgstr "Recientes"
-
-#: src/renderer/components/skills/SkillImportModal.tsx
-#~ msgid "Current project"
-#~ msgstr "Proyecto actual"
 
 #: src/renderer/views/ProfileOverlay/parts/ShareCard.tsx
 msgid "current streak"
@@ -3722,14 +3505,6 @@ msgstr "Resumen diario"
 msgid "Dark"
 msgstr "Oscuro"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Dates"
-#~ msgstr "Fechas"
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Days"
-#~ msgstr "Días"
-
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Decided at"
 msgstr "Decidido el"
@@ -3757,10 +3532,6 @@ msgstr "Enunciado de la decisión"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Decisions & proposals"
 msgstr "Decisiones y propuestas"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Decisions & Proposals"
-#~ msgstr "Decisiones y propuestas"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 msgid "Decline"
@@ -3889,17 +3660,9 @@ msgstr "Eliminar programación"
 msgid "Delete schedule?"
 msgstr "¿Eliminar programación?"
 
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Delete scheduled task?"
-#~ msgstr "¿Eliminar la tarea programada?"
-
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Delete skill"
 msgstr "Eliminar skill"
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Delete task"
-#~ msgstr "Eliminar tarea"
 
 #: src/mobile/views/SettingsView.tsx
 #: src/renderer/views/SettingsOverlay/parts/ArchivedThreadsSettings.tsx
@@ -3934,10 +3697,6 @@ msgstr "Eliminar worktree"
 msgid "Delete worktree {0}"
 msgstr "Eliminar worktree {0}"
 
-#: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
-#~ msgid "Delete:"
-#~ msgstr "Eliminar:"
-
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "Deleting"
 msgstr "Eliminando"
@@ -3965,10 +3724,6 @@ msgstr "Describe el resultado, las restricciones y las comprobaciones que define
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Describe the task before starting the swarm."
 msgstr "Describe la tarea antes de iniciar el swarm."
-
-#: src/renderer/components/experiment/NewExperimentModal.tsx
-#~ msgid "Describe the task to run with multiple agents…"
-#~ msgstr "Describe la tarea que se ejecutará con varios agentes…"
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Describe what the agent should do"
@@ -4003,10 +3758,6 @@ msgstr "Destino"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "detached HEAD"
 msgstr "HEAD separado"
-
-#: src/renderer/views/SchedulesView/ScheduleEditor.tsx
-#~ msgid "Details"
-#~ msgstr "Detalles"
 
 #: src/mobile/views/PortsView.tsx
 msgid "Detected"
@@ -4070,10 +3821,6 @@ msgstr "Dispositivo que usa el botón de entrada de voz del redactor."
 msgid "Devices can pair while this desktop is reachable."
 msgstr "Los dispositivos pueden emparejarse mientras este escritorio esté accesible."
 
-#: src/mobile/views/PortsView.tsx
-#~ msgid "Direct connection required"
-#~ msgstr "Se requiere una conexión directa"
-
 #. placeholder {0}: skill.name
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Disable {0}"
@@ -4120,10 +3867,6 @@ msgstr "Deshabilitar Crossagents"
 msgid "Disable Project"
 msgstr "Deshabilitar proyecto"
 
-#: src/renderer/components/composer/composerMcpServers.ts
-#~ msgid "Disable Subagents"
-#~ msgstr "Deshabilitar subagentes"
-
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Disable tiers an external provider collapses (e.g. keep only High and Max)."
 msgstr "Desactiva los niveles que un proveedor externo unifica (p. ej. mantener solo High y Max)."
@@ -4137,10 +3880,6 @@ msgstr "Deshabilitado"
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Disabled globally"
 msgstr "Deshabilitado globalmente"
-
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Disabling a skill moves it out of active skill folders and removes Poracode-managed provider copies. Its files are preserved so you can enable it again."
-#~ msgstr "Al desactivar una skill, se mueve fuera de las carpetas de skills activas y se eliminan las copias de proveedores administradas por Poracode. Sus archivos se conservan para que puedas volver a activarla."
 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Disabling a skill moves it out of active skill folders and removes Tee's Cockpit-managed provider copies. Its files are preserved so you can enable it again."
@@ -4366,18 +4105,6 @@ msgstr "Editar perfil"
 msgid "Edit schedule"
 msgstr "Editar programación"
 
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Edit scheduled task"
-#~ msgstr "Editar tarea programada"
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Edit task"
-#~ msgstr "Editar tarea"
-
-#: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
-#~ msgid "Edit:"
-#~ msgstr "Editar:"
-
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/FileEditorOverlay/FileEditorOverlay.tsx
@@ -4503,10 +4230,6 @@ msgstr "Activa <0>cookies</0> y <1>almacenamiento</1>. Las cookies pueden conten
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Endpoint"
 msgstr "Endpoint"
-
-#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-#~ msgid "Endpoint, e.g. http://192.168.1.20:38987/"
-#~ msgstr "Endpoint, p. ej. http://192.168.1.20:38987/"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Endpoint, e.g. http://192.168.1.20:49152/"
@@ -4719,10 +4442,6 @@ msgstr "Expandir panel de contexto"
 msgid "Expand error"
 msgstr "Expandir error"
 
-#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
-#~ msgid "Expand experiment"
-#~ msgstr "Expandir experimento"
-
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 msgid "Expand group"
@@ -4850,10 +4569,6 @@ msgstr "Externo"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "External provider"
 msgstr "Proveedor externo"
-
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "External provider skills"
-#~ msgstr "Skills de proveedores externos"
 
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "Extra High"
@@ -5066,88 +4781,44 @@ msgid "Finished · Waiting for your input"
 msgstr "Finalizado · Esperando tu entrada"
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Antigravity CLI integration using Poracode's native runtime."
-#~ msgstr "Integración de primera clase de Antigravity CLI usando el runtime nativo de Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Antigravity CLI integration using Tee's Cockpit's native runtime."
 msgstr "Integración de primera clase de Antigravity CLI usando el runtime nativo de Tee's Cockpit."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Claude Code integration using Poracode's native SDK runtime."
-#~ msgstr "Integración de primera clase de Claude Code usando el runtime nativo del SDK de Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Claude Code integration using Tee's Cockpit's native SDK runtime."
 msgstr "Integración de primera clase de Claude Code usando el runtime nativo del SDK de Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Codex CLI integration using Poracode's native app-server runtime."
-#~ msgstr "Integración de primera clase de Codex CLI usando el runtime nativo de app-server de Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Codex CLI integration using Tee's Cockpit's native app-server runtime."
 msgstr "Integración de primera clase de Codex CLI usando el runtime nativo de app-server de Tee's Cockpit."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Command Code CLI integration using Poracode's native runtime."
-#~ msgstr "Integración de primera clase de Command Code CLI usando el runtime nativo de Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Command Code CLI integration using Tee's Cockpit's native runtime."
 msgstr "Integración de primera clase de Command Code CLI usando el runtime nativo de Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Cursor Agent integration using Poracode's native runtime."
-#~ msgstr "Integración de primera clase de Cursor Agent usando el runtime nativo de Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Cursor Agent integration using Tee's Cockpit's native runtime."
 msgstr "Integración de primera clase de Cursor Agent usando el runtime nativo de Tee's Cockpit."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Factory Droid integration using Poracode's ACP runtime."
-#~ msgstr "Integración de primera clase con Factory Droid mediante el entorno de ejecución ACP de Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Factory Droid integration using Tee's Cockpit's ACP runtime."
 msgstr "Integración de primera clase con Factory Droid mediante el entorno de ejecución ACP de Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Gemini CLI integration using Poracode's native runtime."
-#~ msgstr "Integración de primera clase de Gemini CLI usando el runtime nativo de Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Gemini CLI integration using Tee's Cockpit's native runtime."
 msgstr "Integración de primera clase de Gemini CLI usando el runtime nativo de Tee's Cockpit."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class GitHub Copilot CLI integration using Poracode's native runtime."
-#~ msgstr "Integración de primera clase de GitHub Copilot CLI usando el runtime nativo de Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class GitHub Copilot CLI integration using Tee's Cockpit's native runtime."
 msgstr "Integración de primera clase de GitHub Copilot CLI usando el runtime nativo de Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Grok Build CLI integration using Poracode's native runtime."
-#~ msgstr "Integración de primera clase de Grok Build CLI usando el runtime nativo de Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Grok Build CLI integration using Tee's Cockpit's native runtime."
 msgstr "Integración de primera clase de Grok Build CLI usando el runtime nativo de Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Kimi Code CLI integration using Poracode's native runtime."
-#~ msgstr "Integración de primera clase de Kimi Code CLI usando el runtime nativo de Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Kimi Code CLI integration using Tee's Cockpit's native runtime."
 msgstr "Integración de primera clase de Kimi Code CLI usando el runtime nativo de Tee's Cockpit."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class OpenCode integration using Poracode's native SDK runtime."
-#~ msgstr "Integración de primera clase de OpenCode usando el runtime nativo del SDK de Poracode."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class OpenCode integration using Tee's Cockpit's native SDK runtime."
@@ -5158,24 +4829,12 @@ msgid "First-class Pi integration using a real terminal and Pi's native SDK runt
 msgstr "Integración de primera clase de Pi con un terminal real y el runtime SDK nativo de Pi."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Qoder CLI integration using Poracode's native terminal and ACP runtimes."
-#~ msgstr "Integración de primera clase de Qoder CLI con los runtimes nativos de terminal y ACP de Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Qoder CLI integration using Tee's Cockpit's native terminal and ACP runtimes."
 msgstr "Integración de primera clase de Qoder CLI con los runtimes nativos de terminal y ACP de Tee's Cockpit."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Qwen Code integration using Poracode's native terminal and ACP runtimes."
-#~ msgstr "Integración de primera clase con Qwen Code mediante los entornos de ejecución nativos de terminal y ACP de Poracode."
-
-#: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Qwen Code integration using Tee's Cockpit's native terminal and ACP runtimes."
 msgstr "Integración de primera clase con Qwen Code mediante los entornos de ejecución nativos de terminal y ACP de Tee's Cockpit."
-
-#: src/renderer/components/pdf/PdfViewer.tsx
-#~ msgid "Fit width"
-#~ msgstr "Ajustar al ancho"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/ConflictResolutionActions.tsx
 msgid "Fix in Agent"
@@ -5245,15 +4904,6 @@ msgstr "Forzar recarga de la página del navegador"
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "Fork"
 msgstr "Bifurcar"
-
-#: src/renderer/components/experiment/NewExperimentModal.tsx
-#~ msgid "Fork from"
-#~ msgstr "Bifurcar desde"
-
-#. placeholder {0}: props.baseBranch
-#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
-#~ msgid "Fork from <0>{0}</0>"
-#~ msgstr "Bifurcar desde <0>{0}</0>"
 
 #. placeholder {0}: props.baseBranch
 #: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
@@ -5561,10 +5211,6 @@ msgid "Hello"
 msgstr "Hola"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Help me create a schedule. Ask for any missing details, then use the Poracode schedule controls to create it for me."
-#~ msgstr "Ayúdame a crear una programación. Pregunta por los detalles que falten y usa los controles de programación de Poracode para crearla."
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Help me create a schedule. Ask for any missing details, then use the Tee's Cockpit schedule controls to create it for me."
 msgstr "Ayúdame a crear una programación. Pregunta por los detalles que falten y usa los controles de programación de Tee's Cockpit para crearla."
 
@@ -5766,16 +5412,6 @@ msgstr "Importar a {destinationProjectName}"
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Import to Global"
 msgstr "Importar a Global"
-
-#: src/renderer/components/mcp/McpExternalImportModal.tsx
-#~ msgid "Import to Project"
-#~ msgstr "Importar al proyecto"
-
-#. placeholder {0}: selectedSkills.length
-#. placeholder {1}: selectedSkills.length === 1 ? "skill" : "skills"
-#: src/renderer/components/skills/SkillImportModal.tsx
-#~ msgid "Imported {0} {1}."
-#~ msgstr "Se importaron {0} {1}."
 
 #. placeholder {0}: selectedSkills.length
 #: src/renderer/components/skills/SkillImportModal.tsx
@@ -6002,11 +5638,6 @@ msgstr "Manténme encaminado"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "Keep Poracode in the system tray when it launches at startup."
-#~ msgstr "Mantener Poracode en la bandeja del sistema cuando se inicie automáticamente."
-
-#: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Keep Tee's Cockpit in the system tray when it launches at startup."
 msgstr "Mantener Tee's Cockpit en la bandeja del sistema cuando se inicie automáticamente."
 
@@ -6023,18 +5654,10 @@ msgstr "Hallazgos clave:"
 msgid "Kill bash"
 msgstr "Detener bash"
 
-#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
-#~ msgid "Kimi"
-#~ msgstr "Kimi"
-
 #: src/renderer/components/providers/kimi/manifest.ts
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
 msgid "Kimi Code"
 msgstr "Kimi Code"
-
-#: src/renderer/i18n/sharedMessages.ts
-#~ msgid "Kimi Code could not update its credentials because another process is using the credential file. Close other Poracode or Kimi Code processes, then retry."
-#~ msgstr "Kimi Code no pudo actualizar sus credenciales porque otro proceso está usando el archivo de credenciales. Cierra otros procesos de Poracode o Kimi Code y vuelve a intentarlo."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Kimi Code could not update its credentials because another process is using the credential file. Close other Tee's Cockpit or Kimi Code processes, then retry."
@@ -6047,10 +5670,6 @@ msgstr "Kimi Code finalizó el turno sin devolver una respuesta. Reinicia el hil
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "KPI health"
 msgstr "Estado de KPI"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "KPI Health"
-#~ msgstr "Estado de KPI"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -6080,11 +5699,6 @@ msgstr "Última herramienta: <0>{0}</0>"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Launch at startup"
 msgstr "Iniciar al arrancar"
-
-#: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "Launch Poracode automatically when you sign in to Windows."
-#~ msgstr "Iniciar Poracode automáticamente al iniciar sesión en Windows."
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -6218,11 +5832,6 @@ msgstr "Cargando notas…"
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Loading operations overview…"
 msgstr "Cargando resumen operativo…"
-
-#: src/renderer/components/pdf/PdfViewer.tsx
-#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
-#~ msgid "Loading PDF…"
-#~ msgstr "Cargando PDF…"
 
 #: src/renderer/views/PrReviewOverlay/parts/PrReviewSidebar.tsx
 msgid "Loading PR…"
@@ -6385,52 +5994,19 @@ msgstr "Riesgo bajo"
 msgid "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
 msgstr "Hace translúcido el panel lateral: el efecto de desenfoque del sistema en Windows 11 y un tinte translúcido en otros casos."
 
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "Manage global and project agent skills, including skills imported from other providers."
-#~ msgstr "Gestiona los skills globales y de proyecto de los agentes, incluidos los importados de otros proveedores."
-
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarRemoteServers.tsx
 msgid "Manage remote environments"
 msgstr "Administrar entornos remotos"
-
-#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarRemoteServers.tsx
-#~ msgid "Manage remote servers"
-#~ msgstr "Administrar servidores remotos"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/SkillsSettings.tsx
 msgid "Manage shared skills across global and project scopes."
 msgstr "Administra skills compartidas en ámbitos globales y de proyecto."
 
-#: src/renderer/views/SettingsOverlay/parts/SkillsSettings.tsx
-#~ msgid "Manage shared skills across Linux and projects."
-#~ msgstr "Administra skills compartidas entre Linux y proyectos."
-
-#: src/renderer/views/SettingsOverlay/parts/SkillsSettings.tsx
-#~ msgid "Manage shared skills across macOS and projects."
-#~ msgstr "Administra skills compartidas entre macOS y proyectos."
-
-#: src/renderer/views/SettingsOverlay/parts/SkillsSettings.tsx
-#~ msgid "Manage shared skills across Windows, WSL, and projects."
-#~ msgstr "Administra skills compartidas entre Windows, WSL y proyectos."
-
-#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "Manage the MCP server configurations Poracode adds when starting supported agents. Workspace servers can be configured in each project's settings."
-#~ msgstr "Administra las configuraciones de servidores MCP que Poracode añade al iniciar agentes compatibles. Los servidores del espacio de trabajo se pueden configurar en los ajustes de cada proyecto."
-
 #: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Manage the MCP server configurations Tee's Cockpit adds when starting supported agents. Workspace servers can be configured in each project's settings."
 msgstr "Administra las configuraciones de servidores MCP que Tee's Cockpit añade al iniciar agentes compatibles. Los servidores del espacio de trabajo se pueden configurar en los ajustes de cada proyecto."
-
-#: src/renderer/views/SettingsOverlay/parts/SkillsSettings.tsx
-#~ msgid "Manage the skills Poracode makes available to supported agents. Project skills can be managed in each project's settings."
-#~ msgstr "Gestiona los skills que Poracode pone a disposición de los agentes compatibles. Los skills de proyecto se pueden gestionar en la configuración de cada proyecto."
-
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Managed"
-#~ msgstr "Gestionado"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Managed by Poracode"
@@ -6439,14 +6015,6 @@ msgstr "Gestionado por Poracode"
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Managed by provider"
 msgstr "Gestionado por el proveedor"
-
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Managed by the provider or plugin."
-#~ msgstr "Gestionado por el proveedor o el plugin."
-
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Managed skills"
-#~ msgstr "Skills gestionados"
 
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Manual only"
@@ -6514,10 +6082,6 @@ msgstr "Maximizar"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Maximize browser"
 msgstr "Maximizar navegador"
-
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "MCP Market"
-#~ msgstr "MCP Market"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "MCP Profile"
@@ -6617,11 +6181,6 @@ msgstr "¿Fusionar los cambios de {crownedLabel} en {mergeTarget}?"
 #: src/renderer/views/MainView/parts/Sidebar/parts/useWorktreeActions.ts
 msgid "Merge & Remove"
 msgstr "Fusionar y eliminar"
-
-#. placeholder {0}: props.candidateNumber
-#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
-#~ msgid "Merge candidate {0} ({label}) as experiment winner"
-#~ msgstr "Fusionar al candidato {0} ({label}) como ganador del experimento"
 
 #: src/mobile/views/pr/PrOverviewPage.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
@@ -6793,10 +6352,6 @@ msgstr "La duplicación no está disponible."
 msgid "Missing data"
 msgstr "Datos faltantes"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Missing Data"
-#~ msgstr "Datos faltantes"
-
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Mobile push notifications"
 msgstr "Notificaciones push móviles"
@@ -6817,11 +6372,6 @@ msgstr "Modelo"
 #: src/renderer/commands/registry.ts
 msgid "Model added to favorites"
 msgstr "Modelo agregado a favoritos"
-
-#. placeholder {0}: index + 1
-#: src/renderer/components/experiment/NewExperimentModal.tsx
-#~ msgid "Model for candidate {0}"
-#~ msgstr "Modelo para el candidato {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Model id"
@@ -6907,10 +6457,6 @@ msgstr "Hora del informe matutino"
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Most active hour"
 msgstr "Hora más activa"
-
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "Most installed"
-#~ msgstr "Más instaladas"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Most popular"
@@ -7060,10 +6606,6 @@ msgstr "Nuevo nombre de perfil de Claude"
 msgid "New code"
 msgstr "Nuevo código"
 
-#: src/renderer/components/experiment/NewExperimentModal.tsx
-#~ msgid "New experiment"
-#~ msgstr "Nuevo experimento"
-
 #: src/mobile/views/FilesView.tsx
 msgid "New file"
 msgstr "Nuevo archivo"
@@ -7118,10 +6660,6 @@ msgstr "Nuevo hilo rápido"
 msgid "New schedule"
 msgstr "Nueva programación"
 
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "New scheduled task"
-#~ msgstr "Nueva tarea programada"
-
 #: src/mobile/views/BrowserView.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
@@ -7131,10 +6669,6 @@ msgstr "Nueva pestaña"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 msgid "New tab in group"
 msgstr "Nueva pestaña en el grupo"
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "New task"
-#~ msgstr "Nueva tarea"
 
 #: src/mobile/chrome.ts
 #: src/mobile/views/QuickCompose.tsx
@@ -7155,10 +6689,6 @@ msgstr "Nuevo hilo"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
 msgid "New thread — {projectName}"
 msgstr "Nuevo hilo — {projectName}"
-
-#: src/renderer/views/MainView/parts/Sidebar/parts/NewThreadButton.tsx
-#~ msgid "New thread (draft)"
-#~ msgstr "Nuevo hilo (borrador)"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoRow.tsx
 msgid "New thread from this to-do"
@@ -7190,10 +6720,6 @@ msgstr "Imagen siguiente"
 #: src/renderer/components/find/FindBar.tsx
 msgid "Next match"
 msgstr "Coincidencia siguiente"
-
-#: src/renderer/components/pdf/PdfViewer.tsx
-#~ msgid "Next page"
-#~ msgstr "Página siguiente"
 
 #: src/renderer/commands/registry.ts
 msgid "Next recently viewed chat"
@@ -7321,10 +6847,6 @@ msgstr "No se encontraron commits."
 msgid "No configured MCP servers yet"
 msgstr "Aún no hay servidores MCP configurados"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "No connected sources reported."
-#~ msgstr "No se informaron fuentes conectadas."
-
 #: src/mobile/WideShell.tsx
 msgid "No connection paired"
 msgstr "Ninguna conexión emparejada"
@@ -7337,7 +6859,6 @@ msgstr "Aún no hay conexiones"
 msgid "No content streams."
 msgstr "No hay flujos de contenido."
 
-#: src/renderer/hooks/useControlCentreTool.ts
 #: src/renderer/hooks/useRecordCampaignDecision.ts
 msgid "No Control Centre MCP server is configured for this project."
 msgstr "No hay un servidor MCP de Centro de control configurado para este proyecto."
@@ -7416,10 +6937,6 @@ msgstr "No se encontraron cuentas de GitHub CLI. Inicia sesión con <0>gh auth l
 msgid "No history yet"
 msgstr "Aún no hay historial"
 
-#: src/renderer/components/experiment/NewExperimentModal.tsx
-#~ msgid "No installed agents with selectable models are available for this project."
-#~ msgstr "No hay agentes instalados con modelos seleccionables disponibles para este proyecto."
-
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "No KPI targets set"
 msgstr "Sin objetivos de KPI establecidos"
@@ -7460,14 +6977,14 @@ msgstr "No hay pull requests coincidentes."
 msgid "No matching schedules."
 msgstr "No hay programaciones coincidentes."
 
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "No matching tasks."
-#~ msgstr "No hay tareas coincidentes."
-
 #: src/mobile/views/ThreadsView.tsx
 #: src/renderer/views/ThreadSearchOverlay/ThreadSearchOverlay.tsx
 msgid "No matching threads"
 msgstr "No hay hilos coincidentes"
+
+#: src/renderer/campaign/controlCentreAvailabilityCopy.ts
+msgid "No MCP server named \"control-centre\" is configured. Add one in MCP settings."
+msgstr "No hay ningún servidor MCP llamado «control-centre» configurado. Añade uno en la configuración de MCP."
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "No MCP servers are enabled for this run"
@@ -7565,10 +7082,6 @@ msgstr "Aún no hay proveedores listos"
 msgid "No pull requests found."
 msgstr "No se encontraron pull requests."
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "No recent events."
-#~ msgstr "Sin eventos recientes."
-
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
 msgid "No remote configured. Add a remote to enable push and pull."
 msgstr "No hay remoto configurado. Añade un remoto para habilitar push y pull."
@@ -7597,10 +7110,6 @@ msgstr "Aún no hay ejecuciones."
 #: src/renderer/components/thread/ChatPane/ChatRuntimeDebugPanel.tsx
 msgid "No runtime items yet for this thread."
 msgstr "Aún no hay elementos de runtime para este hilo."
-
-#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-#~ msgid "No servers connected yet."
-#~ msgstr "Aún no hay servidores conectados."
 
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "No shortcuts found"
@@ -7659,10 +7168,6 @@ msgstr "Aún no hay hilos."
 #: src/renderer/components/providers/usageFormat.ts
 msgid "No windows reported"
 msgstr "No se informaron ventanas"
-
-#: src/renderer/components/thread/WorktreeModeSelect.tsx
-#~ msgid "No worktree"
-#~ msgstr "Sin worktree"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
 msgid "No wrap"
@@ -7861,10 +7366,6 @@ msgstr "Abre primero un hilo para adjuntarlo."
 msgid "Open alerts"
 msgstr "Alertas abiertas"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Open Alerts"
-#~ msgstr "Alertas abiertas"
-
 #: src/renderer/components/thread/SwarmActivityPanel.tsx
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ExperimentGroupHeader.tsx
@@ -7990,14 +7491,6 @@ msgstr "Clasificación abierta con métricas de instalaciones y tendencias."
 msgid "Open links in"
 msgstr "Abrir enlaces en"
 
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "Open marketplace"
-#~ msgstr "Abrir marketplace"
-
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "Open MCP Market to browse purchases and downloads without bypassing its account or licensing flow."
-#~ msgstr "Abre MCP Market para explorar compras y descargas sin omitir su flujo de cuenta o licencias."
-
 #: src/renderer/commands/composerCommands.ts
 msgid "Open model picker"
 msgstr "Abrir el selector de modelo"
@@ -8060,10 +7553,6 @@ msgstr "Abrir ajustes"
 #: src/renderer/components/composer/voiceError.ts
 msgid "Open Settings"
 msgstr "Abrir ajustes"
-
-#: src/mobile/views/DesktopsView.tsx
-#~ msgid "Open Settings → Remote Access in Poracode on this computer, then paste its pairing token here."
-#~ msgstr "Abre Configuración → Acceso remoto en Poracode en este equipo y pega aquí el token de emparejamiento."
 
 #: src/mobile/views/DesktopsView.tsx
 msgid "Open Settings → Remote Access in Poracode on your desktop, then scan the QR code from here — or enter the endpoint and pairing token manually."
@@ -8192,10 +7681,6 @@ msgstr "Resultado"
 msgid "Over pace — runs out early"
 msgstr "Por encima del ritmo — se agotará antes"
 
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Overridden by project"
-#~ msgstr "Reemplazado por el proyecto"
-
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Override Claude defaults — e.g. ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN."
 msgstr "Anula los valores predeterminados de Claude, p. ej. ANTHROPIC_BASE_URL y ANTHROPIC_AUTH_TOKEN."
@@ -8207,10 +7692,6 @@ msgstr "Anula dónde se crean los worktrees de este proyecto. Se aplica a los wo
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Overrides {conflict}"
 msgstr "Reemplaza {conflict}"
-
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Overrides global"
-#~ msgstr "Reemplaza el global"
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/SearchSection.tsx
 msgid "Overriding the global setting for this project."
@@ -8257,10 +7738,6 @@ msgstr "Empareja un teléfono, una tableta o un navegador con este escritorio."
 #: src/mobile/useRemoteDesktop.ts
 msgid "Pair again"
 msgstr "Emparejar de nuevo"
-
-#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-#~ msgid "Pair with Poracode"
-#~ msgstr "Emparejar con Poracode"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Pair with Tee's Cockpit"
@@ -8402,10 +7879,6 @@ msgid "Paused"
 msgstr "En pausa"
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
-#~ msgid "PDF preview opens in the browser panel."
-#~ msgstr "La vista previa del PDF se abre en el panel del navegador."
-
-#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 msgid "PDF preview opens in the browser."
 msgstr "La vista previa del PDF se abre en el navegador."
 
@@ -8543,39 +8016,12 @@ msgstr "Apunta este perfil a un proveedor distinto de Anthropic (z.ai, …) con 
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "Popular editor themes adapted to Poracode. Each follows the light or dark mode above."
-#~ msgstr "Temas populares de editores adaptados a Poracode. Cada uno sigue el modo claro u oscuro de arriba."
-
-#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Popular editor themes adapted to Tee's Cockpit. Each follows the light or dark mode above."
 msgstr "Temas populares de editores adaptados a Tee's Cockpit. Cada uno sigue el modo claro u oscuro de arriba."
-
-#: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
-#~ msgid "Poracode and your agents run on the remote machine. SSH is used only to start the remote environment and secure its local tunnel."
-#~ msgstr "Poracode y tus agentes se ejecutan en la máquina remota. SSH solo se usa para iniciar el entorno remoto y proteger su túnel local."
-
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "Poracode does not store marketplace credentials in plain settings. Open the catalog to browse its security-scanned skills."
-#~ msgstr "Poracode no guarda las credenciales del marketplace como texto sin cifrar en los ajustes. Abre el catálogo para explorar sus skills analizadas por seguridad."
-
-#: src/renderer/components/skills/SkillImportModal.tsx
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "Poracode only"
-#~ msgstr "Solo Poracode"
 
 #: src/mobile/views/DesktopsView.tsx
 msgid "Poracode will install or reuse its server on the SSH host and keep credentials in this device's secure storage."
 msgstr "Poracode instalará o reutilizará su servidor en el host SSH y guardará las credenciales en el almacenamiento seguro de este dispositivo."
-
-#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-#~ msgid "Poracode will restart, back up its current data, and replace it with a complete copy of your Lightcode data."
-#~ msgstr "Poracode se reiniciará, hará una copia de seguridad de sus datos actuales y los reemplazará por una copia completa de tus datos de Lightcode."
-
-#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
-#~ msgid "Poracode's built-in browser tools."
-#~ msgstr "Las herramientas de navegador integradas de Poracode."
 
 #: src/mobile/views/DesktopsView.tsx
 #: src/mobile/views/PortsView.tsx
@@ -8595,10 +8041,6 @@ msgstr "El reenvío de puertos no está disponible en este escritorio."
 #: src/mobile/views/PortsView.tsx
 msgid "Port forwarding isn't enabled"
 msgstr "El reenvío de puertos no está habilitado"
-
-#: src/mobile/views/PortsView.tsx
-#~ msgid "Port forwarding needs a direct connection to the desktop. It isn't available over a relay or tunnel."
-#~ msgstr "El reenvío de puertos necesita una conexión directa al escritorio. No está disponible a través de un relay o túnel."
 
 #: src/mobile/chrome.ts
 #: src/mobile/NarrowShell.tsx
@@ -8675,17 +8117,9 @@ msgstr "Imagen anterior"
 msgid "Previous match"
 msgstr "Coincidencia anterior"
 
-#: src/renderer/components/pdf/PdfViewer.tsx
-#~ msgid "Previous page"
-#~ msgstr "Página anterior"
-
 #: src/renderer/commands/registry.ts
 msgid "Previous recently viewed chat"
 msgstr "Chat anterior visto recientemente"
-
-#: src/renderer/views/SchedulesView/parts/ScheduleRow.tsx
-#~ msgid "Previous run did not finish."
-#~ msgstr "La ejecución anterior no terminó."
 
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 #: src/renderer/views/SchedulesView/parts/ScheduleRow.tsx
@@ -8753,10 +8187,6 @@ msgstr "Ajustes del proyecto"
 msgid "Project skills are available only when agents run in this project. Each provider applies its own precedence rules when names overlap."
 msgstr "Los skills del proyecto solo están disponibles cuando los agentes se ejecutan en este proyecto. Cada proveedor aplica sus propias reglas de prioridad cuando los nombres coinciden."
 
-#: src/renderer/views/ProjectSettingsOverlay/parts/SkillsSection.tsx
-#~ msgid "Project skills override global skills with the same name and are available only when agents run in this project."
-#~ msgstr "Los skills de proyecto reemplazan a los skills globales con el mismo nombre y solo están disponibles cuando los agentes se ejecutan en este proyecto."
-
 #: src/renderer/views/ProjectSettingsOverlay/parts/SearchSection.tsx
 msgid "Project-specific overrides on top of the global search settings."
 msgstr "Anulaciones específicas del proyecto sobre los ajustes de búsqueda globales."
@@ -8812,10 +8242,6 @@ msgstr "Plan propuesto"
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Provenance"
 msgstr "Procedencia"
-
-#: src/renderer/components/mcp/McpServersManager.tsx
-#~ msgid "Provided and managed by Poracode for supported agents."
-#~ msgstr "Poracode lo proporciona y administra para los agentes compatibles."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Provided and managed by Tee's Cockpit for supported agents."
@@ -8888,10 +8314,6 @@ msgstr "Pull ({behind})"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SyncBadge.tsx
 msgid "Pull ↓{behind}"
 msgstr "Pull ↓{behind}"
-
-#: src/renderer/i18n/sharedMessages.ts
-#~ msgid "Pull did not complete. Your local changes remain in a Poracode stash."
-#~ msgstr "El pull no se completó. Tus cambios locales permanecen en un stash de Poracode."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Pull did not complete. Your local changes remain in a Tee's Cockpit stash."
@@ -8993,10 +8415,6 @@ msgstr "En cola"
 msgid "Quota reached"
 msgstr "Cuota alcanzada"
 
-#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
-#~ msgid "Qwen"
-#~ msgstr "Qwen"
-
 #: src/renderer/components/providers/qwen/manifest.ts
 msgid "Qwen Code"
 msgstr "Qwen Code"
@@ -9074,10 +8492,6 @@ msgstr "Razonamiento"
 #: src/renderer/components/common/ProviderModelMenu/parts/buildItems.ts
 msgid "Recent"
 msgstr "Recientes"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Recent Events"
-#~ msgstr "Eventos recientes"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Recent installs"
@@ -9273,15 +8687,6 @@ msgstr "Servidor remoto"
 #: src/renderer/state/remoteServersStore.ts
 msgid "Remote server not found."
 msgstr "No se encontró el servidor remoto."
-
-#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarRemoteServers.tsx
-#~ msgid "Remote servers"
-#~ msgstr "Servidores remotos"
-
-#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
-#~ msgid "Remote Servers"
-#~ msgstr "Servidores remotos"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Remote session"
@@ -9765,10 +9170,6 @@ msgstr "Revisor"
 msgid "Reviewing"
 msgstr "Para revisar"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
-#~ msgid "Reviewing each candidate's changes to recommend a winner."
-#~ msgstr "Revisando los cambios de cada candidato para recomendar un ganador."
-
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Revised"
 msgstr "Revisado"
@@ -9838,14 +9239,6 @@ msgstr "Ejecuta {loginCommand} para iniciar sesión."
 msgid "Run a new thread on {0}."
 msgstr "Ejecutar un hilo nuevo en {0}."
 
-#: src/renderer/components/thread/ThreadDraftComposerArea.tsx
-#~ msgid "Run as experiment"
-#~ msgstr "Ejecutar como experimento"
-
-#: src/renderer/components/thread/ThreadDraftComposerArea.tsx
-#~ msgid "Run as experiment with multiple agents"
-#~ msgstr "Ejecutar como experimento con varios agentes"
-
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Run at"
 msgstr "Ejecutar el"
@@ -9876,24 +9269,12 @@ msgid "Run one prompt with multiple agents, then compare their work."
 msgstr "Ejecuta un prompt con varios agentes y luego compara su trabajo."
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Run standalone tasks on this device without a project."
-#~ msgstr "Ejecuta tareas independientes en este dispositivo sin un proyecto."
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Run standalone tasks on this device. Schedules run while the device is awake and Poracode is open."
-#~ msgstr "Ejecuta tareas independientes en este dispositivo. Las programaciones se ejecutan mientras el dispositivo está activo y Poracode está abierto."
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Run standalone tasks on this device. Schedules run while the device is awake and Tee's Cockpit is open."
 msgstr "Ejecuta tareas independientes en este dispositivo. Las programaciones se ejecutan mientras el dispositivo está activo y Tee's Cockpit está abierto."
 
 #: src/renderer/commands/registry.ts
 msgid "Run Terminal Command"
 msgstr "Ejecutar comando de terminal"
-
-#: src/renderer/views/SchedulesView/ScheduleEditor.tsx
-#~ msgid "Run this schedule automatically at the times above."
-#~ msgstr "Ejecutar esta programación automáticamente en los horarios indicados arriba."
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Run this schedule automatically on the schedule below."
@@ -10031,10 +9412,6 @@ msgstr "Tareas programadas"
 #: src/mobile/settingsSections.ts
 msgid "Scheduled tasks on this desktop"
 msgstr "Tareas programadas en este escritorio"
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Scheduled tasks run only while this device is awake and Poracode is open."
-#~ msgstr "Las tareas programadas solo se ejecutan mientras este dispositivo está activo y Poracode está abierto."
 
 #: src/mobile/settingsSections.ts
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
@@ -10186,10 +9563,6 @@ msgstr "Buscando..."
 msgid "Searching…"
 msgstr "Buscando…"
 
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "Security-focused directory with verified skill metadata."
-#~ msgstr "Directorio centrado en la seguridad con metadatos verificados de las skills."
-
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectThreadList.tsx
 msgid "See more"
 msgstr "Ver más"
@@ -10227,14 +9600,6 @@ msgstr "Selecciona un archivo para empezar a editar."
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Select a platform"
 msgstr "Selecciona una plataforma"
-
-#: src/renderer/components/mcp/McpExternalImportModal.tsx
-#~ msgid "Select a project before importing to Project."
-#~ msgstr "Selecciona un proyecto antes de importar al proyecto."
-
-#: src/renderer/components/mcp/McpExternalImportModal.tsx
-#~ msgid "Select a project to scan project MCP servers."
-#~ msgstr "Selecciona un proyecto para analizar sus servidores MCP."
 
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "Select a repository."
@@ -10293,18 +9658,6 @@ msgstr "Seleccionar proyecto"
 #: src/renderer/components/common/Select.tsx
 msgid "Select…"
 msgstr "Seleccionar…"
-
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Selected days"
-#~ msgstr "Días seleccionados"
-
-#: src/renderer/components/mcp/McpExternalImportModal.tsx
-#~ msgid "Selected project"
-#~ msgstr "Proyecto seleccionado"
-
-#: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
-#~ msgid "Selects which Control Centre tool subset the \"control-centre\" MCP server exposes for this campaign project. Changes apply when Poracode next starts or reconnects to a newly launched MCP process."
-#~ msgstr "Selecciona qué subconjunto de herramientas de Control Centre expone el servidor MCP \"control-centre\" para este proyecto de campaña. Los cambios se aplican la próxima vez que Poracode se inicie o se reconecte a un proceso MCP recién lanzado."
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Selects which Control Centre tool subset the \"control-centre\" MCP server exposes for this campaign project. Changes apply when Tee's Cockpit next starts or reconnects to a newly launched MCP process."
@@ -10687,10 +10040,6 @@ msgstr "Comandos con barra"
 msgid "Solution {0}"
 msgstr "Solución {0}"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
-#~ msgid "Solution {ordinal}"
-#~ msgstr "Solución {ordinal}"
-
 #: src/mobile/views/pr/PrOverviewPage.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "Some checks are failing or pending."
@@ -10749,14 +10098,6 @@ msgstr "Celda de origen sin atribuir"
 msgid "Source health"
 msgstr "Estado de fuentes"
 
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Source Health"
-#~ msgstr "Estado de fuentes"
-
-#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-#~ msgid "Source health:"
-#~ msgstr "Estado de fuentes:"
-
 #. placeholder {0}: source.label
 #. placeholder {1}: source.freshness
 #: src/renderer/components/campaignDeployment/parts/EvidenceSection.tsx
@@ -10780,10 +10121,6 @@ msgstr "Separados por espacios; usa comillas si contienen espacios"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
 msgid "Spend"
 msgstr "Gasto"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Spend vs Budget"
-#~ msgstr "Gasto vs presupuesto"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextStatusStrip.tsx
 msgid "spent"
@@ -11081,10 +10418,6 @@ msgstr "Guardar como secreto (cifrado en reposo)"
 msgid "Stored on this device; the desktop keeps its own values."
 msgstr "Guardado en este dispositivo; el equipo de escritorio conserva sus propios valores."
 
-#: src/mobile/views/MoreView.tsx
-#~ msgid "Stored on this phone; the desktop keeps its own values."
-#~ msgstr "Guardado en este teléfono; el escritorio conserva sus propios valores."
-
 #: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
@@ -11099,11 +10432,6 @@ msgstr "Subagente no encontrado."
 msgid "Subagent Result"
 msgstr "Resultado del subagente"
 
-#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
-#~ msgid "Subagent routing guide"
-#~ msgstr "Guía de enrutamiento de subagentes"
-
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Subagent runs"
 msgstr "Ejecuciones de subagentes"
@@ -11112,10 +10440,6 @@ msgstr "Ejecuciones de subagentes"
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Subagents"
 msgstr "Subagentes"
-
-#: src/renderer/components/composer/composerMcpServers.ts
-#~ msgid "Subagents enabled for this thread"
-#~ msgstr "Subagentes habilitados para este hilo"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionRows.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
@@ -11146,10 +10470,6 @@ msgstr "Enviar revisión"
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "Succeeded"
 msgstr "Exitosa"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-#~ msgid "Suggested Questions"
-#~ msgstr "Preguntas sugeridas"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Suggestions"
@@ -11328,14 +10648,6 @@ msgstr "Toma el control del escritorio mientras el agente hace clic o escribe"
 msgid "Tap + to add a folder or clone a repository on your desktop."
 msgstr "Toca + para agregar una carpeta o clonar un repositorio en tu escritorio."
 
-#: src/mobile/views/DesktopsView.tsx
-#~ msgid "Tap + to pair directly or connect to a remote machine over SSH."
-#~ msgstr "Toca + para emparejar directamente o conectarte a una máquina remota mediante SSH."
-
-#: src/mobile/views/DesktopsView.tsx
-#~ msgid "Tap + to pair with Poracode on your desktop."
-#~ msgstr "Toca + para emparejar con Poracode en tu escritorio."
-
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CreatePrModal.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "Target branch"
@@ -11453,11 +10765,6 @@ msgstr "Ese código QR no es un enlace de emparejamiento de Poracode."
 msgid "That remote session was already gone."
 msgstr "Esa sesión remota ya no existía."
 
-#. placeholder {0}: target.wslDistro
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "the {0} WSL user"
-#~ msgstr "el usuario de WSL {0}"
-
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "The active remote Control Centre profile is managed by the remote server administrator. Remote servers do not support client-controlled profile reconfiguration."
 msgstr "El perfil activo de Control Centre remoto es administrado por el administrador del servidor remoto. Los servidores remotos no admiten la reconfiguración de perfiles controlada por el cliente."
@@ -11478,10 +10785,6 @@ msgstr "la app"
 msgid "The approved change is being applied to the platform."
 msgstr "El cambio aprobado se está aplicando en la plataforma."
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
-#~ msgid "the base branch"
-#~ msgstr "la rama base"
-
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "The candidates changed after judging. Compare them again."
 msgstr "Los candidatos cambiaron después de la evaluación. Compáralos de nuevo."
@@ -11497,6 +10800,10 @@ msgstr "la carpeta elegida"
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
 msgid "The Control Centre campaign group this workspace binds to."
 msgstr "El grupo de campaña del Centro de control al que se vincula este espacio de trabajo."
+
+#: src/renderer/campaign/controlCentreAvailabilityCopy.ts
+msgid "The Control Centre MCP server is disabled. Enable it in MCP settings."
+msgstr "El servidor MCP de Control Centre está desactivado. Actívalo en la configuración de MCP."
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "The decision could not be submitted"
@@ -11578,14 +10885,6 @@ msgstr "La ubicación del repositorio en el disco. Actualízala si moviste la ca
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "The root and reviewer use the strongest available reasoning tier."
 msgstr "El agente raíz y el revisor usan el nivel de razonamiento más potente disponible."
-
-#: src/renderer/components/mcp/McpServersManager.tsx
-#~ msgid "The selected file does not contain valid MCP server configurations."
-#~ msgstr "El archivo seleccionado no contiene configuraciones de servidores MCP válidas."
-
-#: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
-#~ msgid "The selected model compares anonymized snapshots of each candidate's changes. It recommends a winner without merging anything."
-#~ msgstr "El modelo seleccionado compara instantáneas anonimizadas de los cambios de cada candidato. Recomienda un ganador sin fusionar nada."
 
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
 msgid "The selected model compares snapshots of each candidate's changes under anonymous labels. It recommends a winner without merging anything."
@@ -11675,21 +10974,9 @@ msgstr "Esta acción no se puede deshacer. Escribe la frase de confirmación exa
 msgid "This agent is not installed."
 msgstr "Este agente no está instalado."
 
-#: src/mobile/routeComponents.tsx
-#~ msgid "This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
-#~ msgstr "Esta app se sirve por HTTPS, pero el escritorio usa HTTP sin cifrar, que los navegadores bloquean. Abre el enlace de emparejamiento directamente desde el escritorio (LAN) o expón el escritorio por HTTPS."
-
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "This browser does not support system notifications here; you will still see in-app toasts."
 msgstr "Este navegador no admite notificaciones del sistema aquí; seguirás viendo avisos dentro de la app."
-
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "This catalog manages downloads through its website."
-#~ msgstr "Este catálogo gestiona las descargas mediante su sitio web."
-
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "This catalog requires its own API key."
-#~ msgstr "Este catálogo requiere su propia clave de API."
 
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "This connection can view projects but not manage them. Re-pair to enable."
@@ -11771,10 +11058,6 @@ msgid "This removes the worktree on \"{0}\", then deletes the branch."
 msgstr "Esto elimina el worktree en \"{0}\" y luego elimina la rama."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
-#~ msgid "This server requires authentication before Poracode can check it."
-#~ msgstr "Este servidor requiere autenticación antes de que Poracode pueda comprobarlo."
-
-#: src/renderer/components/mcp/McpServersManager.tsx
 msgid "This server requires authentication before Tee's Cockpit can check it."
 msgstr "Este servidor requiere autenticación antes de que Tee's Cockpit pueda comprobarlo."
 
@@ -11786,11 +11069,6 @@ msgstr "Este atajo global no está disponible. Elige otra combinación de teclas
 #: src/renderer/views/MainView/parts/Sidebar/parts/DeleteWorktreeDialog.tsx
 msgid "This thread uses worktree <0>{0}</0>. Also remove the worktree directory?"
 msgstr "Este hilo usa el worktree <0>{0}</0>. ¿Eliminar también el directorio del worktree?"
-
-#. placeholder {0}: activeDialog.sourceBranch
-#: src/renderer/views/MainView/parts/PullFromSourceDialog.tsx
-#~ msgid "This worktree has local changes. Poracode can temporarily stash them, pull from {0}, then re-apply your changes."
-#~ msgstr "Este worktree tiene cambios locales. Poracode puede guardarlos temporalmente en el stash, extraer de {0} y luego volver a aplicar tus cambios."
 
 #. placeholder {0}: activeDialog.sourceBranch
 #: src/renderer/views/MainView/parts/PullFromSourceDialog.tsx
@@ -11846,10 +11124,6 @@ msgstr "Panel del objetivo del hilo"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Thread is already unloaded."
 msgstr "El hilo ya está descargado."
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-#~ msgid "Thread messages will appear here"
-#~ msgstr "Los mensajes del hilo aparecerán aquí"
 
 #: src/renderer/components/thread/PresentationModeTabs.tsx
 msgid "Thread mode"
@@ -12072,10 +11346,6 @@ msgstr "Tipo"
 #: src/renderer/commands/CommandPalette.tsx
 msgid "Type a command"
 msgstr "Escribe un comando"
-
-#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-#~ msgid "Type a message…"
-#~ msgstr "Escriba un mensaje…"
 
 #: src/mobile/views/BrowserView.tsx
 msgid "Type into the page"
@@ -12651,10 +11921,6 @@ msgstr "Usado"
 msgid "Used by {conflict}"
 msgstr "Lo usa {conflict}"
 
-#: src/renderer/components/mcp/McpServersManager.tsx
-#~ msgid "User"
-#~ msgstr "Usuario"
-
 #: src/mobile/views/DesktopsView.tsx
 msgid "user@example.com"
 msgstr "user@example.com"
@@ -12728,10 +11994,6 @@ msgstr "Ver texto sin formato"
 msgid "View rendered"
 msgstr "Ver vista renderizada"
 
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "View skill"
-#~ msgstr "Ver skill"
-
 #: src/renderer/commands/registry.ts
 msgid "View the changelog"
 msgstr "Ver el registro de cambios"
@@ -12772,10 +12034,6 @@ msgstr "Espera a que todos los candidatos terminen antes de realizar la limpieza
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "Wait for every candidate to finish before comparing them."
 msgstr "Espera a que todos los candidatos terminen antes de compararlos."
-
-#: src/renderer/actions/experimentDecisionActions.ts
-#~ msgid "Wait for every candidate to finish before discarding the experiment."
-#~ msgstr "Espera a que todos los candidatos terminen antes de descartar el experimento."
 
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 msgid "Wait for every candidate to finish before judging."
@@ -12898,10 +12156,6 @@ msgstr "Revisión semanal"
 msgid "What did you decide?"
 msgstr "¿Qué decidiste?"
 
-#: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "What should the agent do?"
-#~ msgstr "¿Qué debe hacer el agente?"
-
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "What should the remote agent work on?"
 msgstr "¿En qué debe trabajar el agente remoto?"
@@ -12926,21 +12180,12 @@ msgid "What's New"
 msgstr "Novedades"
 
 #: src/renderer/views/SettingsOverlay/parts/ChangelogSettings.tsx
-#~ msgid "What's new in Poracode, newest first."
-#~ msgstr "Novedades en Poracode, las más recientes primero."
-
-#: src/renderer/views/SettingsOverlay/parts/ChangelogSettings.tsx
 msgid "What's new in Tee's Cockpit, newest first."
 msgstr "Novedades en Tee's Cockpit, las más recientes primero."
 
 #: src/renderer/views/SettingsOverlay/parts/SearchSettings.tsx
 msgid "When enabled, search respects <0>.gitignore</0> entries."
 msgstr "Cuando está activado, la búsqueda respeta las entradas de <0>.gitignore</0>."
-
-#: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "When links open in a Poracode browser tab, choose where the browser is revealed."
-#~ msgstr "Cuando los enlaces se abren en una pestaña del navegador de Poracode, elige dónde se muestra el navegador."
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -12958,11 +12203,6 @@ msgstr "Cuándo mostrar avisos dentro de la app para los hilos visibles."
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "When you close the window, keep Poracode running in the system tray. Disable to quit on close."
-#~ msgstr "Cuando cierres la ventana, mantener Poracode en ejecución en la bandeja del sistema. Desactívalo para salir al cerrar."
-
-#: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "When you close the window, keep Tee's Cockpit running in the system tray. Disable to quit on close."
 msgstr "Cuando cierres la ventana, mantener Tee's Cockpit en ejecución en la bandeja del sistema. Desactívalo para salir al cerrar."
 
@@ -12974,10 +12214,6 @@ msgstr "Adónde va la selección del selector de elementos del navegador en los 
 #: src/renderer/views/WelcomeOverlay.tsx
 msgid "Where do you want to begin?"
 msgstr "¿Por dónde quieres empezar?"
-
-#: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
-#~ msgid "Where Poracode creates git worktrees for new branches. Changes apply to worktrees created from now on; existing worktrees stay where they are."
-#~ msgstr "Dónde crea Poracode los worktrees de git para las nuevas ramas. Los cambios se aplican a los worktrees creados a partir de ahora; los worktrees existentes permanecen donde están."
 
 #: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
 msgid "Where Tee's Cockpit creates git worktrees for new branches. Changes apply to worktrees created from now on; existing worktrees stay where they are."
@@ -13016,10 +12252,6 @@ msgstr "Se ejecutará en {0}:"
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "Windows"
 msgstr "Windows"
-
-#: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
-#~ msgid "Windows is not supported yet. Install inside WSL or on macOS/Linux."
-#~ msgstr "Windows aún no es compatible. Instala dentro de WSL o en macOS/Linux."
 
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 msgid "Winner merged."
@@ -13222,14 +12454,13 @@ msgstr "WSL ({distro})"
 msgid "WSL base folder"
 msgstr "Carpeta base de WSL"
 
-#: src/renderer/components/skills/SkillImportModal.tsx
-#: src/renderer/components/skills/SkillsManager.tsx
-#~ msgid "WSL user"
-#~ msgstr "Usuario de WSL"
-
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Yes"
 msgstr "Sí"
+
+#: src/renderer/campaign/controlCentreAvailabilityCopy.ts
+msgid "You can still create a campaign workspace manually, but live campaign context will not load until Control Centre is connected."
+msgstr "Aún puedes crear un espacio de trabajo de campaña manualmente, pero el contexto de campaña en vivo no se cargará hasta que Control Centre esté conectado."
 
 #: src/renderer/campaign/cockpit/cockpitGreeting.ts
 msgid "You're all caught up."
@@ -13250,10 +12481,6 @@ msgstr "Tus cambios locales se guardaron en un stash y se volverán a aplicar cu
 #: src/renderer/views/ProfileOverlay/parts/EditProfileDialog.tsx
 msgid "Your name"
 msgstr "Tu nombre"
-
-#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
-#~ msgid "Your pick"
-#~ msgstr "Tu elección"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Your stashed local changes were re-applied."

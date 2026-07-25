@@ -119,7 +119,9 @@ describe("CampaignTodayView", () => {
 
     render(<CampaignTodayView />);
 
-    expect(screen.getByText(/Add Control Centre MCP to a campaign project/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/No MCP server named "control-centre" is configured/i),
+    ).toBeInTheDocument();
     expect(
       screen.queryByText(/links Poracode to your Control Centre campaigns/i),
     ).not.toBeInTheDocument();

@@ -4,13 +4,17 @@ import type { z } from "zod";
 import { i18n } from "@/renderer/i18n/i18n";
 import {
   applyCampaignMcpProfile,
-  CONTROL_CENTRE_MCP_SERVER_NAME,
+  diagnoseControlCentreMcpSetup,
   getCampaignMcpProfile,
   mergeMcpServers,
   type McpServer,
   type McpToolCallResult,
   type Project,
 } from "@/shared/contracts";
+import {
+  controlCentreUnavailableMessage,
+  type ControlCentreUnavailableReason,
+} from "@/renderer/campaign/controlCentreAvailabilityCopy";
 import { readBridge } from "@/renderer/bridge";
 import { useProject } from "@/renderer/state/useThread";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
@@ -24,7 +28,11 @@ export type ControlCentreToolState<T> =
   | { status: "loading" }
   | { status: "empty" }
   | { status: "unauthorized" }
-  | { status: "unavailable"; message: string }
+  | {
+      status: "unavailable";
+      message: string;
+      reason: ControlCentreUnavailableReason;
+    }
   | { status: "error"; message: string }
   | { status: "ready"; data: T };
 
@@ -35,12 +43,33 @@ export function resolveControlCentreServer(
 ): McpServer | undefined {
   if (!project) return undefined;
   const merged = mergeMcpServers(userMcpServers, project.mcpServers ?? []);
-  const server = merged.find(
-    (candidate) =>
-      candidate.enabled && candidate.name.trim().toLowerCase() === CONTROL_CENTRE_MCP_SERVER_NAME,
-  );
-  if (!server) return undefined;
-  return applyCampaignMcpProfile([server], getCampaignMcpProfile(project))[0];
+  const setup = diagnoseControlCentreMcpSetup(merged);
+  if (setup.kind !== "ready") return undefined;
+  return applyCampaignMcpProfile([setup.server], getCampaignMcpProfile(project))[0];
+}
+
+function unavailableState(
+  reason: Exclude<ControlCentreUnavailableReason, "connection-failed">,
+): ControlCentreToolState<never> {
+  return {
+    status: "unavailable",
+    reason,
+    message: i18n._(controlCentreUnavailableMessage(reason)),
+  };
+}
+
+function resolveUnavailableState(
+  project: Project | undefined,
+  userMcpServers: readonly McpServer[],
+): ControlCentreToolState<never> {
+  const merged = project
+    ? mergeMcpServers(userMcpServers, project.mcpServers ?? [])
+    : userMcpServers;
+  const setup = diagnoseControlCentreMcpSetup(merged);
+  if (setup.kind === "disabled") {
+    return unavailableState("disabled");
+  }
+  return unavailableState("not-configured");
 }
 
 function stateFromResult<T>(
@@ -50,7 +79,11 @@ function stateFromResult<T>(
 ): ControlCentreToolState<T> {
   if (result.status === "auth-required") return { status: "unauthorized" };
   if (result.status === "unavailable") {
-    return { status: "unavailable", message: result.error.message };
+    return {
+      status: "unavailable",
+      reason: "connection-failed",
+      message: result.error.message,
+    };
   }
   if (result.status === "tool-error") return { status: "error", message: result.message };
   // If content is a raw string, JSON.parse failed in extractToolResultContent —
@@ -141,10 +174,7 @@ export function useControlCentreTool<T>(options: {
       return;
     }
     if (!server) {
-      setState({
-        status: "unavailable",
-        message: i18n._(msg`No Control Centre MCP server is configured for this project.`),
-      });
+      setState(resolveUnavailableState(project, userMcpServers));
       return;
     }
 
@@ -167,6 +197,7 @@ export function useControlCentreTool<T>(options: {
         if (!mounted.current || requestSequence.current !== sequence) return;
         setState({
           status: "unavailable",
+          reason: "connection-failed",
           message: i18n._(msg`Could not reach the MCP runtime.`),
         });
       });

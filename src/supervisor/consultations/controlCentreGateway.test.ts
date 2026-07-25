@@ -21,21 +21,21 @@ function makeControlCentreServer(overrides: Partial<McpServer> = {}): McpServer 
 describe("McpControlCentreGateway authenticated transport", () => {
   it("applies OAuth authorization to the server before connecting", async () => {
     let calledServer: McpServer | undefined;
-    const applyAuthorization = vi.fn<(server: McpServer) => Promise<McpServer>>(
-      async (server) => {
-        calledServer = server;
-        return {
-          ...server,
-          transport: {
-            ...server.transport,
-            headers: {
-              ...(server.transport.type === "http" ? (server.transport as { headers?: Record<string, string> }).headers : {}),
-              Authorization: "Bearer test-token-123",
-            },
+    const applyAuthorization = vi.fn<(server: McpServer) => Promise<McpServer>>(async (server) => {
+      calledServer = server;
+      return {
+        ...server,
+        transport: {
+          ...server.transport,
+          headers: {
+            ...(server.transport.type === "http"
+              ? (server.transport as { headers?: Record<string, string> }).headers
+              : {}),
+            Authorization: "Bearer test-token-123",
           },
-        };
-      },
-    );
+        },
+      };
+    });
 
     const gateway = new McpControlCentreGateway({
       getProjectMcpServers: () => [makeControlCentreServer()],
@@ -75,7 +75,35 @@ describe("McpControlCentreGateway authenticated transport", () => {
     });
 
     const result = await gateway.callTool("p-1", "get_campaign_context", { id: "cg-1" });
-    expect(result.status).toBe("not-configured");
+    expect(result).toMatchObject({
+      status: "not-configured",
+      message: expect.stringContaining("control-centre"),
+    });
+  });
+
+  it("accepts Control_Centre as the server name", async () => {
+    const gateway = new McpControlCentreGateway({
+      getProjectMcpServers: () => [makeControlCentreServer({ name: "Control_Centre" })],
+      getSharedMcpServers: () => [],
+    });
+
+    const result = await gateway.callTool("p-1", "get_campaign_context", { id: "cg-1" });
+    expect(result.status).not.toBe("not-configured");
+  });
+
+  it("returns not-configured with a disabled message when the matching server is off", async () => {
+    const gateway = new McpControlCentreGateway({
+      getProjectMcpServers: () => [
+        makeControlCentreServer({ name: "control centre", enabled: false }),
+      ],
+      getSharedMcpServers: () => [],
+    });
+
+    const result = await gateway.callTool("p-1", "get_campaign_context", { id: "cg-1" });
+    expect(result).toMatchObject({
+      status: "not-configured",
+      message: expect.stringContaining("disabled"),
+    });
   });
 
   it("returns auth-required when the server is disabled after authorization", async () => {
