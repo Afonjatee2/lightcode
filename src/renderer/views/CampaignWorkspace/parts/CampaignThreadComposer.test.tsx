@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
         message: string;
       }) => Promise<{ ok: true; consultation: { id: string } } | { ok: false; message: string }>
     >(),
+  submitThreadInput:
+    vi.fn<(threadId: string, prompt: string, segments?: unknown[]) => Promise<void>>(),
   copyCampaignConsultationAttachments: vi.fn<
     (input: { projectId: string; sourcePaths: string[] }) => Promise<{
       copies: Array<{
@@ -41,6 +43,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/renderer/actions/consultationActions", () => ({
   submitConsultation: mocks.submitConsultation,
+}));
+
+vi.mock("@/renderer/actions/threadRuntimeActions", () => ({
+  submitThreadInput: mocks.submitThreadInput,
 }));
 
 vi.mock("@/renderer/bridge", async (importOriginal) => {
@@ -72,7 +78,12 @@ vi.mock("@/renderer/components/composer/useAttachments", () => ({
           sourceUrl: string;
         }) => void
       >(),
-    toSegments: vi.fn<() => []>(() => []),
+    toSegments: () =>
+      mocks.attachments.map((attachment) => ({
+        kind: "attachment" as const,
+        path: attachment.path,
+        ...(attachment.mimeType ? { mimeType: attachment.mimeType } : {}),
+      })),
     restore: vi.fn<(attachments: unknown[]) => void>(),
   }),
 }));
@@ -96,6 +107,7 @@ describe("CampaignThreadComposer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.attachments = [];
+    mocks.submitThreadInput.mockResolvedValue(undefined);
     mocks.submitConsultation.mockResolvedValue({
       ok: true,
       consultation: { id: "consultation-1" },
@@ -130,7 +142,7 @@ describe("CampaignThreadComposer", () => {
     expect(mocks.clearAll).toHaveBeenCalled();
   });
 
-  it("wraps plain text with the default provider before submitting", async () => {
+  it("dispatches plain text to submitThreadInput on the active thread", async () => {
     render(
       <CampaignThreadComposer
         projectId="project-1"
@@ -144,16 +156,42 @@ describe("CampaignThreadComposer", () => {
     fireEvent.change(composer, { target: { value: "Summarise pacing" } });
     fireEvent.click(screen.getByRole("button", { name: /send message/i }));
 
+    await waitFor(() => expect(mocks.submitThreadInput).toHaveBeenCalledTimes(1));
+    expect(mocks.submitThreadInput).toHaveBeenCalledWith("thread-1", "Summarise pacing", [
+      { kind: "text", content: "Summarise pacing" },
+    ]);
+    expect(mocks.submitConsultation).not.toHaveBeenCalled();
+    expect(composer).toHaveValue("");
+    expect(mocks.clearAll).toHaveBeenCalled();
+  });
+
+  it("dispatches @verify mentions to submitConsultation", async () => {
+    render(
+      <CampaignThreadComposer
+        projectId="project-1"
+        parentThreadId="thread-1"
+        campaignGroupId="cg-1"
+        defaultProvider="claude"
+      />,
+    );
+
+    const composer = screen.getByRole("textbox", { name: /message composer/i });
+    fireEvent.change(composer, { target: { value: "@verify check the KPI evidence" } });
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+
     await waitFor(() => expect(mocks.submitConsultation).toHaveBeenCalledTimes(1));
     expect(mocks.submitConsultation).toHaveBeenCalledWith({
       projectId: "project-1",
       parentThreadId: "thread-1",
       campaignGroupId: "cg-1",
-      message: "@codex Summarise pacing",
+      message: "@verify check the KPI evidence",
     });
+    expect(mocks.submitThreadInput).not.toHaveBeenCalled();
+    expect(composer).toHaveValue("");
+    expect(mocks.clearAll).toHaveBeenCalled();
   });
 
-  it("copies attachments into the workspace and references them in the message", async () => {
+  it("copies attachments into the workspace and references them in consultation messages", async () => {
     mocks.attachments = [
       {
         id: "att-1",
@@ -183,7 +221,7 @@ describe("CampaignThreadComposer", () => {
     );
 
     const composer = screen.getByRole("textbox", { name: /message composer/i });
-    fireEvent.change(composer, { target: { value: "Review the plan" } });
+    fireEvent.change(composer, { target: { value: "@codex Review the plan" } });
     fireEvent.click(screen.getByRole("button", { name: /send message/i }));
 
     await waitFor(() => expect(mocks.submitConsultation).toHaveBeenCalledTimes(1));
@@ -197,6 +235,38 @@ describe("CampaignThreadComposer", () => {
       campaignGroupId: "cg-1",
       message: "@codex Review the plan\n\nAttached files: ./attachments/plan-v3.xlsx",
     });
+    expect(mocks.submitThreadInput).not.toHaveBeenCalled();
+  });
+
+  it("sends plain-text attachments through submitThreadInput segments", async () => {
+    mocks.attachments = [
+      {
+        id: "att-1",
+        path: "/tmp/plan-v3.xlsx",
+        name: "plan-v3.xlsx",
+        isImage: false,
+      },
+    ];
+
+    render(
+      <CampaignThreadComposer
+        projectId="project-1"
+        parentThreadId="thread-1"
+        campaignGroupId="cg-1"
+        defaultProvider="codex"
+      />,
+    );
+
+    const composer = screen.getByRole("textbox", { name: /message composer/i });
+    fireEvent.change(composer, { target: { value: "Review the plan" } });
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+
+    await waitFor(() => expect(mocks.submitThreadInput).toHaveBeenCalledTimes(1));
+    expect(mocks.copyCampaignConsultationAttachments).not.toHaveBeenCalled();
+    expect(mocks.submitThreadInput).toHaveBeenCalledWith("thread-1", "Review the plan", [
+      { kind: "attachment", path: "/tmp/plan-v3.xlsx" },
+      { kind: "text", content: "Review the plan" },
+    ]);
   });
 
   it("adds picked files through the attachment hook", async () => {
@@ -340,7 +410,7 @@ describe("CampaignThreadComposer", () => {
     expect(composer).toHaveValue("@codex");
   });
 
-  it("warns when a copied attachment exceeds 100 MB", async () => {
+  it("warns when a copied consultation attachment exceeds 100 MB", async () => {
     mocks.attachments = [
       {
         id: "att-1",
@@ -369,9 +439,12 @@ describe("CampaignThreadComposer", () => {
       />,
     );
 
+    const composer = screen.getByRole("textbox", { name: /message composer/i });
+    fireEvent.change(composer, { target: { value: "@codex review this archive" } });
     fireEvent.click(screen.getByRole("button", { name: /send message/i }));
 
     await waitFor(() => expect(mocks.toastWarning).toHaveBeenCalled());
     expect(mocks.submitConsultation).toHaveBeenCalled();
+    expect(mocks.submitThreadInput).not.toHaveBeenCalled();
   });
 });

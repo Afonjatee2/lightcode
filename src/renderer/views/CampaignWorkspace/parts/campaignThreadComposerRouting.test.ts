@@ -58,10 +58,10 @@ describe("routeCampaignComposerMessage", () => {
     });
   });
 
-  it("wraps plain text with the default provider", () => {
+  it("routes plain text to the active thread chat path", () => {
     expect(routeCampaignComposerMessage("Summarise pacing", "codex")).toEqual({
-      kind: "consultation",
-      message: "@codex Summarise pacing",
+      kind: "chat",
+      message: "Summarise pacing",
     });
   });
 

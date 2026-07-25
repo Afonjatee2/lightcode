@@ -582,8 +582,8 @@ msgid "@{0} is reserved for a built-in mention."
 msgstr "@{0} is reserved for a built-in mention."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
-msgid "@codex check budget pacing, or type a message…"
-msgstr "@codex check budget pacing, or type a message…"
+#~ msgid "@codex check budget pacing, or type a message…"
+#~ msgstr "@codex check budget pacing, or type a message…"
 
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "@codex check the budget pacing"
@@ -1379,6 +1379,11 @@ msgstr "Arguments"
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Ask"
 msgstr "Ask"
+
+#. placeholder {0}: props.defaultProvider
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+msgid "Ask {0} about this campaign — @mention for roles"
+msgstr "Ask {0} about this campaign — @mention for roles"
 
 #. placeholder {0}: agentStatus?.label ?? agentFallbackLabel
 #. placeholder {0}: project.name
@@ -2964,8 +2969,8 @@ msgid "Consultation failed"
 msgstr "Consultation failed"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
-msgstr "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
+#~ msgid "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
+#~ msgstr "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Consultation was cancelled"
@@ -6025,6 +6030,10 @@ msgstr "Loading skills…"
 #: src/mobile/views/ThreadView.tsx
 msgid "Loading thread"
 msgstr "Loading thread"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Loading thread…"
+msgstr "Loading thread…"
 
 #: src/mobile/views/ThreadsView.tsx
 msgid "Loading threads"

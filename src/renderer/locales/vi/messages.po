@@ -582,8 +582,8 @@ msgid "@{0} is reserved for a built-in mention."
 msgstr "@{0} được dành riêng cho lượt nhắc tích hợp."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
-msgid "@codex check budget pacing, or type a message…"
-msgstr "@codex kiểm tra tiến độ ngân sách hoặc nhập tin nhắn…"
+#~ msgid "@codex check budget pacing, or type a message…"
+#~ msgstr "@codex kiểm tra tiến độ ngân sách hoặc nhập tin nhắn…"
 
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "@codex check the budget pacing"
@@ -1379,6 +1379,11 @@ msgstr "Đối số"
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Ask"
 msgstr "Hỏi"
+
+#. placeholder {0}: props.defaultProvider
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+msgid "Ask {0} about this campaign — @mention for roles"
+msgstr "Hỏi {0} về chiến dịch này — @mention cho vai trò"
 
 #. placeholder {0}: agentStatus?.label ?? agentFallbackLabel
 #. placeholder {0}: project.name
@@ -2964,8 +2969,8 @@ msgid "Consultation failed"
 msgstr "Tư vấn thất bại"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
-msgstr "Kết quả tư vấn sẽ hiển thị tại đây. Dùng @codex, @verify, @panel và các đề cập khác trong ô soạn thảo bên dưới."
+#~ msgid "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
+#~ msgstr "Kết quả tư vấn sẽ hiển thị tại đây. Dùng @codex, @verify, @panel và các đề cập khác trong ô soạn thảo bên dưới."
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Consultation was cancelled"
@@ -6025,6 +6030,10 @@ msgstr "Đang tải skill…"
 #: src/mobile/views/ThreadView.tsx
 msgid "Loading thread"
 msgstr "Đang tải luồng"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Loading thread…"
+msgstr "Đang tải luồng…"
 
 #: src/mobile/views/ThreadsView.tsx
 msgid "Loading threads"

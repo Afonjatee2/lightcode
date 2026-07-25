@@ -582,8 +582,8 @@ msgid "@{0} is reserved for a built-in mention."
 msgstr "@{0}은(는) 기본 제공 멘션용으로 예약되어 있습니다."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
-msgid "@codex check budget pacing, or type a message…"
-msgstr "@codex 예산 진행 속도 확인 또는 메시지 입력…"
+#~ msgid "@codex check budget pacing, or type a message…"
+#~ msgstr "@codex 예산 진행 속도 확인 또는 메시지 입력…"
 
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "@codex check the budget pacing"
@@ -1379,6 +1379,11 @@ msgstr "인수"
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Ask"
 msgstr "질문"
+
+#. placeholder {0}: props.defaultProvider
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+msgid "Ask {0} about this campaign — @mention for roles"
+msgstr "{0}에게 이 캠페인에 대해 질문하세요 — 역할은 @멘션"
 
 #. placeholder {0}: agentStatus?.label ?? agentFallbackLabel
 #. placeholder {0}: project.name
@@ -2964,8 +2969,8 @@ msgid "Consultation failed"
 msgstr "상담 실패"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
-msgstr "상담 결과가 여기에 표시됩니다. 아래 작성기에서 @codex, @verify, @panel 및 기타 멘션을 사용하세요."
+#~ msgid "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
+#~ msgstr "상담 결과가 여기에 표시됩니다. 아래 작성기에서 @codex, @verify, @panel 및 기타 멘션을 사용하세요."
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Consultation was cancelled"
@@ -6025,6 +6030,10 @@ msgstr "스킬 불러오는 중…"
 #: src/mobile/views/ThreadView.tsx
 msgid "Loading thread"
 msgstr "스레드 로드 중"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Loading thread…"
+msgstr "스레드 로드 중…"
 
 #: src/mobile/views/ThreadsView.tsx
 msgid "Loading threads"

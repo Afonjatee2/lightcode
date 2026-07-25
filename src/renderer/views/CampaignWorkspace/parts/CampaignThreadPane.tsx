@@ -9,10 +9,13 @@ import {
 } from "@/renderer/actions/campaignChatThreadActions";
 import { selectCampaignTopic } from "@/renderer/actions/campaignTopicThreadActions";
 import { openThread } from "@/renderer/actions/threadActions";
+import { ChatPane } from "@/renderer/components/thread/ChatPane/ChatPane";
+import { guiChatFontCssVars } from "@/renderer/components/thread/ChatPane/chatFontVars";
 import { ConsultationDock } from "@/renderer/components/consultations";
 import { useConsultationStore } from "@/renderer/components/consultations/consultationStore";
 import { useProjectThreads } from "@/renderer/hooks/uiSelectors";
 import { useAppStore } from "@/renderer/state/appStore";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { resolveCampaignAttachmentAbsolutePath } from "@/renderer/services/planIntelligence/resolveCampaignAttachmentPath";
 import { CampaignChatsDropdown } from "./CampaignChatsDropdown";
 import { CampaignThreadComposer } from "./CampaignThreadComposer";
@@ -34,6 +37,7 @@ export function CampaignThreadPane(props: {
   }) => void;
 }) {
   const { t } = useLingui();
+  const guiChatFontSize = useSharedSettings((state) => state.guiChatFontSize);
   const projectThreads = useProjectThreads(props.projectId);
   const consultationRecords = useConsultationStore((state) => state.records);
   const campaignTopicLastViewedAtByThreadId = useAppStore(
@@ -89,11 +93,6 @@ export function CampaignThreadPane(props: {
     ? projectThreads.find((thread) => thread.id === threadId)
     : undefined;
   const isChatMode = Boolean(activeChatId && threadId === activeChatId);
-  const hasConsultations = useConsultationStore((state) =>
-    threadId
-      ? [...state.records.values()].some((record) => record.parentThreadId === threadId)
-      : false,
-  );
   const mediaPlanPrompts = (() => {
     if (!threadId) return [];
     const prompts: Array<{ recordId: string; path: string; fileName: string }> = [];
@@ -208,64 +207,70 @@ export function CampaignThreadPane(props: {
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-4">
-          {threadId ? (
-            <ConsultationDock
-              threadId={threadId}
-              onOpenThread={(childThreadId) => openThread(childThreadId)}
-            />
-          ) : null}
-          {mediaPlanPrompts.length > 0 && props.onAnalyzeMediaPlan && props.identity ? (
-            <div className="mb-4 space-y-2 rounded-xl border border-[var(--hairline)] bg-surface-secondary p-3">
-              <p className="text-xs text-muted">
-                <Trans>Media plan attachments detected in this thread.</Trans>
-              </p>
-              {mediaPlanPrompts.map((attachment) => (
-                <div
-                  key={`${attachment.recordId}:${attachment.path}`}
-                  className="flex flex-wrap items-center gap-2"
-                >
-                  <span className="inline-flex items-center gap-2 rounded-md border border-divider px-2.5 py-1.5 text-xs text-default-600">
-                    <FileSpreadsheet className="size-3.5 text-success" aria-hidden />
-                    {attachment.fileName}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-[var(--cockpit-accent)]"
-                    data-testid={`analyze-media-plan-${attachment.fileName}`}
-                    onPress={() => {
-                      void resolveCampaignAttachmentAbsolutePath({
-                        projectId: props.projectId,
-                        relativePath: attachment.path,
-                      })
-                        .then((filePath) =>
-                          props.onAnalyzeMediaPlan?.({
-                            filePath,
-                            filename: attachment.fileName,
-                            campaignGroupId: props.identity!.campaignGroupId,
-                          }),
-                        )
-                        .catch(() => undefined);
-                    }}
-                  >
-                    <Trans>Compare to published plan</Trans>
-                  </Button>
+        {activeThread ? (
+          <div
+            className="flex min-h-0 flex-1 flex-col overflow-hidden text-[length:var(--lc-chat-font-size)]"
+            style={guiChatFontCssVars(guiChatFontSize)}
+          >
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <ChatPane thread={activeThread} />
+            </div>
+            <div className="shrink-0 overflow-y-auto px-5">
+              {threadId ? (
+                <ConsultationDock
+                  threadId={threadId}
+                  onOpenThread={(childThreadId) => openThread(childThreadId)}
+                />
+              ) : null}
+              {mediaPlanPrompts.length > 0 && props.onAnalyzeMediaPlan && props.identity ? (
+                <div className="mb-4 space-y-2 rounded-xl border border-[var(--hairline)] bg-surface-secondary p-3">
+                  <p className="text-xs text-muted">
+                    <Trans>Media plan attachments detected in this thread.</Trans>
+                  </p>
+                  {mediaPlanPrompts.map((attachment) => (
+                    <div
+                      key={`${attachment.recordId}:${attachment.path}`}
+                      className="flex flex-wrap items-center gap-2"
+                    >
+                      <span className="inline-flex items-center gap-2 rounded-md border border-divider px-2.5 py-1.5 text-xs text-default-600">
+                        <FileSpreadsheet className="size-3.5 text-success" aria-hidden />
+                        {attachment.fileName}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-[var(--cockpit-accent)]"
+                        data-testid={`analyze-media-plan-${attachment.fileName}`}
+                        onPress={() => {
+                          void resolveCampaignAttachmentAbsolutePath({
+                            projectId: props.projectId,
+                            relativePath: attachment.path,
+                          })
+                            .then((filePath) =>
+                              props.onAnalyzeMediaPlan?.({
+                                filePath,
+                                filename: attachment.fileName,
+                                campaignGroupId: props.identity!.campaignGroupId,
+                              }),
+                            )
+                            .catch(() => undefined);
+                        }}
+                      >
+                        <Trans>Compare to published plan</Trans>
+                      </Button>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : null}
             </div>
-          ) : null}
-          {!hasConsultations ? (
-            <div className="flex flex-1 flex-col items-center justify-center px-4 text-muted">
-              <p className="max-w-md text-center text-sm">
-                <Trans>
-                  Consultation results appear here. Use @codex, @verify, @panel, and other mentions
-                  in the composer below.
-                </Trans>
-              </p>
-            </div>
-          ) : null}
-        </div>
+          </div>
+        ) : (
+          <div className="flex flex-1 items-center justify-center px-4 text-muted">
+            <p className="max-w-md text-center text-sm">
+              <Trans>Loading thread…</Trans>
+            </p>
+          </div>
+        )}
 
         <CampaignThreadComposer
           projectId={props.projectId}

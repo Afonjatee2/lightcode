@@ -31,6 +31,12 @@ vi.mock("@/renderer/components/consultations", () => ({
   ConsultationDock: () => <div data-testid="consultation-dock" />,
 }));
 
+vi.mock("@/renderer/components/thread/ChatPane/ChatPane", () => ({
+  ChatPane: (props: { thread: { id: string } }) => (
+    <div data-testid="campaign-chat-pane">{props.thread.id}</div>
+  ),
+}));
+
 vi.mock("./CampaignThreadComposer", () => ({
   CampaignThreadComposer: () => <div data-testid="campaign-thread-composer" />,
 }));
@@ -109,5 +115,16 @@ describe("CampaignThreadPane chats", () => {
         campaignGroupId: "group-1",
       }),
     );
+  });
+
+  it("renders the active thread chat timeline above consultations", async () => {
+    render(
+      <CampaignThreadPane projectId="project-1" identity={identity} suggestedQuestions={[]} />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("campaign-chat-pane")).toHaveTextContent("topic-thread"),
+    );
+    expect(screen.getByTestId("consultation-dock")).toBeInTheDocument();
   });
 });

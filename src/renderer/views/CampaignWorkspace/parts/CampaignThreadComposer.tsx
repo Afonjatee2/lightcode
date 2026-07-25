@@ -3,6 +3,9 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, toast } from "@heroui/react";
 import { FileSpreadsheet, Send } from "lucide-react";
 import { submitConsultation } from "@/renderer/actions/consultationActions";
+import { submitThreadInput } from "@/renderer/actions/threadRuntimeActions";
+import { flattenSegments } from "@/renderer/components/composer/serializeMentions";
+import type { PromptSegment } from "@/shared/contracts";
 import { AttachmentBar } from "@/renderer/components/composer/AttachmentBar";
 import { ComposerAddMenu } from "@/renderer/components/composer/ComposerAddMenu";
 import { openAttachmentLightbox } from "@/renderer/components/composer/ImageLightbox";
@@ -70,6 +73,32 @@ export function CampaignThreadComposer(props: CampaignThreadComposerProps) {
     submittingThreads.add(threadId);
     setIsSubmitting(true);
     try {
+      const route = routeCampaignComposerMessage(input, props.defaultProvider, {
+        modelAliases,
+      });
+      if (route.kind === "parse_error") {
+        toast.warning(route.message);
+        return;
+      }
+      if (route.kind === "empty" && attachments.attachments.length === 0) return;
+
+      if (route.kind === "chat" || route.kind === "empty") {
+        const attachmentSegments = attachments.toSegments();
+        const textSegments: PromptSegment[] =
+          route.kind === "chat" && route.message.trim()
+            ? [{ kind: "text", content: route.message }]
+            : [];
+        const allSegments = [...attachmentSegments, ...textSegments];
+        const flat = flattenSegments(allSegments);
+        if (flat.length === 0) return;
+
+        useAppStore.getState().requestChatScrollToBottom(threadId);
+        await submitThreadInput(threadId, flat, allSegments.length > 0 ? allSegments : undefined);
+        setInput("");
+        attachments.clearAll();
+        return;
+      }
+
       const copied = await copyCampaignComposerAttachments({
         projectId: props.projectId,
         attachments: attachments.attachments,
@@ -83,23 +112,15 @@ export function CampaignThreadComposer(props: CampaignThreadComposerProps) {
       }
 
       const messageWithAttachments = buildCampaignMessageWithAttachments(
-        input,
+        route.message,
         copied.map((copy) => copy.relativePath),
       );
-      const route = routeCampaignComposerMessage(messageWithAttachments, props.defaultProvider, {
-        modelAliases,
-      });
-      if (route.kind === "empty") return;
-      if (route.kind === "parse_error") {
-        toast.warning(route.message);
-        return;
-      }
 
       const result = await submitConsultation({
         projectId: props.projectId,
         parentThreadId: threadId,
         campaignGroupId: props.campaignGroupId,
-        message: route.message,
+        message: messageWithAttachments,
       });
       if (!result.ok) {
         toast.warning(result.message);
@@ -237,7 +258,7 @@ export function CampaignThreadComposer(props: CampaignThreadComposerProps) {
           <textarea
             ref={textareaRef}
             aria-label={t`Message composer`}
-            placeholder={t`@codex check budget pacing, or type a message…`}
+            placeholder={t`Ask ${props.defaultProvider} about this campaign — @mention for roles`}
             rows={2}
             value={input}
             onChange={(event) => setInput(event.target.value)}
