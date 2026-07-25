@@ -94,6 +94,7 @@ export function mapCampaignContext(
       id: kpi.id,
       metricKey: kpi.metricKey,
       label: kpi.metricKey,
+      ...(kpi.channel !== undefined ? { channel: kpi.channel } : {}),
       targetType: kpi.targetType,
       targetValue: kpi.targetValue,
       actualValue: kpi.actualValue,

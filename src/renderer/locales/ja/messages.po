@@ -10909,8 +10909,12 @@ msgstr "対象プロバイダー"
 
 #. placeholder {0}: kpi.targetValue
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Target: {0}"
-msgstr "目標: {0}"
+#~ msgid "Target: {0}"
+#~ msgstr "目標: {0}"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Target: {formattedTarget}"
+msgstr "目標: {formattedTarget}"
 
 #: src/renderer/components/providers/qwen/index.tsx
 #: src/renderer/views/SwarmView/SwarmTaskPanel.tsx

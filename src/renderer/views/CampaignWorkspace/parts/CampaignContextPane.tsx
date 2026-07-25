@@ -51,6 +51,17 @@ function formatMoney(value: number | undefined | null, currency: string): string
   }
 }
 
+function formatKpiNumber(value: number, locale?: string): string {
+  try {
+    return new Intl.NumberFormat(locale, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    return value.toLocaleString();
+  }
+}
+
 function CenteredMessage(props: { icon?: ReactNode; children: ReactNode }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-muted">
@@ -148,7 +159,7 @@ function ContextSections(props: {
   decisions?: CampaignDecisionsBundle;
 }) {
   const { context, decisions } = props;
-  const { t } = useLingui();
+  const { i18n, t } = useLingui();
   const [recordModal, setRecordModal] = useState<{
     open: boolean;
     seed?: DecisionFormSeed;
@@ -192,25 +203,45 @@ function ContextSections(props: {
         ) : (
           <ul className="space-y-3">
             {kpiGroupData.groups.map((group) => {
-              const isMultiNoChannel = group.items.length > 1;
+              const isGrouped = group.items.length > 1;
               return (
                 <li
                   key={group.metricKey}
                   className="border-t border-[var(--hairline)] pt-2.5 first:border-0 first:pt-0"
                 >
-                  {isMultiNoChannel ? (
+                  {isGrouped ? (
                     <div className="cockpit-klabel mb-1.5 font-bold tracking-wider text-foreground uppercase">
                       {group.metricKey}
                     </div>
                   ) : null}
                   <div className="space-y-2.5">
                     {group.items.map((kpi) => {
+                      const formattedTarget = formatKpiNumber(kpi.targetValue, i18n.locale);
                       const pct = kpi.pctAchieved ?? 0;
                       const onTrack = kpi.status === "on_track" || kpi.status === "healthy";
                       const over = kpi.pctAchieved !== null && pct > 100;
-                      const displayLabel = isMultiNoChannel
-                        ? t`Target: ${kpi.targetValue}`
-                        : kpi.label;
+
+                      let displayLabel: ReactNode;
+                      if (isGrouped) {
+                        if (kpi.channel) {
+                          displayLabel = (
+                            <>
+                              <span>{kpi.channel}</span>{" "}
+                              <span className="font-normal text-muted">
+                                {t`Target: ${formattedTarget}`}
+                              </span>
+                            </>
+                          );
+                        } else {
+                          displayLabel = t`Target: ${formattedTarget}`;
+                        }
+                      } else {
+                        if (kpi.channel) {
+                          displayLabel = `${kpi.channel} · ${kpi.label}`;
+                        } else {
+                          displayLabel = kpi.label;
+                        }
+                      }
 
                       return (
                         <div key={kpi.id}>

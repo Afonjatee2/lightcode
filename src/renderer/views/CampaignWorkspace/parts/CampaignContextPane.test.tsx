@@ -135,7 +135,7 @@ describe("CampaignContextPane", () => {
     expect(screen.getByRole("button", { name: "Show less" })).toBeTruthy();
   });
 
-  it("groups duplicate metric names under a single subheading when channel context is absent", () => {
+  it("groups duplicate metric names under a single subheading with formatted numbers when channel context is absent", () => {
     const context: CampaignContextViewModel = {
       ...baseContext,
       kpis: [
@@ -179,9 +179,78 @@ describe("CampaignContextPane", () => {
     );
 
     expect(screen.getByText("impressions")).toBeTruthy();
-    expect(screen.getByText("Target: 1000")).toBeTruthy();
-    expect(screen.getByText("Target: 2000")).toBeTruthy();
+    expect(screen.getByText("Target: 1,000")).toBeTruthy();
+    expect(screen.getByText("Target: 2,000")).toBeTruthy();
     expect(screen.getAllByText("80%")).toHaveLength(2);
     expect(screen.getByText("110%")).toBeTruthy();
+  });
+
+  it("renders channel label with secondary target text for grouped rows when channel is present", () => {
+    const context: CampaignContextViewModel = {
+      ...baseContext,
+      kpis: [
+        {
+          id: "k1",
+          metricKey: "impressions",
+          label: "impressions",
+          channel: "YouTube",
+          targetType: "min",
+          targetValue: 936000,
+          actualValue: 500000,
+          pctAchieved: 53.4,
+          status: "on_track",
+        },
+        {
+          id: "k2",
+          metricKey: "impressions",
+          label: "impressions",
+          channel: "Meta",
+          targetType: "min",
+          targetValue: 500000,
+          actualValue: 450000,
+          pctAchieved: 90,
+          status: "on_track",
+        },
+      ],
+    };
+
+    render(
+      <CampaignContextPane
+        campaignContext={{ status: "ready", data: context, refetch: vi.fn<() => void>() }}
+      />,
+    );
+
+    expect(screen.getByText("impressions")).toBeTruthy();
+    expect(screen.getByText("YouTube")).toBeTruthy();
+    expect(screen.getByText("Target: 936,000")).toBeTruthy();
+    expect(screen.getByText("Meta")).toBeTruthy();
+    expect(screen.getByText("Target: 500,000")).toBeTruthy();
+  });
+
+  it("renders 'channel · label' for ungrouped single rows when channel is present", () => {
+    const context: CampaignContextViewModel = {
+      ...baseContext,
+      kpis: [
+        {
+          id: "k1",
+          metricKey: "impressions",
+          label: "Impressions",
+          channel: "YouTube",
+          targetType: "min",
+          targetValue: 1365088.5714,
+          actualValue: 1000000,
+          pctAchieved: 73.2,
+          status: "on_track",
+        },
+      ],
+    };
+
+    render(
+      <CampaignContextPane
+        campaignContext={{ status: "ready", data: context, refetch: vi.fn<() => void>() }}
+      />,
+    );
+
+    expect(screen.getByText("YouTube · Impressions")).toBeTruthy();
   });
 });

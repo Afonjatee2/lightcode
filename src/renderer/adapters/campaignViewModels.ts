@@ -39,6 +39,7 @@ export interface CampaignContextKpiViewModel {
   metricKey: string;
   /** Falls back to metricKey since CC has no separate label. */
   label: string;
+  channel?: string;
   targetType: string;
   targetValue: number;
   actualValue: number | null;

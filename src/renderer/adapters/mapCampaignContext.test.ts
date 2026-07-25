@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { ControlCentreCampaignContext } from "@/shared/contracts/campaign/controlCentreCampaignContext";
 import { mapCampaignContext } from "./mapCampaignContext";
 import {
   controlCentreCampaignContextFixture,
@@ -45,6 +46,39 @@ describe("mapCampaignContext", () => {
     expect(vm.kpis[0]!.id).toBe("kpi-1");
     expect(vm.kpis[0]!.targetType).toBe("min");
     expect(vm.kpis[0]!.status).toBe("on_track");
+    expect(vm.kpis[0]!.channel).toBeUndefined();
+  });
+
+  it("carries channel on kpi when present, and omits it when absent", () => {
+    const contextWithChannel: ControlCentreCampaignContext = {
+      ...controlCentreCampaignContextFixture,
+      kpiTargets: [
+        {
+          id: "k1",
+          metricKey: "impressions",
+          channel: "YouTube",
+          targetType: "min",
+          targetValue: 936000,
+          actualValue: 500000,
+          percentAchieved: 0.534,
+          status: "on_track",
+        },
+        {
+          id: "k2",
+          metricKey: "impressions",
+          targetType: "min",
+          targetValue: 500000,
+          actualValue: null,
+          percentAchieved: null,
+          status: null,
+        },
+      ],
+    };
+    const vm = mapCampaignContext(contextWithChannel);
+    expect(vm.kpis[0]!.channel).toBe("YouTube");
+    expect("channel" in vm.kpis[0]!).toBe(true);
+    expect(vm.kpis[1]!.channel).toBeUndefined();
+    expect("channel" in vm.kpis[1]!).toBe(false);
   });
 
   it("uses metricKey as label when CC has no separate label", () => {

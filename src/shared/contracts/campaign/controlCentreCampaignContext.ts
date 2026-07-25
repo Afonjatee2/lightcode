@@ -34,6 +34,7 @@ export const controlCentreBudgetSchema = z.object({
 export const controlCentreKpiTargetSchema = z.object({
   id: z.string().min(1),
   metricKey: z.string(),
+  channel: z.string().optional(),
   targetType: z.string(),
   targetValue: z.number(),
   actualValue: z.number().nullable(),
