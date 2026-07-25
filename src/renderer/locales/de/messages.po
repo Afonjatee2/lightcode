@@ -10911,8 +10911,12 @@ msgstr "Zielanbieter"
 
 #. placeholder {0}: kpi.targetValue
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
-msgid "Target: {0}"
-msgstr "Ziel: {0}"
+#~ msgid "Target: {0}"
+#~ msgstr "Ziel: {0}"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Target: {formattedTarget}"
+msgstr "Ziel: {formattedTarget}"
 
 #: src/renderer/components/providers/qwen/index.tsx
 #: src/renderer/views/SwarmView/SwarmTaskPanel.tsx
