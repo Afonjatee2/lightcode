@@ -1427,6 +1427,10 @@ msgstr "時刻"
 msgid "At least two worktrees must be created. Any partial experiment was cleaned up."
 msgstr "少なくとも 2 つのワークツリーを作成する必要があります。途中まで作成された実験はクリーンアップされました。"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "At risk"
+msgstr "リスクあり"
+
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "Attach"
 msgstr "添付する"
@@ -2101,6 +2105,7 @@ msgid "Channel"
 msgstr "チャンネル"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
 msgid "Channels"
 msgstr "チャンネル"
 
@@ -5089,6 +5094,14 @@ msgstr "頻度"
 msgid "Friday at 4:00 PM"
 msgstr "金曜日午後4:00"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "from chat"
+msgstr "チャットより"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "from chat · {time}"
+msgstr "チャットより · {time}"
+
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 msgid "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
 msgstr "システムのぼかし素材（vibrancy）でサイドバーをすりガラス調にし、最近のmacOSの質感を再現します。非対応の環境では半透明の色付けに切り替わります。"
@@ -5571,6 +5584,12 @@ msgstr "{0} 個のスキルをインポートしました。"
 msgid "Imported 1 skill."
 msgstr "1 個のスキルをインポートしました。"
 
+#. placeholder {0}: formatCount(channel.impressions, locale)
+#. placeholder {1}: formatCount(channel.impressionsTarget, locale)
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "Impressions {0} / {1}"
+msgstr "インプレッション {0} / {1}"
+
 #: src/renderer/components/changelog/ChangelogView.tsx
 msgid "Improved"
 msgstr "改善"
@@ -5828,6 +5847,10 @@ msgstr "Kimi Code は応答を返さずにターンを終了しました。ス�
 msgid "KPI health"
 msgstr "KPI 状態"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "KPIs"
+msgstr "KPI"
+
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Language"
@@ -5851,6 +5874,10 @@ msgstr "前回の評価:"
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "Last tool: <0>{0}</0>"
 msgstr "最後のツール: <0>{0}</0>"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "Latest performance"
+msgstr "最新パフォーマンス"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -7065,6 +7092,10 @@ msgstr "このプロジェクトにはコントロールセンターMCPサーバ
 msgid "No conversation yet. Be the first to comment."
 msgstr "まだ会話はありません。最初にコメントしてください。"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "No data"
+msgstr "データなし"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "No data sources connected"
 msgstr "データソースが接続されていません"
@@ -7499,6 +7530,10 @@ msgstr "曜日"
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "On the hour"
 msgstr "毎正時"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "On track"
+msgstr "順調"
 
 #. placeholder {0}: dateTimeFormatter.format(new Date(task.recurrence.runAt))
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
@@ -11922,6 +11957,7 @@ msgstr "アンインストール"
 #: src/renderer/components/thread/threadContextUsage.ts
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Unknown"
 msgstr "不明"

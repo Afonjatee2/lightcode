@@ -253,4 +253,60 @@ describe("CampaignContextPane", () => {
 
     expect(screen.getByText("YouTube · Impressions")).toBeTruthy();
   });
+
+  it("renders latest performance snapshot section when present", () => {
+    const context: CampaignContextViewModel = {
+      ...baseContext,
+      channels: [
+        {
+          id: "ch-1",
+          channelLabel: "Meta",
+          platform: "meta",
+          plannedBudget: 10000,
+          actualSpend: 5000,
+          status: "live",
+        },
+      ],
+    };
+
+    render(
+      <CampaignContextPane
+        campaignContext={{ status: "ready", data: context, refetch: vi.fn<() => void>() }}
+        performanceSnapshot={{
+          schemaVersion: 1,
+          generatedAt: "2026-07-25T12:54:00.000Z",
+          source: "chat",
+          headline: "July pacing on track",
+          channels: [
+            {
+              channel: "Meta",
+              spend: 12000,
+              budget: 15000,
+              impressions: 450000,
+              impressionsTarget: 500000,
+              status: "on_track",
+            },
+          ],
+          kpis: [{ label: "CPA", actual: 42, target: 50, pctAchieved: 84, status: "on_track" }],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Latest performance")).toBeTruthy();
+    expect(screen.getByText("July pacing on track")).toBeTruthy();
+    expect(screen.getByText("On track")).toBeTruthy();
+    expect(screen.getByText("CPA")).toBeTruthy();
+    expect(screen.getByText("84%")).toBeTruthy();
+  });
+
+  it("keeps layout unchanged when no performance snapshot is provided", () => {
+    render(
+      <CampaignContextPane
+        campaignContext={{ status: "ready", data: baseContext, refetch: vi.fn<() => void>() }}
+      />,
+    );
+
+    expect(screen.queryByText("Latest performance")).toBeNull();
+    expect(screen.getByText("KPI health")).toBeTruthy();
+  });
 });

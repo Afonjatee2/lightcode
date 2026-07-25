@@ -184,6 +184,7 @@ const {
         projectListeners.push(listener);
         return () => undefined;
       }),
+      onCampaignPerformanceSnapshotChanged: vi.fn<() => () => void>(() => () => undefined),
       onThreadOpenRequested: vi.fn<
         (listener: (event: ThreadOpenRequestedEvent) => void) => () => void
       >((listener) => {

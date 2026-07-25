@@ -7,6 +7,7 @@ import { CampaignApprovalsPane } from "./parts/CampaignApprovalsPane";
 import { PlanIntelligencePane, type PlanIntelligenceSession } from "./parts/PlanIntelligencePane";
 import { useProject } from "@/renderer/state/useThread";
 import { useCampaignContext } from "@/renderer/hooks/useCampaignContext";
+import { useCampaignPerformanceSnapshot } from "@/renderer/hooks/useCampaignPerformanceSnapshot";
 import {
   isLinkedCampaignGroupId,
   unlinkedCampaignIdentity,
@@ -92,6 +93,7 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
   const operationsToday = useOperationsToday(props.projectId);
   const activeCampaignId = selectedCampaignId ?? (isHubProject ? null : boundCampaignGroupId);
   const campaignContext = useCampaignContext(props.projectId, activeCampaignId);
+  const performanceSnapshot = useCampaignPerformanceSnapshot(props.projectId);
   const threadIdentity =
     campaignContext.status === "ready"
       ? campaignContext.data.identity
@@ -216,6 +218,7 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
       >
         <CampaignContextPane
           campaignContext={campaignContext}
+          performanceSnapshot={performanceSnapshot ?? null}
           isUnlinkedProject={isUnlinkedProject}
           onOpenApprovals={(proposalId) => {
             setSelectedProposalId(proposalId ?? null);

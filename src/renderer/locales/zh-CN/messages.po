@@ -1428,6 +1428,10 @@ msgstr "时间"
 msgid "At least two worktrees must be created. Any partial experiment was cleaned up."
 msgstr "必须至少创建两个工作树。已清理部分创建的实验。"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "At risk"
+msgstr "有风险"
+
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "Attach"
 msgstr "附加"
@@ -2102,6 +2106,7 @@ msgid "Channel"
 msgstr "频道"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
 msgid "Channels"
 msgstr "渠道"
 
@@ -5090,6 +5095,14 @@ msgstr "频率"
 msgid "Friday at 4:00 PM"
 msgstr "星期五下午 4:00"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "from chat"
+msgstr "来自聊天"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "from chat · {time}"
+msgstr "来自聊天 · {time}"
+
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 msgid "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
 msgstr "使用系统模糊材质（vibrancy）为侧边栏添加磨砂效果，呼应新版macOS。不支持时回退为半透明着色。"
@@ -5572,6 +5585,12 @@ msgstr "已导入 {0} 个技能。"
 msgid "Imported 1 skill."
 msgstr "已导入 1 个技能。"
 
+#. placeholder {0}: formatCount(channel.impressions, locale)
+#. placeholder {1}: formatCount(channel.impressionsTarget, locale)
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "Impressions {0} / {1}"
+msgstr "展示 {0} / {1}"
+
 #: src/renderer/components/changelog/ChangelogView.tsx
 msgid "Improved"
 msgstr "已改进"
@@ -5829,6 +5848,10 @@ msgstr "Kimi Code 在未返回响应的情况下结束了本轮。请重启会�
 msgid "KPI health"
 msgstr "KPI 状态"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "KPIs"
+msgstr "KPI"
+
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Language"
@@ -5852,6 +5875,10 @@ msgstr "上次评估："
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "Last tool: <0>{0}</0>"
 msgstr "最后一个工具：<0>{0}</0>"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "Latest performance"
+msgstr "最新成效"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -7066,6 +7093,10 @@ msgstr "此项目未配置控制中心 MCP 服务器。"
 msgid "No conversation yet. Be the first to comment."
 msgstr "还没有对话。成为第一个发表评论的人。"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "No data"
+msgstr "无数据"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "No data sources connected"
 msgstr "未连接数据源"
@@ -7500,6 +7531,10 @@ msgstr "日期"
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "On the hour"
 msgstr "整点"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "On track"
+msgstr "正常"
 
 #. placeholder {0}: dateTimeFormatter.format(new Date(task.recurrence.runAt))
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
@@ -11923,6 +11958,7 @@ msgstr "卸载"
 #: src/renderer/components/thread/threadContextUsage.ts
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Unknown"
 msgstr "未知"

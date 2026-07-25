@@ -13,6 +13,7 @@ import {
 } from "./procedureMap";
 import type {
   BrowserEvent,
+  CampaignPerformanceSnapshotChangedEvent,
   ProjectStateChangedEvent,
   SupervisorEvent,
   ThreadOpenRequestedEvent,
@@ -62,6 +63,9 @@ export type PoracodeBridge = PoracodeInvokeBridge & {
   /** Shared settings rewritten outside this renderer (e.g. by a remote client). */
   onSharedSettingsChanged(listener: (settings: SharedSettings) => void): () => void;
   onProjectStateChanged(listener: (event: ProjectStateChangedEvent) => void): () => void;
+  onCampaignPerformanceSnapshotChanged(
+    listener: (event: CampaignPerformanceSnapshotChangedEvent) => void,
+  ): () => void;
   onThreadOpenRequested(listener: (event: ThreadOpenRequestedEvent) => void): () => void;
   submitQuickComposer(submission: QuickComposerSubmission): Promise<void>;
   dismissQuickComposer(): Promise<void>;
@@ -124,6 +128,7 @@ export const IPC_EVENT_CHANNELS = {
   remoteAccessPairingChanged: createChannel("remoteAccessPairingChanged"),
   sharedSettingsChanged: createChannel("sharedSettingsChanged"),
   projectStateChanged: createChannel("projectStateChanged"),
+  campaignPerformanceSnapshotChanged: createChannel("campaignPerformanceSnapshotChanged"),
   threadOpenRequested: createChannel("threadOpenRequested"),
   quickComposerSubmit: createChannel("quickComposerSubmit"),
   quickComposerDismissRequested: createChannel("quickComposerDismissRequested"),

@@ -1428,6 +1428,10 @@ msgstr "Às"
 msgid "At least two worktrees must be created. Any partial experiment was cleaned up."
 msgstr "Pelo menos duas árvores de trabalho devem ser criadas. Qualquer experimento criado parcialmente foi limpo."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "At risk"
+msgstr "Em risco"
+
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "Attach"
 msgstr "Anexar"
@@ -2102,6 +2106,7 @@ msgid "Channel"
 msgstr "Canal"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
 msgid "Channels"
 msgstr "Canais"
 
@@ -5090,6 +5095,14 @@ msgstr "Frequência"
 msgid "Friday at 4:00 PM"
 msgstr "Sexta-feira às 16:00"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "from chat"
+msgstr "do chat"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "from chat · {time}"
+msgstr "do chat · {time}"
+
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 msgid "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
 msgstr "Aplica o efeito fosco à barra lateral com o material de desfoque do sistema (vibrância), à semelhança do macOS recente. Recorre a um tom translúcido onde não houver suporte."
@@ -5572,6 +5585,12 @@ msgstr "{0} skills importadas."
 msgid "Imported 1 skill."
 msgstr "1 skill importada."
 
+#. placeholder {0}: formatCount(channel.impressions, locale)
+#. placeholder {1}: formatCount(channel.impressionsTarget, locale)
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "Impressions {0} / {1}"
+msgstr "Impressões {0} / {1}"
+
 #: src/renderer/components/changelog/ChangelogView.tsx
 msgid "Improved"
 msgstr "Melhorado"
@@ -5829,6 +5848,10 @@ msgstr "O Kimi Code encerrou o turno sem retornar uma resposta. Reinicie a conve
 msgid "KPI health"
 msgstr "Saúde dos KPIs"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "KPIs"
+msgstr "KPIs"
+
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Language"
@@ -5852,6 +5875,10 @@ msgstr "Última avaliação:"
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "Last tool: <0>{0}</0>"
 msgstr "Última ferramenta: <0>{0}</0>"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "Latest performance"
+msgstr "Desempenho recente"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -7067,6 +7094,10 @@ msgstr "Nenhum servidor MCP da Central de Controle está configurado para este p
 msgid "No conversation yet. Be the first to comment."
 msgstr "Nenhuma conversa ainda. Seja o primeiro a comentar."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "No data"
+msgstr "Sem dados"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "No data sources connected"
 msgstr "Nenhuma fonte de dados conectada"
@@ -7501,6 +7532,10 @@ msgstr "Em"
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "On the hour"
 msgstr "Na hora exata"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "On track"
+msgstr "No ritmo"
 
 #. placeholder {0}: dateTimeFormatter.format(new Date(task.recurrence.runAt))
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
@@ -11924,6 +11959,7 @@ msgstr "Desinstalar"
 #: src/renderer/components/thread/threadContextUsage.ts
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Unknown"
 msgstr "Desconhecido"

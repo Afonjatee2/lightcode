@@ -11,6 +11,7 @@ import {
   type BrowserEvent,
   type PoracodeBridge,
   type PoracodeWindowKind,
+  type CampaignPerformanceSnapshotChangedEvent,
   type ProjectStateChangedEvent,
   type QuickComposerSubmission,
   type SupervisorEvent,
@@ -187,6 +188,18 @@ const bridge: PoracodeBridge = {
     ipcRenderer.on(IPC_EVENT_CHANNELS.projectStateChanged, handler);
     return () => {
       ipcRenderer.removeListener(IPC_EVENT_CHANNELS.projectStateChanged, handler);
+    };
+  },
+  onCampaignPerformanceSnapshotChanged(listener) {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      payload: CampaignPerformanceSnapshotChangedEvent,
+    ) => {
+      listener(payload);
+    };
+    ipcRenderer.on(IPC_EVENT_CHANNELS.campaignPerformanceSnapshotChanged, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_EVENT_CHANNELS.campaignPerformanceSnapshotChanged, handler);
     };
   },
   onThreadOpenRequested(listener) {

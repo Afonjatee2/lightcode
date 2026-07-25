@@ -19,6 +19,7 @@ import type {
 } from "../contracts";
 import type { BrowserState, BrowserTabInfo } from "./procedures/browser";
 import type { BrowserLinkPresentationMode } from "../settings";
+import type { PerformanceSnapshot } from "../contracts/campaign/performanceSnapshot";
 import type { IpcProcedurePayload, SupervisorProcedureName } from "./procedureMap";
 
 export type SupervisorRequest = {
@@ -172,6 +173,12 @@ export type ThreadOpenRequestedEvent = {
 /** Project rows changed outside the renderer's persisted app-store snapshot. */
 export type ProjectStateChangedEvent = {
   projects: Project[];
+};
+
+/** Chat-written campaign performance snapshot updated in the workspace `.cockpit` dir. */
+export type CampaignPerformanceSnapshotChangedEvent = {
+  projectId: string;
+  snapshot: PerformanceSnapshot | null;
 };
 
 export type UpdateStatus =

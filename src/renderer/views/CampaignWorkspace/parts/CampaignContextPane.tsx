@@ -18,10 +18,12 @@ import type {
   CampaignContextViewModel,
 } from "@/renderer/adapters/campaignViewModels";
 import type { CampaignContextState } from "@/renderer/hooks/useCampaignContext";
+import type { PerformanceSnapshot } from "@/shared/contracts/campaign/performanceSnapshot";
 import type { CampaignDecisionsState } from "@/renderer/hooks/useCampaignDecisions";
 import type { RecordCampaignDecision } from "@/renderer/hooks/useRecordCampaignDecision";
 import { CampaignContextStatusStrip } from "./CampaignContextStatusStrip";
 import { CampaignDecisionsList } from "./CampaignDecisionsList";
+import { CampaignPerformanceSnapshotSection } from "./CampaignPerformanceSnapshotSection";
 import { RecordDecisionModal } from "./RecordDecisionModal";
 import type { DecisionFormSeed } from "./decisionForm";
 import { groupAlerts } from "./alertGrouping";
@@ -155,10 +157,11 @@ function deriveKpiGroups(kpis: CampaignContextKpiViewModel[]): { groups: KpiGrou
 
 function ContextSections(props: {
   context: CampaignContextViewModel;
+  performanceSnapshot?: PerformanceSnapshot | null;
   onOpenApprovals?: (proposalId?: string) => void;
   decisions?: CampaignDecisionsBundle;
 }) {
-  const { context, decisions } = props;
+  const { context, decisions, performanceSnapshot } = props;
   const { i18n, t } = useLingui();
   const [recordModal, setRecordModal] = useState<{
     open: boolean;
@@ -193,6 +196,10 @@ function ContextSections(props: {
 
   return (
     <div className="space-y-0">
+      {performanceSnapshot ? (
+        <CampaignPerformanceSnapshotSection snapshot={performanceSnapshot} />
+      ) : null}
+
       <CampaignContextStatusStrip context={context} />
 
       <CollapsibleSection title={<Trans>KPI health</Trans>} count={context.kpis.length}>
@@ -523,6 +530,7 @@ function ContextSections(props: {
 
 export function CampaignContextPane(props: {
   campaignContext: CampaignContextState & { refetch: () => void };
+  performanceSnapshot?: PerformanceSnapshot | null;
   isUnlinkedProject?: boolean;
   onOpenApprovals?: (proposalId?: string) => void;
   decisions?: CampaignDecisionsBundle;
@@ -638,6 +646,9 @@ export function CampaignContextPane(props: {
         {campaignContext.status === "ready" && (
           <ContextSections
             context={campaignContext.data}
+            {...(props.performanceSnapshot !== undefined
+              ? { performanceSnapshot: props.performanceSnapshot }
+              : {})}
             {...(props.onOpenApprovals ? { onOpenApprovals: props.onOpenApprovals } : {})}
             {...(props.decisions ? { decisions: props.decisions } : {})}
           />

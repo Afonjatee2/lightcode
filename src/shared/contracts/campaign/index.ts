@@ -28,6 +28,7 @@ export * from "./controlCentreCampaignDecision";
 export * from "./controlCentreOperationsToday";
 export * from "./controlCentreCampaignGroupList";
 export * from "./planIntelligence";
+export * from "./performanceSnapshot";
 
 // Legacy re-exports — keep backward compatibility for existing consumers
 // that import from campaignContext / operationsToday directly.
