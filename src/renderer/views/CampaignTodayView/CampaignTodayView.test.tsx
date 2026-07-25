@@ -13,7 +13,8 @@ const mocks = vi.hoisted(() => ({
   ensureCampaignsHubProject: vi.fn<() => Promise<unknown>>(),
 }));
 
-vi.mock("@/renderer/campaign/ensureCampaignsHubProject", () => ({
+vi.mock("@/renderer/campaign/ensureCampaignsHubProject", async (importOriginal) => ({
+  ...(await importOriginal()),
   ensureCampaignsHubProject: mocks.ensureCampaignsHubProject,
   CAMPAIGNS_HUB_GROUP_ID: "poracode-campaigns-hub",
 }));

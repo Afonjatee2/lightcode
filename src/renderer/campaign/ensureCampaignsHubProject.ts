@@ -9,6 +9,14 @@ import { resolveAgentAndModelForCampaign } from "@/renderer/actions/campaignProj
 export const CAMPAIGNS_HUB_GROUP_ID = "poracode-campaigns-hub";
 export const CAMPAIGNS_HUB_PROJECT_NAME = "Campaigns";
 
+/** True for the auto-created hub — it must not count as a "real" pinned campaign. */
+export function isCampaignsHubProject(project: Project): boolean {
+  return (
+    getProjectPurpose(project) === "campaign" &&
+    project.campaignExtension?.campaignGroupId === CAMPAIGNS_HUB_GROUP_ID
+  );
+}
+
 export function findCampaignsHubProject(projects: readonly Project[]): Project | undefined {
   return projects.find(
     (project) =>
@@ -24,8 +32,23 @@ export type EnsureCampaignsHubOutcome =
 /**
  * Lightweight cross-campaign workspace used when Today ask-anything runs before
  * any pinned campaign workspace exists. Not bound to a live Control Centre group.
+ *
+ * Concurrent callers share one in-flight ensure: two rapid submits (double
+ * Enter, Enter+click) both land here before the first workspace-dir IPC
+ * resolves, and without this guard each would persist its own hub project.
  */
+let inFlightEnsure: Promise<EnsureCampaignsHubOutcome> | null = null;
+
 export async function ensureCampaignsHubProject(): Promise<EnsureCampaignsHubOutcome> {
+  if (!inFlightEnsure) {
+    inFlightEnsure = ensureCampaignsHubProjectOnce().finally(() => {
+      inFlightEnsure = null;
+    });
+  }
+  return inFlightEnsure;
+}
+
+async function ensureCampaignsHubProjectOnce(): Promise<EnsureCampaignsHubOutcome> {
   const store = useAppStore.getState();
   const existing = findCampaignsHubProject(store.projects);
   if (existing) {

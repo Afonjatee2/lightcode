@@ -19,7 +19,10 @@ import {
   diagnoseTodayControlCentreSetup,
   pickDefaultCampaignGroupId,
 } from "@/renderer/campaign/resolveTodayDataSource";
-import { ensureCampaignsHubProject } from "@/renderer/campaign/ensureCampaignsHubProject";
+import {
+  ensureCampaignsHubProject,
+  isCampaignsHubProject,
+} from "@/renderer/campaign/ensureCampaignsHubProject";
 import { controlCentreUnavailableMessage } from "@/renderer/campaign/controlCentreAvailabilityCopy";
 import {
   dayPeriodGreeting,
@@ -296,7 +299,12 @@ export function CampaignTodayView() {
   const setPendingCampaignWorkspaceSelection = useAppStore(
     (state) => state.setPendingCampaignWorkspaceSelection,
   );
-  const hasCampaignProjects = projects.some((project) => getProjectPurpose(project) === "campaign");
+  // The auto-created hub does not count: with only the hub present the user
+  // still has no pinned campaign, so the setup card (and its create action)
+  // must stay visible.
+  const hasCampaignProjects = projects.some(
+    (project) => getProjectPurpose(project) === "campaign" && !isCampaignsHubProject(project),
+  );
   const showNoProjectsSetupState = !hasCampaignProjects;
   const showNoControlCentreSetupState =
     hasCampaignProjects && !projectId && !globalControlCentreReady;
