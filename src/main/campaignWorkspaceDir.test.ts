@@ -120,6 +120,8 @@ describe("ensureCampaignWorkspaceDir", () => {
     expect(existsSync(join(result.path, "PROJECT_DOCUMENTATION.md"))).toBe(true);
     expect(existsSync(join(result.path, ".env.example"))).toBe(true);
     expect(existsSync(join(result.path, "scripts", "README.md"))).toBe(true);
+    expect(existsSync(join(result.path, "AGENTS.md"))).toBe(true);
+    expect(existsSync(join(result.path, ".cockpit"))).toBe(true);
 
     const readme = readFileSync(join(result.path, "README.md"), "utf8");
     expect(readme).toContain("# Q4 Brand Refresh");
@@ -143,5 +145,19 @@ describe("ensureCampaignWorkspaceDir", () => {
     ensureCampaignWorkspaceDir(baseDir, payload);
 
     expect(readFileSync(join(first.path, "README.md"), "utf8")).toBe("# Custom README\n");
+  });
+
+  it("does not clobber existing AGENTS.md on second call", () => {
+    const payload = {
+      projectId: "00000000-0000-4000-a000-000000000006",
+      name: "Campaign",
+    };
+
+    const first = ensureCampaignWorkspaceDir(baseDir, payload);
+    writeFileSync(join(first.path, "AGENTS.md"), "# Custom agents\n", "utf8");
+
+    ensureCampaignWorkspaceDir(baseDir, payload);
+
+    expect(readFileSync(join(first.path, "AGENTS.md"), "utf8")).toBe("# Custom agents\n");
   });
 });

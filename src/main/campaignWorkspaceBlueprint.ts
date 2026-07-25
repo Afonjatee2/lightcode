@@ -55,6 +55,28 @@ const ENV_EXAMPLE = `# Local-only secrets for campaign automation scripts.
 
 const SCRIPTS_README = "Campaign automation scripts — agents can run these from chat.\n";
 
+const AGENTS_INSTRUCTIONS = `# Campaign workspace — agent notes
+
+After fetching campaign performance data in chat, write or update \`.cockpit/performance-snapshot.json\` so the sidebar shows the latest numbers.
+
+Schema (all numerics optional — include what you have):
+
+\`\`\`json
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-25T12:54:00.000Z",
+  "source": "control-centre get_plan_vs_actual",
+  "headline": "July pacing on track",
+  "channels": [
+    { "channel": "Meta", "spend": 12000, "budget": 15000, "impressions": 450000, "impressionsTarget": 500000, "status": "on_track" }
+  ],
+  "kpis": [{ "label": "CPA", "actual": 42, "target": 50, "pctAchieved": 84, "status": "on_track" }]
+}
+\`\`\`
+
+Channel \`status\`: \`on_track\` | \`at_risk\` | \`no_data\`.
+`;
+
 /**
  * Idempotently scaffolds campaign workspace documentation and script folders.
  * Existing files are never overwritten.
@@ -66,6 +88,12 @@ export function scaffoldCampaignWorkspaceBlueprint(
   writeIfMissing(join(workspacePath, "README.md"), formatReadmeHeader(context));
   writeIfMissing(join(workspacePath, "PROJECT_DOCUMENTATION.md"), PROJECT_DOCUMENTATION);
   writeIfMissing(join(workspacePath, ".env.example"), ENV_EXAMPLE);
+  writeIfMissing(join(workspacePath, "AGENTS.md"), AGENTS_INSTRUCTIONS);
+
+  const cockpitDir = join(workspacePath, ".cockpit");
+  if (!existsSync(cockpitDir)) {
+    mkdirSync(cockpitDir, { recursive: true });
+  }
 
   const scriptsDir = join(workspacePath, "scripts");
   if (!existsSync(scriptsDir)) {

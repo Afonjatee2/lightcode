@@ -99,6 +99,7 @@ import { refreshMacDockIcon } from "./macDockIcon";
 import { repairLegacyMacAppPath } from "./macAppPathMigration";
 import { persistSupervisorEvent } from "./remote/server/runtimePersistence";
 import { shouldUseMockKeychain } from "./mockKeychain";
+import { PerformanceSnapshotWatcher } from "./performanceSnapshotWatcher";
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const channel = resolvePoracodeChannel();
@@ -779,12 +780,21 @@ if (!hasSingleInstanceLock) {
       };
       const publishProjectsChanged = (): void => {
         const projects = dbGetProjects();
+        performanceSnapshotWatcher.syncProjects(projects);
         remoteAccessController?.getServer()?.publishSupervisorEvent({
           type: "remote-projects-changed",
           projects: remoteProjectCommandResultSchema.parse({ projects }).projects,
         });
         mainWindow?.webContents.send(IPC_EVENT_CHANNELS.projectStateChanged, { projects });
       };
+      const performanceSnapshotWatcher = new PerformanceSnapshotWatcher();
+      performanceSnapshotWatcher.setListener((projectId, snapshot) => {
+        mainWindow?.webContents.send(IPC_EVENT_CHANNELS.campaignPerformanceSnapshotChanged, {
+          projectId,
+          snapshot,
+        });
+      });
+      performanceSnapshotWatcher.syncProjects(dbGetProjects());
       // Latest updater status, captured from the auto-updater's status stream so
       // the app-controls `check_for_update` tool can report the most recent
       // result (the check itself is fire-and-forget and event-driven).

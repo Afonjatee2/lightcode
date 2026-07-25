@@ -17,6 +17,7 @@ import {
 } from "./notifications";
 
 import { useAppStore } from "./state/appStore";
+import { usePerformanceSnapshotStore } from "./state/performanceSnapshotStore";
 import {
   acknowledgeThread,
   archiveThread,
@@ -412,6 +413,9 @@ const mainWindowCleanups: Array<() => void> = isMainWindow
       // before its next dbSyncAll persistence write.
       readBridge().onProjectStateChanged(({ projects }) => {
         useAppStore.setState({ projects });
+      }),
+      readBridge().onCampaignPerformanceSnapshotChanged(({ projectId, snapshot }) => {
+        usePerformanceSnapshotStore.getState().setSnapshot(projectId, snapshot);
       }),
       readBridge().onThreadOpenRequested(({ threadId }) => {
         openThread(threadId, { focusComposer: true });

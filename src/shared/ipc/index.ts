@@ -35,6 +35,7 @@ export {
   isAgentStatusSupervisorEvent,
   type AgentStatusSupervisorEvent,
   type BrowserEvent,
+  type CampaignPerformanceSnapshotChangedEvent,
   type ProjectStateChangedEvent,
   type ThreadOpenRequestedEvent,
   type SupervisorEvent,

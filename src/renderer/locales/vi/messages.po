@@ -1424,6 +1424,10 @@ msgstr "Lúc"
 msgid "At least two worktrees must be created. Any partial experiment was cleaned up."
 msgstr "Cần tạo ít nhất hai cây làm việc. Mọi thử nghiệm chỉ được tạo một phần đã được dọn dẹp."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "At risk"
+msgstr "Có rủi ro"
+
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "Attach"
 msgstr "Đính kèm"
@@ -2098,6 +2102,7 @@ msgid "Channel"
 msgstr "Kênh"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
 msgid "Channels"
 msgstr "Kênh"
 
@@ -5086,6 +5091,14 @@ msgstr "Tần suất"
 msgid "Friday at 4:00 PM"
 msgstr "Thứ Sáu lúc 4:00 CH"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "from chat"
+msgstr "từ chat"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "from chat · {time}"
+msgstr "từ chat · {time}"
+
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 msgid "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
 msgstr "Làm mờ thanh bên bằng hiệu ứng làm mờ của hệ thống (vibrancy), gợi nhớ macOS gần đây. Sẽ dùng lớp màu mờ trong suốt nếu không được hỗ trợ."
@@ -5568,6 +5581,12 @@ msgstr "Đã nhập {0} skill."
 msgid "Imported 1 skill."
 msgstr "Đã nhập 1 skill."
 
+#. placeholder {0}: formatCount(channel.impressions, locale)
+#. placeholder {1}: formatCount(channel.impressionsTarget, locale)
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "Impressions {0} / {1}"
+msgstr "Lượt hiển thị {0} / {1}"
+
 #: src/renderer/components/changelog/ChangelogView.tsx
 msgid "Improved"
 msgstr "Cải thiện"
@@ -5825,6 +5844,10 @@ msgstr "Kimi Code đã kết thúc lượt mà không trả về phản hồi. H
 msgid "KPI health"
 msgstr "Tình trạng KPI"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "KPIs"
+msgstr "KPI"
+
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Language"
@@ -5848,6 +5871,10 @@ msgstr "Lần đánh giá gần nhất:"
 #: src/renderer/components/thread/ChatPane/parts/items/WorkflowOverlayBody.tsx
 msgid "Last tool: <0>{0}</0>"
 msgstr "Công cụ cuối cùng: <0>{0}</0>"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "Latest performance"
+msgstr "Hiệu suất mới nhất"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -7063,6 +7090,10 @@ msgstr "Chưa cấu hình máy chủ MCP Trung tâm điều khiển cho dự án
 msgid "No conversation yet. Be the first to comment."
 msgstr "Chưa có cuộc trò chuyện nào. Hãy là người đầu tiên bình luận."
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "No data"
+msgstr "Không có dữ liệu"
+
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "No data sources connected"
 msgstr "Không có nguồn dữ liệu nào được kết nối"
@@ -7497,6 +7528,10 @@ msgstr "Vào"
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "On the hour"
 msgstr "Đúng đầu giờ"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
+msgid "On track"
+msgstr "Đúng tiến độ"
 
 #. placeholder {0}: dateTimeFormatter.format(new Date(task.recurrence.runAt))
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
@@ -11916,6 +11951,7 @@ msgstr "Gỡ cài đặt"
 #: src/renderer/components/thread/threadContextUsage.ts
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignPerformanceSnapshotSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Unknown"
 msgstr "Không xác định"

@@ -376,6 +376,8 @@ const remoteBridge = {
   onBrowserEvent: () => () => undefined,
   onRemoteThreadCommand: () => () => undefined,
   onSharedSettingsChanged: () => () => undefined,
+  onProjectStateChanged: () => () => undefined,
+  onCampaignPerformanceSnapshotChanged: () => () => undefined,
   onThreadOpenRequested: () => () => undefined,
 };
 
