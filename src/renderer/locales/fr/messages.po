@@ -992,6 +992,10 @@ msgstr "Agent"
 msgid "Agent ({subagent}): {description}"
 msgstr "Agent ({subagent}) : {description}"
 
+#: src/renderer/i18n/sharedMessages.ts
+msgid "Agent catalog is still warming up for provider \"{provider}\" — please retry in a moment"
+msgstr "Le catalogue d'agents est encore en cours de chargement pour le fournisseur « {provider} » — réessayez dans un instant"
+
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
 msgstr "Chat d'agent (ACP / markdown). Les lignes de commande utilisent cette taille moins 1 px ; les lignes d'outil et de plan moins 2 px."
@@ -8470,6 +8474,10 @@ msgstr "fournisseur"
 #: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 msgid "Provider"
 msgstr "Fournisseur"
+
+#: src/renderer/i18n/sharedMessages.ts
+msgid "Provider \"{provider}\" is not installed or cannot host a consultation thread"
+msgstr "Le fournisseur « {provider} » n'est pas installé ou ne peut pas héberger un fil de consultation"
 
 #: src/renderer/components/thread/ThreadContextDock.tsx
 #: src/renderer/components/thread/threadContextUsage.ts

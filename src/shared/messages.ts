@@ -116,6 +116,12 @@ const messages = {
   "supervisor.exited": "Background process exited unexpectedly",
   "supervisor.notRunning": "Background process is not running",
 
+  // ── Consultations ─────────────────────────────────────────
+  "consultation.providerWarmingUp":
+    'Agent catalog is still warming up for provider "{provider}" — please retry in a moment',
+  "consultation.providerUnavailable":
+    'Provider "{provider}" is not installed or cannot host a consultation thread',
+
   // ── Kimi Code ─────────────────────────────────────────────
   "kimi.credentialsLocked":
     "Kimi Code could not update its credentials because another process is using the credential file. Close other Poracode or Kimi Code processes, then retry.",

@@ -1,7 +1,5 @@
-import type { AgentKind, AgentCapability } from "@/shared/contracts";
-import type {
-  CampaignAgentRoleId,
-} from "@/shared/contracts/campaign/agentRole";
+import { agentCapabilitySchema, type AgentKind, type AgentCapability } from "@/shared/contracts";
+import type { CampaignAgentRoleId } from "@/shared/contracts/campaign/agentRole";
 import { CAMPAIGN_AGENT_ROLE_IDS } from "@/shared/contracts/campaign/agentRole";
 import type { SpawnableAgent } from "@/supervisor/crossagentMcp/types";
 
@@ -26,6 +24,8 @@ export interface CampaignAgentRegistryDeps {
   getSpawnableAgents: () => Promise<SpawnableAgent[]>;
   /** Get persisted capabilities for an agent kind. */
   getCapabilities: (kind: AgentKind) => AgentCapability | undefined;
+  /** Optional helper to await ongoing detection if cache is cold. */
+  awaitPendingDetection?: () => Promise<void>;
 }
 
 /**
@@ -46,10 +46,16 @@ export class CampaignAgentRegistry {
 
   /** All spawnable agents with their assigned campaign roles. */
   async resolveAll(): Promise<CampaignAgentEntry[]> {
-    const agents = await this.deps.getSpawnableAgents();
+    let agents = await this.deps.getSpawnableAgents();
+    if (agents.length === 0 && this.deps.awaitPendingDetection) {
+      await this.deps.awaitPendingDetection();
+      agents = await this.deps.getSpawnableAgents();
+    }
     const entries: CampaignAgentEntry[] = [];
     for (const agent of agents) {
-      const caps = this.deps.getCapabilities(agent.provider.value as AgentKind);
+      const caps =
+        this.deps.getCapabilities(agent.provider.value as AgentKind) ??
+        this.defaultCapabilities(agent);
       if (!caps) continue;
       const roles = this.assignRoles(agent);
       if (roles.length === 0) continue;
@@ -61,6 +67,12 @@ export class CampaignAgentRegistry {
       });
     }
     return entries;
+  }
+
+  private defaultCapabilities(agent: SpawnableAgent): AgentCapability {
+    return agentCapabilitySchema.parse({
+      models: agent.models.map((m) => ({ id: m.value, label: m.label })),
+    });
   }
 
   /**

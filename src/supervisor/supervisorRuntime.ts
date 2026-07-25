@@ -448,7 +448,10 @@ export class SupervisorRuntime {
         const { windows } = await this.agentStatusService.getAgentStatuses({ wslDistros: [] });
         return buildSpawnableAgents(this.adapters, windows);
       },
-      getCapabilities: (kind) => this.agentStatusService.getCachedCapabilities(kind),
+      getCapabilities: (kind) =>
+        this.agentStatusService.getCachedCapabilities(kind) ??
+        this.adapters.get(kind)?.capabilities,
+      awaitPendingDetection: () => this.agentStatusService.awaitPendingDetection(),
     });
 
     // Phase 4: central consultation coordinator (Parts 2-5, 9). Reuses the

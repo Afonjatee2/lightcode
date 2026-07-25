@@ -992,6 +992,10 @@ msgstr "에이전트"
 msgid "Agent ({subagent}): {description}"
 msgstr "에이전트 ({subagent}): {description}"
 
+#: src/renderer/i18n/sharedMessages.ts
+msgid "Agent catalog is still warming up for provider \"{provider}\" — please retry in a moment"
+msgstr "공급자 \"{provider}\"의 에이전트 카탈로그를 준비하는 중입니다 — 잠시 후 다시 시도하세요"
+
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
 msgstr "에이전트 채팅 (ACP / markdown). 명령 행은 이 크기에서 1px를 뺀 값을, 도구 및 계획 행은 2px를 뺀 값을 사용합니다."
@@ -8471,6 +8475,10 @@ msgstr "공급자"
 #: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 msgid "Provider"
 msgstr "공급자"
+
+#: src/renderer/i18n/sharedMessages.ts
+msgid "Provider \"{provider}\" is not installed or cannot host a consultation thread"
+msgstr "공급자 \"{provider}\"가 설치되어 있지 않거나 상담 스레드를 호스팅할 수 없습니다"
 
 #: src/renderer/components/thread/ThreadContextDock.tsx
 #: src/renderer/components/thread/threadContextUsage.ts

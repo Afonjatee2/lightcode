@@ -171,6 +171,13 @@ const SHARED_MESSAGE_DESCRIPTORS: Record<MessageKey, MessageDescriptor> = {
   "supervisor.restarted": msg({ message: "Background process restarted" }),
   "supervisor.exited": msg({ message: "Background process exited unexpectedly" }),
   "supervisor.notRunning": msg({ message: "Background process is not running" }),
+  "consultation.providerWarmingUp": msg({
+    message:
+      'Agent catalog is still warming up for provider "{provider}" — please retry in a moment',
+  }),
+  "consultation.providerUnavailable": msg({
+    message: 'Provider "{provider}" is not installed or cannot host a consultation thread',
+  }),
   "kimi.credentialsLocked": msg({
     message:
       "Kimi Code could not update its credentials because another process is using the credential file. Close other Tee's Cockpit or Kimi Code processes, then retry.",

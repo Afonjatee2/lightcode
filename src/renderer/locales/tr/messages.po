@@ -992,6 +992,10 @@ msgstr "Temsilci"
 msgid "Agent ({subagent}): {description}"
 msgstr "Temsilci ({subagent}): {description}"
 
+#: src/renderer/i18n/sharedMessages.ts
+msgid "Agent catalog is still warming up for provider \"{provider}\" — please retry in a moment"
+msgstr "\"{provider}\" sağlayıcısı için ajan kataloğu hâlâ hazırlanıyor — birazdan yeniden deneyin"
+
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
 msgstr "Temsilci sohbeti (ACP / markdown). Komut satırları bu boyutu eksi 1 piksel kullanır; araç ve plan satırları 2 piksel eksiğini kullanır."
@@ -8471,6 +8475,10 @@ msgstr "sağlayıcı"
 #: src/renderer/views/SettingsOverlay/parts/ModelAliasesSection.tsx
 msgid "Provider"
 msgstr "Sağlayıcı"
+
+#: src/renderer/i18n/sharedMessages.ts
+msgid "Provider \"{provider}\" is not installed or cannot host a consultation thread"
+msgstr "\"{provider}\" sağlayıcısı yüklü değil veya bir danışma dizisi barındıramıyor"
 
 #: src/renderer/components/thread/ThreadContextDock.tsx
 #: src/renderer/components/thread/threadContextUsage.ts

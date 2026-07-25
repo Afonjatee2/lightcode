@@ -1,3 +1,4 @@
+import { msg } from "@/shared/messages";
 import type { ConsultationMode, ConsultationRole } from "./types";
 import { CONSULTATION_MODES, CONSULTATION_ROLES } from "./types";
 
@@ -80,10 +81,21 @@ export interface ProviderResolution {
   actualModel: string;
 }
 
+export type ProviderUnavailableReason = "warming_up" | "not_detected";
+
 export class ProviderUnavailableError extends Error {
-  constructor(provider: string) {
-    super(`Provider "${provider}" is not installed or cannot host a consultation thread`);
+  readonly provider: string;
+  readonly reason: ProviderUnavailableReason;
+
+  constructor(provider: string, reason: ProviderUnavailableReason = "not_detected") {
+    const message =
+      reason === "warming_up"
+        ? msg("consultation.providerWarmingUp", { provider })
+        : msg("consultation.providerUnavailable", { provider });
+    super(message);
     this.name = "ProviderUnavailableError";
+    this.provider = provider;
+    this.reason = reason;
   }
 }
 
@@ -115,12 +127,17 @@ export function resolveProvider(input: {
   requestedProvider: string | null;
   requestedModel: string | null;
   catalog: AvailableProvider[];
+  isWarmingUp?: boolean;
 }): ProviderResolution {
-  const { role, requestedProvider, requestedModel, catalog } = input;
+  const { role, requestedProvider, requestedModel, catalog, isWarmingUp } = input;
 
   if (requestedProvider) {
     const match = catalog.find((entry) => entry.provider === requestedProvider);
-    if (!match) throw new ProviderUnavailableError(requestedProvider);
+    if (!match) {
+      const reason: ProviderUnavailableReason =
+        isWarmingUp || catalog.length === 0 ? "warming_up" : "not_detected";
+      throw new ProviderUnavailableError(requestedProvider, reason);
+    }
     if (!match.authenticated) throw new ProviderAuthError(requestedProvider);
     return { actualProvider: match.provider, actualModel: pickModel(match, requestedModel) };
   }
@@ -128,7 +145,12 @@ export function resolveProvider(input: {
   const authenticated = catalog.filter((entry) => entry.authenticated && entry.models.length > 0);
   const roleMatch = authenticated.find((entry) => entry.roles?.includes(role));
   const chosen = roleMatch ?? authenticated[0];
-  if (!chosen) throw new NoProviderForRoleError(role);
+  if (!chosen) {
+    if (isWarmingUp || catalog.length === 0) {
+      throw new ProviderUnavailableError("catalog", "warming_up");
+    }
+    throw new NoProviderForRoleError(role);
+  }
   return { actualProvider: chosen.provider, actualModel: pickModel(chosen, requestedModel) };
 }
 

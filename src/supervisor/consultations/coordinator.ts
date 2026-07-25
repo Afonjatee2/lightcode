@@ -1,6 +1,7 @@
 import {
   PERMISSION_POLICY_VERSION,
   ProviderAuthError,
+  ProviderUnavailableError,
   assertCan,
   buildResultAttachment,
   canTransition,
@@ -540,7 +541,12 @@ export class ConsultationCoordinator {
         catalog,
       });
     } catch (error) {
-      const code = error instanceof ProviderAuthError ? "auth_failure" : "provider_unavailable";
+      const code =
+        error instanceof ProviderAuthError
+          ? "auth_failure"
+          : error instanceof ProviderUnavailableError && error.reason === "warming_up"
+            ? "provider_warming_up"
+            : "provider_unavailable";
       this.fail(record, code, safeMessage(error));
       return;
     }
