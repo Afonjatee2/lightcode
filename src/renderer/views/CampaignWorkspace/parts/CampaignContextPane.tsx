@@ -355,6 +355,7 @@ function ContextSections(props: {
 
 export function CampaignContextPane(props: {
   campaignContext: CampaignContextState & { refetch: () => void };
+  isUnlinkedProject?: boolean;
   onOpenApprovals?: (proposalId?: string) => void;
   decisions?: CampaignDecisionsBundle;
   collapsed?: boolean;
@@ -442,7 +443,13 @@ export function CampaignContextPane(props: {
         )}
         {campaignContext.status === "empty" && (
           <CenteredMessage>
-            <Trans>This project isn't linked to a Control Centre campaign yet.</Trans>
+            {props.isUnlinkedProject ? (
+              <Trans>
+                Not linked to Control Centre — link in Advanced settings when creating a workspace.
+              </Trans>
+            ) : (
+              <Trans>This project isn't linked to a Control Centre campaign yet.</Trans>
+            )}
           </CenteredMessage>
         )}
         {campaignContext.status === "unauthorized" && (

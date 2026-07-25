@@ -7,6 +7,10 @@ import { CampaignApprovalsPane } from "./parts/CampaignApprovalsPane";
 import { PlanIntelligencePane, type PlanIntelligenceSession } from "./parts/PlanIntelligencePane";
 import { useProject } from "@/renderer/state/useThread";
 import { useCampaignContext } from "@/renderer/hooks/useCampaignContext";
+import {
+  isLinkedCampaignGroupId,
+  unlinkedCampaignIdentity,
+} from "@/renderer/campaign/campaignWorkspaceIdentity";
 import { useCampaignDecisions } from "@/renderer/hooks/useCampaignDecisions";
 import { useRecordCampaignDecision } from "@/renderer/hooks/useRecordCampaignDecision";
 import { useOperationsToday } from "@/renderer/hooks/useOperationsToday";
@@ -69,6 +73,10 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
   const project = useProject(props.projectId);
   const boundCampaignGroupId = project?.campaignExtension?.campaignGroupId ?? null;
   const isHubProject = boundCampaignGroupId === CAMPAIGNS_HUB_GROUP_ID;
+  const isUnlinkedProject =
+    project?.purpose === "campaign" &&
+    Boolean(project.campaignExtension) &&
+    !isLinkedCampaignGroupId(boundCampaignGroupId);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(
     isHubProject ? null : boundCampaignGroupId,
   );
@@ -84,6 +92,12 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
   const operationsToday = useOperationsToday(props.projectId);
   const activeCampaignId = selectedCampaignId ?? (isHubProject ? null : boundCampaignGroupId);
   const campaignContext = useCampaignContext(props.projectId, activeCampaignId);
+  const threadIdentity =
+    campaignContext.status === "ready"
+      ? campaignContext.data.identity
+      : isUnlinkedProject && project
+        ? unlinkedCampaignIdentity(project)
+        : null;
   const campaignDecisions = useCampaignDecisions(props.projectId, activeCampaignId);
   const recordDecision = useRecordCampaignDecision(props.projectId);
 
@@ -172,7 +186,7 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
         ) : (
           <CampaignThreadPane
             projectId={props.projectId}
-            identity={campaignContext.status === "ready" ? campaignContext.data.identity : null}
+            identity={threadIdentity}
             suggestedQuestions={
               campaignContext.status === "ready" ? campaignContext.data.suggestedQuestions : []
             }
@@ -202,6 +216,7 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
       >
         <CampaignContextPane
           campaignContext={campaignContext}
+          isUnlinkedProject={isUnlinkedProject}
           onOpenApprovals={(proposalId) => {
             setSelectedProposalId(proposalId ?? null);
             setWorkspaceView("approvals");

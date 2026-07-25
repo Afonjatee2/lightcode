@@ -107,10 +107,10 @@ describe("campaignProjectExtensionSchema", () => {
     expect(campaignProjectExtensionSchema.safeParse(missing).success).toBe(false);
   });
 
-  it("rejects empty campaignGroupId", () => {
+  it("accepts empty campaignGroupId for unlinked workspaces", () => {
     expect(
       campaignProjectExtensionSchema.safeParse({ ...validExtension, campaignGroupId: "" }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("rejects missing clientName", () => {

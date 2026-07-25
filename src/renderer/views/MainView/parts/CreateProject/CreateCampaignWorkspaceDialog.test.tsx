@@ -10,9 +10,13 @@ const mocks = vi.hoisted(() => ({
   useCampaignContext: vi.fn<() => unknown>(),
 }));
 
-vi.mock("@/renderer/actions/campaignProjectActions", () => ({
-  createCampaignWorkspace: mocks.createCampaignWorkspace,
-}));
+vi.mock("@/renderer/actions/campaignProjectActions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/renderer/actions/campaignProjectActions")>();
+  return {
+    ...actual,
+    createCampaignWorkspace: mocks.createCampaignWorkspace,
+  };
+});
 
 vi.mock("@/renderer/hooks/useCampaignGroupList", () => ({
   useCampaignGroupList: mocks.useCampaignGroupList,
@@ -130,9 +134,11 @@ describe("CreateCampaignWorkspaceDialog", () => {
     await waitFor(() =>
       expect(screen.getByText(/Could not reach Control Centre/)).toBeInTheDocument(),
     );
-    expect(screen.getByLabelText("Workspace name")).toBeInTheDocument();
+    expect(screen.getAllByLabelText("Workspace name").length).toBeGreaterThan(0);
 
-    fireEvent.change(screen.getByLabelText("Workspace name"), { target: { value: "Manual Camp" } });
+    fireEvent.change(screen.getAllByLabelText("Workspace name")[1]!, {
+      target: { value: "Manual Camp" },
+    });
     fireEvent.change(screen.getByLabelText("Client name"), { target: { value: "Manual Client" } });
     fireEvent.change(screen.getByLabelText("Campaign reference"), {
       target: { value: "cg-manual" },
@@ -159,5 +165,29 @@ describe("CreateCampaignWorkspaceDialog", () => {
     usePanelStore.getState().openCreateCampaignProjectModal();
     render(<CreateCampaignWorkspaceDialog />);
     expect(screen.getByText(/Loading campaigns from Control Centre/)).toBeInTheDocument();
+  });
+
+  test("creates an unlinked workspace from the name-only path", async () => {
+    mocks.useCampaignGroupList.mockReturnValue(mockGroupsReady());
+    usePanelStore.getState().openCreateCampaignProjectModal();
+    render(<CreateCampaignWorkspaceDialog />);
+
+    fireEvent.change(screen.getByTestId("unlinked-workspace-name"), {
+      target: { value: "AIB GAA A55201" },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Start without linking$/ }));
+    });
+
+    await waitFor(() => expect(mocks.createCampaignWorkspace).toHaveBeenCalledTimes(1));
+    expect(mocks.createCampaignWorkspace).toHaveBeenCalledWith({
+      name: "AIB GAA A55201",
+      campaignExtension: {
+        campaignGroupId: "",
+        clientName: "AIB GAA A55201",
+        campaignName: "AIB GAA A55201",
+      },
+    });
   });
 });
