@@ -353,20 +353,18 @@ export function Sidebar() {
             <WhatsNewButton iconOnly />
             <SidebarButton
               iconOnly
+              icon={<Megaphone className="size-4" />}
+              label={t`Campaigns`}
+              isActive={appView.kind === "campaignToday"}
+              onPress={() => startTransition(() => openCampaignToday())}
+            />
+            <SidebarButton
+              iconOnly
               icon={<Network className="size-4" />}
               label={t`Swarm`}
               isActive={appView.kind === "swarm"}
               onPress={() => startTransition(() => openSwarm())}
             />
-            {campaignProjectIds.length > 0 ? (
-              <SidebarButton
-                iconOnly
-                icon={<Megaphone className="size-4" />}
-                label={t`Campaigns`}
-                isActive={appView.kind === "campaignToday"}
-                onPress={() => startTransition(() => openCampaignToday())}
-              />
-            ) : null}
             <SidebarButton
               iconOnly
               icon={<GitPullRequest className="size-4" />}
@@ -477,6 +475,12 @@ export function Sidebar() {
         <div className={sidebarFooterNavClass}>
           <UpdateButtons />
           <WhatsNewButton />
+          <SidebarButton
+            icon={<Megaphone className="size-4" />}
+            label={t`Campaigns`}
+            isActive={appView.kind === "campaignToday"}
+            onPress={() => startTransition(() => openCampaignToday())}
+          />
           <SidebarButton
             icon={<Network className="size-4" />}
             label={t`Swarm`}

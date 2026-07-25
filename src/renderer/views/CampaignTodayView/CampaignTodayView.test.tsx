@@ -1,9 +1,10 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { McpToolCallPayload, McpToolCallResult, Project } from "@/shared/contracts";
 import { controlCentreOperationsTodayFixture } from "@/shared/contracts/campaign/fixtures/controlCentreOperationsToday.fixture";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import { useAppStore } from "@/renderer/state/appStore";
+import { usePanelStore } from "@/renderer/state/panelStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { CampaignTodayView } from "./CampaignTodayView";
 
@@ -85,5 +86,43 @@ describe("CampaignTodayView", () => {
     expect(screen.getAllByText(/B2B Lead Gen/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Recently resolved/i)).toBeInTheDocument();
     expect(screen.getByText(/Source health/i)).toBeInTheDocument();
+  });
+
+  it("shows the no-campaign-projects setup state with a create action", () => {
+    useAppStore.setState((state) => ({
+      ...state,
+      projects: [],
+      view: { kind: "campaignToday" },
+    }));
+
+    render(<CampaignTodayView />);
+
+    expect(
+      screen.getByText(/links Poracode to your Control Centre campaigns/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Add Control Centre MCP/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /New Campaign Project/i }));
+    expect(usePanelStore.getState().createCampaignProjectModalOpen).toBe(true);
+  });
+
+  it("shows a distinct Control Centre setup state when campaign projects exist without MCP", () => {
+    useAppStore.setState((state) => ({
+      ...state,
+      projects: [
+        campaignProject({
+          mcpServers: [],
+        }),
+      ],
+      view: { kind: "campaignToday" },
+    }));
+
+    render(<CampaignTodayView />);
+
+    expect(screen.getByText(/Add Control Centre MCP to a campaign project/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/links Poracode to your Control Centre campaigns/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /New Campaign Project/i })).not.toBeInTheDocument();
   });
 });
