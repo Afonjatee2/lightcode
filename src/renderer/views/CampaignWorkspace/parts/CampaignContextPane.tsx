@@ -122,15 +122,7 @@ interface KpiGroup {
   items: CampaignContextKpiViewModel[];
 }
 
-function deriveKpiGroups(kpis: CampaignContextKpiViewModel[]): {
-  groups: KpiGroup[];
-  hasChannelLabels: boolean;
-} {
-  const hasChannelLabels = kpis.some((kpi) => {
-    const raw = kpi as { channel?: string; platform?: string; source?: string };
-    return Boolean(raw.channel || raw.platform || raw.source);
-  });
-
+function deriveKpiGroups(kpis: CampaignContextKpiViewModel[]): { groups: KpiGroup[] } {
   const map = new Map<string, CampaignContextKpiViewModel[]>();
   for (const kpi of kpis) {
     const key = kpi.metricKey || kpi.label;
@@ -147,7 +139,7 @@ function deriveKpiGroups(kpis: CampaignContextKpiViewModel[]): {
     items,
   }));
 
-  return { groups, hasChannelLabels };
+  return { groups };
 }
 
 function ContextSections(props: {
@@ -200,7 +192,7 @@ function ContextSections(props: {
         ) : (
           <ul className="space-y-3">
             {kpiGroupData.groups.map((group) => {
-              const isMultiNoChannel = !kpiGroupData.hasChannelLabels && group.items.length > 1;
+              const isMultiNoChannel = group.items.length > 1;
               return (
                 <li
                   key={group.metricKey}
@@ -213,8 +205,6 @@ function ContextSections(props: {
                   ) : null}
                   <div className="space-y-2.5">
                     {group.items.map((kpi) => {
-                      const raw = kpi as { channel?: string; platform?: string; source?: string };
-                      const channelLabel = raw.channel || raw.platform || raw.source;
                       const pct = kpi.pctAchieved ?? 0;
                       const onTrack = kpi.status === "on_track" || kpi.status === "healthy";
                       const over = kpi.pctAchieved !== null && pct > 100;
@@ -225,14 +215,7 @@ function ContextSections(props: {
                       return (
                         <div key={kpi.id}>
                           <div className="mb-1 flex justify-between text-xs">
-                            <span className="font-semibold text-foreground">
-                              {displayLabel}
-                              {channelLabel ? (
-                                <span className="ml-1 text-[11px] font-normal text-muted">
-                                  ({channelLabel})
-                                </span>
-                              ) : null}
-                            </span>
+                            <span className="font-semibold text-foreground">{displayLabel}</span>
                             <span
                               className={`inline-flex items-center gap-0.5 tabular-nums font-semibold ${onTrack ? "text-success" : "text-warning"}`}
                             >

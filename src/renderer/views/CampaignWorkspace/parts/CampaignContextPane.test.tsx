@@ -135,45 +135,6 @@ describe("CampaignContextPane", () => {
     expect(screen.getByRole("button", { name: "Show less" })).toBeTruthy();
   });
 
-  it("renders KPI channel label when channel context is present on KPI items", () => {
-    const context: CampaignContextViewModel = {
-      ...baseContext,
-      kpis: [
-        {
-          id: "k1",
-          metricKey: "impressions",
-          label: "impressions",
-          targetType: "min",
-          targetValue: 1000,
-          actualValue: 800,
-          pctAchieved: 80,
-          status: "on_track",
-          channel: "Meta Ads",
-        } as any,
-        {
-          id: "k2",
-          metricKey: "impressions",
-          label: "impressions",
-          targetType: "min",
-          targetValue: 2000,
-          actualValue: 2200,
-          pctAchieved: 110,
-          status: "on_track",
-          channel: "Google Ads",
-        } as any,
-      ],
-    };
-
-    render(
-      <CampaignContextPane
-        campaignContext={{ status: "ready", data: context, refetch: vi.fn<() => void>() }}
-      />,
-    );
-
-    expect(screen.getByText("(Meta Ads)")).toBeTruthy();
-    expect(screen.getByText("(Google Ads)")).toBeTruthy();
-  });
-
   it("groups duplicate metric names under a single subheading when channel context is absent", () => {
     const context: CampaignContextViewModel = {
       ...baseContext,
