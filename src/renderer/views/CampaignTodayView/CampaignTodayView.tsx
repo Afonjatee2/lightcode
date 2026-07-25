@@ -17,7 +17,12 @@ import { getProjectPurpose } from "@/shared/contracts/project";
 import {
   findCampaignProjectByGroupId,
   diagnoseTodayControlCentreSetup,
+  pickDefaultCampaignGroupId,
 } from "@/renderer/campaign/resolveTodayDataSource";
+import {
+  ensureCampaignsHubProject,
+  isCampaignsHubProject,
+} from "@/renderer/campaign/ensureCampaignsHubProject";
 import { controlCentreUnavailableMessage } from "@/renderer/campaign/controlCentreAvailabilityCopy";
 import {
   dayPeriodGreeting,
@@ -283,7 +288,7 @@ export function CampaignTodayView() {
   const [askText, setAskText] = useState("");
   const projects = useAppStore((state) => state.projects);
   const userMcpServers = useSharedSettings((s) => s.mcpServers);
-  const { projectId, operationsToday } = useCampaignTodayOperations();
+  const { projectId, globalControlCentreReady, operationsToday } = useCampaignTodayOperations();
   const openDraft = useAppStore((state) => state.openDraft);
   const setPendingCampaignComposerPrefill = useAppStore(
     (state) => state.setPendingCampaignComposerPrefill,
@@ -291,9 +296,19 @@ export function CampaignTodayView() {
   const setPendingCampaignApprovalsFocus = useAppStore(
     (state) => state.setPendingCampaignApprovalsFocus,
   );
-  const hasCampaignProjects = projects.some((project) => getProjectPurpose(project) === "campaign");
+  const setPendingCampaignWorkspaceSelection = useAppStore(
+    (state) => state.setPendingCampaignWorkspaceSelection,
+  );
+  // The auto-created hub does not count: with only the hub present the user
+  // still has no pinned campaign, so the setup card (and its create action)
+  // must stay visible.
+  const hasCampaignProjects = projects.some(
+    (project) => getProjectPurpose(project) === "campaign" && !isCampaignsHubProject(project),
+  );
   const showNoProjectsSetupState = !hasCampaignProjects;
-  const showNoControlCentreSetupState = hasCampaignProjects && !projectId;
+  const showNoControlCentreSetupState =
+    hasCampaignProjects && !projectId && !globalControlCentreReady;
+  const canAskAnything = Boolean(projectId || globalControlCentreReady);
   const controlCentreSetupReason = showNoControlCentreSetupState
     ? diagnoseTodayControlCentreSetup(projects, userMcpServers)
     : null;
@@ -331,18 +346,36 @@ export function CampaignTodayView() {
     openDraft(project.id);
   }
 
-  function handleAskSubmit() {
+  async function handleAskSubmit() {
     const text = askText.trim();
-    if (!text || !projectId) return;
-    setPendingCampaignComposerPrefill({ projectId, text });
-    openDraft(projectId);
+    if (!text || !canAskAnything) return;
+
+    let targetProjectId = projectId;
+    if (!targetProjectId) {
+      const hub = await ensureCampaignsHubProject();
+      if (!hub.ok) return;
+      targetProjectId = hub.projectId;
+      const defaultCampaignGroupId =
+        operationsToday.status === "ready"
+          ? pickDefaultCampaignGroupId(operationsToday.data)
+          : undefined;
+      if (defaultCampaignGroupId) {
+        setPendingCampaignWorkspaceSelection({
+          projectId: targetProjectId,
+          campaignGroupId: defaultCampaignGroupId,
+        });
+      }
+    }
+
+    setPendingCampaignComposerPrefill({ projectId: targetProjectId, text });
+    openDraft(targetProjectId);
     setAskText("");
   }
 
   function handleAskKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      handleAskSubmit();
+      void handleAskSubmit();
     }
   }
 
@@ -423,7 +456,7 @@ export function CampaignTodayView() {
               onChange={(event) => setAskText(event.target.value)}
               onKeyDown={handleAskKeyDown}
               rows={1}
-              disabled={!projectId}
+              disabled={!canAskAnything}
               className="max-h-24 min-h-[24px] flex-1 resize-none border-none bg-transparent text-sm text-foreground outline-none placeholder:text-muted disabled:opacity-50"
             />
             <Button
@@ -431,9 +464,11 @@ export function CampaignTodayView() {
               size="sm"
               variant="primary"
               className="shrink-0 bg-[var(--cockpit-accent)] text-[#0e0e14]"
-              isDisabled={!projectId || askText.trim().length === 0}
+              isDisabled={!canAskAnything || askText.trim().length === 0}
               aria-label={t`Ask`}
-              onPress={handleAskSubmit}
+              onPress={() => {
+                void handleAskSubmit();
+              }}
             >
               <Send className="size-4" />
             </Button>
@@ -444,7 +479,7 @@ export function CampaignTodayView() {
                 key={suggestion.id}
                 type="button"
                 className="cockpit-chip"
-                disabled={!projectId}
+                disabled={!canAskAnything}
                 onClick={() => setAskText(t(suggestion))}
               >
                 {t(suggestion)}
@@ -457,8 +492,8 @@ export function CampaignTodayView() {
           <section className="rounded-2xl border border-[var(--hairline)] px-4 py-6 text-center">
             <p className="text-sm text-muted">
               <Trans>
-                A campaign workspace links Poracode to your Control Centre campaigns — approvals,
-                plan intelligence, and daily operations in one place.
+                Ask questions above anytime Control Centre is connected. Pin a campaign workspace
+                here when you want a dedicated folder for one campaign.
               </Trans>
             </p>
             <Button
@@ -467,7 +502,7 @@ export function CampaignTodayView() {
               size="sm"
               onPress={() => usePanelStore.getState().openCreateCampaignProjectModal()}
             >
-              <Trans>New Campaign Project</Trans>
+              <Trans>Pin campaign workspace</Trans>
             </Button>
           </section>
         ) : null}
@@ -489,7 +524,7 @@ export function CampaignTodayView() {
 
         {operationsToday.status === "unauthorized" ? (
           <p className="text-sm text-muted">
-            <Trans>Control Centre needs authorization. Reconnect it in MCP settings.</Trans>
+            <Trans>Control Centre needs authorization. Reconnect it in settings.</Trans>
           </p>
         ) : null}
 

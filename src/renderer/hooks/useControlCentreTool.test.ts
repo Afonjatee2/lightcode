@@ -57,8 +57,10 @@ describe("resolveControlCentreServer", () => {
     expect(resolveControlCentreServer(project, [])?.name).toBe("Control_Centre");
   });
 
-  it("returns undefined when no project is given", () => {
-    expect(resolveControlCentreServer(undefined, [controlCentreServer])).toBeUndefined();
+  it("finds the global control-centre server when no project is given", () => {
+    expect(resolveControlCentreServer(undefined, [controlCentreServer])?.name).toBe(
+      "control-centre",
+    );
   });
 
   it("returns undefined when no control-centre server is configured", () => {

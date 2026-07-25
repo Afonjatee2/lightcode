@@ -10,6 +10,13 @@ import { CampaignTodayView } from "./CampaignTodayView";
 
 const mocks = vi.hoisted(() => ({
   callMcpTool: vi.fn<(payload: McpToolCallPayload) => Promise<McpToolCallResult>>(),
+  ensureCampaignsHubProject: vi.fn<() => Promise<unknown>>(),
+}));
+
+vi.mock("@/renderer/campaign/ensureCampaignsHubProject", async (importOriginal) => ({
+  ...(await importOriginal()),
+  ensureCampaignsHubProject: mocks.ensureCampaignsHubProject,
+  CAMPAIGNS_HUB_GROUP_ID: "poracode-campaigns-hub",
 }));
 
 vi.mock("@/renderer/bridge", async (importOriginal) => {
@@ -65,6 +72,7 @@ function toolResult(content: unknown): McpToolCallResult {
 describe("CampaignTodayView", () => {
   beforeEach(() => {
     mocks.callMcpTool.mockReset();
+    mocks.ensureCampaignsHubProject.mockReset();
     useAppStore.setState((state) => ({
       ...state,
       projects: [campaignProject()],
@@ -72,6 +80,11 @@ describe("CampaignTodayView", () => {
     }));
     useSharedSettings.setState({ mcpServers: [] });
     mocks.callMcpTool.mockResolvedValue(toolResult(controlCentreOperationsTodayFixture));
+    mocks.ensureCampaignsHubProject.mockResolvedValue({
+      ok: true,
+      projectId: "hub-project",
+      threadId: "hub-thread",
+    });
   });
 
   it("renders operations today buckets from the fixture payload", async () => {
@@ -88,6 +101,52 @@ describe("CampaignTodayView", () => {
     expect(screen.getByText(/Source health/i)).toBeInTheDocument();
   });
 
+  it("shows the setup card for pinning workspaces while ask-anything stays enabled", () => {
+    useAppStore.setState((state) => ({
+      ...state,
+      projects: [],
+      view: { kind: "campaignToday" },
+    }));
+    useSharedSettings.setState({ mcpServers: [controlCentreServer] });
+
+    render(<CampaignTodayView />);
+
+    expect(
+      screen.getByText(/Ask questions above anytime Control Centre is connected/i),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Ask anything about your campaigns")).not.toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: /Pin campaign workspace/i }));
+    expect(usePanelStore.getState().createCampaignProjectModalOpen).toBe(true);
+  });
+
+  it("routes zero-project ask-anything through the auto-created campaigns hub", async () => {
+    useAppStore.setState((state) => ({
+      ...state,
+      projects: [],
+      view: { kind: "campaignToday" },
+    }));
+    useSharedSettings.setState({ mcpServers: [controlCentreServer] });
+
+    render(<CampaignTodayView />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Needs attention/i)).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("Ask anything about your campaigns"), {
+      target: { value: "Which campaigns need me today?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+
+    await waitFor(() => expect(mocks.ensureCampaignsHubProject).toHaveBeenCalledTimes(1));
+    expect(useAppStore.getState().view).toEqual({ kind: "draft", projectId: "hub-project" });
+    expect(useAppStore.getState().pendingCampaignComposerPrefill).toEqual({
+      projectId: "hub-project",
+      text: "Which campaigns need me today?",
+    });
+  });
+
   it("shows the no-campaign-projects setup state with a create action", () => {
     useAppStore.setState((state) => ({
       ...state,
@@ -98,15 +157,15 @@ describe("CampaignTodayView", () => {
     render(<CampaignTodayView />);
 
     expect(
-      screen.getByText(/links Poracode to your Control Centre campaigns/i),
+      screen.getByText(/Ask questions above anytime Control Centre is connected/i),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/Add Control Centre MCP/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Ask anything about your campaigns")).toBeDisabled();
 
-    fireEvent.click(screen.getByRole("button", { name: /New Campaign Project/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Pin campaign workspace/i }));
     expect(usePanelStore.getState().createCampaignProjectModalOpen).toBe(true);
   });
 
-  it("shows a distinct Control Centre setup state when campaign projects exist without MCP", () => {
+  it("shows a distinct Control Centre setup state when campaign projects exist without a connection", () => {
     useAppStore.setState((state) => ({
       ...state,
       projects: [
@@ -119,12 +178,12 @@ describe("CampaignTodayView", () => {
 
     render(<CampaignTodayView />);
 
+    expect(screen.getByText(/Control Centre is not connected/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/No MCP server named "control-centre" is configured/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText(/links Poracode to your Control Centre campaigns/i),
+      screen.queryByText(/Ask questions above anytime Control Centre is connected/i),
     ).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /New Campaign Project/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Pin campaign workspace/i }),
+    ).not.toBeInTheDocument();
   });
 });

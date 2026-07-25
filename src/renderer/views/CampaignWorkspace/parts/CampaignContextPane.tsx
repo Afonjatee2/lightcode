@@ -447,7 +447,7 @@ export function CampaignContextPane(props: {
         )}
         {campaignContext.status === "unauthorized" && (
           <CenteredMessage icon={<ShieldAlert className="size-6" />}>
-            <Trans>Control Centre needs authorization. Reconnect it in MCP settings.</Trans>
+            <Trans>Control Centre needs authorization. Reconnect it in settings.</Trans>
           </CenteredMessage>
         )}
         {campaignContext.status === "unavailable" && (

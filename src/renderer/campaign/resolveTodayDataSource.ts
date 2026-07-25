@@ -3,6 +3,7 @@ import { diagnoseControlCentreMcpSetup, mergeMcpServers } from "@/shared/contrac
 import { getProjectPurpose } from "@/shared/contracts/project";
 import { resolveControlCentreServer } from "@/renderer/hooks/useControlCentreTool";
 import type { ControlCentreUnavailableReason } from "@/renderer/campaign/controlCentreAvailabilityCopy";
+import type { OperationsTodayViewModel } from "@/renderer/adapters/campaignViewModels";
 
 /** Latest thread activity for a project, falling back to project creation time. */
 export function projectActivityTimestamp(project: Project, threads: readonly Thread[]): string {
@@ -85,4 +86,13 @@ export function findCampaignProjectByGroupId(
       getProjectPurpose(project) === "campaign" &&
       project.campaignExtension?.campaignGroupId === campaignGroupId,
   );
+}
+
+/** Picks a default campaign group for cross-campaign ask-anything routing. */
+export function pickDefaultCampaignGroupId(
+  data: OperationsTodayViewModel | undefined,
+): string | undefined {
+  if (!data) return undefined;
+  const first = data.needsAttention[0] ?? data.waitingForApproval[0] ?? data.otherLive[0];
+  return first?.campaignGroupId;
 }

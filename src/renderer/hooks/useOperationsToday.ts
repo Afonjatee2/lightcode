@@ -1,10 +1,7 @@
 import { controlCentreOperationsTodaySchema } from "@/shared/contracts/campaign/controlCentreOperationsToday";
 import type { OperationsTodayViewModel } from "@/renderer/adapters/campaignViewModels";
 import { mapOperationsToday } from "@/renderer/adapters/mapOperationsToday";
-import {
-  useControlCentreTool,
-  type ControlCentreToolState,
-} from "./useControlCentreTool";
+import { useControlCentreTool, type ControlCentreToolState } from "./useControlCentreTool";
 
 export type OperationsTodayState = ControlCentreToolState<OperationsTodayViewModel>;
 
@@ -21,7 +18,7 @@ const NO_ARGS = {};
  */
 export function useOperationsToday(
   projectId: string | undefined,
-  options?: { skip?: boolean },
+  options?: { skip?: boolean; useGlobalServer?: boolean },
 ): OperationsTodayState & { refetch: () => void } {
   const { state, refetch } = useControlCentreTool({
     projectId,
@@ -29,6 +26,7 @@ export function useOperationsToday(
     args: NO_ARGS,
     schema: controlCentreOperationsTodaySchema,
     skip: options?.skip ?? false,
+    useGlobalServer: options?.useGlobalServer ?? false,
   });
 
   if (state.status === "ready") {

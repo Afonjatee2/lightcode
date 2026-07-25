@@ -42,6 +42,8 @@ export interface ViewSlice {
     campaignGroupId: string;
     proposalId?: string;
   } | null;
+  /** Select a campaign in the workspace after navigating from Today ask-anything. */
+  pendingCampaignWorkspaceSelection: { projectId: string; campaignGroupId: string } | null;
   /** Last selected campaign topic tab per project/campaign workspace key. */
   campaignActiveTopicByKey: Record<string, CampaignTopicId>;
   /** Persisted view timestamps for campaign topic unread dots (thread id → ms). */
@@ -61,6 +63,9 @@ export interface ViewSlice {
   setPendingCampaignComposerPrefill: (prefill: { projectId: string; text: string } | null) => void;
   setPendingCampaignApprovalsFocus: (
     focus: { projectId: string; campaignGroupId: string; proposalId?: string } | null,
+  ) => void;
+  setPendingCampaignWorkspaceSelection: (
+    selection: { projectId: string; campaignGroupId: string } | null,
   ) => void;
   setCampaignActiveTopic: (workspaceKey: string, topicId: CampaignTopicId) => void;
   markCampaignTopicViewed: (threadId: string) => void;
@@ -115,6 +120,7 @@ export const createViewSlice: SliceCreator<ViewSlice> = (set) => ({
   pendingComposerFocusThreadId: null,
   pendingCampaignComposerPrefill: null,
   pendingCampaignApprovalsFocus: null,
+  pendingCampaignWorkspaceSelection: null,
   campaignActiveTopicByKey: {},
   campaignTopicLastViewedAtByThreadId: {},
   chatScrollToBottomTokens: {},
@@ -128,6 +134,8 @@ export const createViewSlice: SliceCreator<ViewSlice> = (set) => ({
     ),
   setPendingCampaignComposerPrefill: (prefill) => set({ pendingCampaignComposerPrefill: prefill }),
   setPendingCampaignApprovalsFocus: (focus) => set({ pendingCampaignApprovalsFocus: focus }),
+  setPendingCampaignWorkspaceSelection: (selection) =>
+    set({ pendingCampaignWorkspaceSelection: selection }),
   setCampaignActiveTopic: (workspaceKey, topicId) =>
     set((state) =>
       state.campaignActiveTopicByKey[workspaceKey] === topicId
