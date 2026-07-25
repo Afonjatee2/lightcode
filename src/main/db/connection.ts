@@ -1,7 +1,9 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import Database from "better-sqlite3";
+import { is } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import { getTableConfig, SQLiteTable } from "drizzle-orm/sqlite-core";
 import * as schema from "../db.schema";
 
 let _db: ReturnType<typeof drizzle> | undefined;
@@ -95,21 +97,12 @@ function openDatabase(dbPath: string): InstanceType<typeof Database> {
   }
 }
 
-export function initDatabase(dbPath: string) {
-  console.log(`[db] opening ${dbPath}`);
-  const sqlite = openDatabase(dbPath);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("synchronous = NORMAL");
-  sqlite.pragma("foreign_keys = ON");
-  sqlite.pragma("busy_timeout = 5000");
-
-  _sqlite = sqlite;
-  _db = drizzle({ client: sqlite, schema });
-  _knownProjectIds = new Set();
-  _knownThreadIds = new Set();
-
-  // Create tables if they don't exist.
-  sqlite.exec(`
+/**
+ * Canonical baseline DDL. Every statement is IF NOT EXISTS, so re-running is
+ * safe — initDatabase re-executes it after schema repair to restore indexes
+ * dropped by a divergent-table rebuild.
+ */
+const BASELINE_SCHEMA_SQL = `
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -331,7 +324,23 @@ export function initDatabase(dbPath: string) {
     );
     CREATE INDEX IF NOT EXISTS idx_panel_membership_child
       ON panel_membership (child_consultation_id);
-  `);
+`;
+
+export function initDatabase(dbPath: string) {
+  console.log(`[db] opening ${dbPath}`);
+  const sqlite = openDatabase(dbPath);
+  sqlite.pragma("journal_mode = WAL");
+  sqlite.pragma("synchronous = NORMAL");
+  sqlite.pragma("foreign_keys = ON");
+  sqlite.pragma("busy_timeout = 5000");
+
+  _sqlite = sqlite;
+  _db = drizzle({ client: sqlite, schema });
+  _knownProjectIds = new Set();
+  _knownThreadIds = new Set();
+
+  // Create tables if they don't exist.
+  sqlite.exec(BASELINE_SCHEMA_SQL);
 
   // Baseline schema version for future DB migrations.
   // New upgrade steps should live behind this gate when we need them.
@@ -738,7 +747,12 @@ export function initDatabase(dbPath: string) {
       .run(String(SCHEMA_VERSION));
   }
 
-  repairExpectedColumns(sqlite);
+  const repairedDrift = repairExpectedColumns(sqlite);
+  if (repairedDrift.length > 0) {
+    // A divergent-table rebuild drops that table's indexes; the baseline DDL is
+    // all IF NOT EXISTS, so re-running it restores them.
+    sqlite.exec(BASELINE_SCHEMA_SQL);
+  }
 
   // Bound the durable usage log: drop events older than the retention window so
   // a long-lived install can't accumulate unboundedly (aggregation reads scan
@@ -758,46 +772,131 @@ export function initDatabase(dbPath: string) {
 }
 
 /**
- * Columns the current code reads unconditionally, paired with the DDL that adds
- * them. The numbered ladder above only runs for databases below each version,
- * so a database stamped by a divergent build — same version number, different
- * columns — skips migrations it still needs and every query touching the
- * missing column throws. This pass is version-independent and idempotent, so
- * such a database heals itself on the next launch instead of failing opaquely.
+ * SQL literal used to backfill existing rows when repair adds a NOT NULL
+ * column. Prefers the column's own declared default; falls back to the empty
+ * value for the column's type so the ALTER is always legal.
  */
-const EXPECTED_COLUMNS: readonly { table: string; column: string; ddl: string }[] = [
-  {
-    table: "projects",
-    column: "campaign_group_id",
-    ddl: "ALTER TABLE projects ADD COLUMN campaign_group_id TEXT",
-  },
-  { table: "projects", column: "purpose", ddl: "ALTER TABLE projects ADD COLUMN purpose TEXT" },
-  {
-    table: "projects",
-    column: "campaign_extension",
-    ddl: "ALTER TABLE projects ADD COLUMN campaign_extension TEXT",
-  },
-  {
-    table: "consultations",
-    column: "panel_completion_rule",
-    ddl: "ALTER TABLE consultations ADD COLUMN panel_completion_rule TEXT",
-  },
-];
+function repairDefaultLiteral(column: {
+  getSQLType(): string;
+  hasDefault: boolean;
+  default: unknown;
+}): string {
+  const declared = column.hasDefault ? column.default : undefined;
+  if (typeof declared === "number") return String(declared);
+  if (typeof declared === "boolean") return declared ? "1" : "0";
+  if (typeof declared === "string") return `'${declared.replaceAll("'", "''")}'`;
+  return column.getSQLType().toLowerCase().includes("text") ? "''" : "0";
+}
+
+/**
+ * Version-independent, idempotent schema repair. The numbered ladder above only
+ * runs for databases below each version, so a database stamped by a divergent
+ * build — same version number, different columns — skips migrations it still
+ * needs and every query touching the missing column throws (incident history:
+ * projects.campaign_group_id, then thread_summaries.source_cursor). Instead of
+ * hand-listing expected columns (which recreates the divergent-beliefs problem
+ * inside the repair itself), this derives the expected shape from the drizzle
+ * schema — the exact shape the code reads — and adds whatever is missing.
+ * Primary-key columns cannot be added by ALTER TABLE; a table missing its PK
+ * column is logged and left for the ladder (it indicates drift beyond column
+ * repair).
+ */
+type TableInfoRow = { name: string; notnull: number; dflt_value: string | null };
+
+/**
+ * Rebuilds a table to the canonical drizzle shape, copying the intersection of
+ * old and canonical columns. Needed when a divergent build left an EXTRA
+ * NOT NULL column without a default: current code never writes it, so every
+ * insert fails, and SQLite cannot drop a constraint in place. Canonical NOT
+ * NULL columns get a DEFAULT so rows copied from a table missing them backfill
+ * legally. Returns the repair labels for the rebuilt table.
+ */
+function rebuildTableToCanonicalShape(
+  sqlite: InstanceType<typeof Database>,
+  tableName: string,
+  config: ReturnType<typeof getTableConfig>,
+  oldInfo: TableInfoRow[],
+): string[] {
+  const colDefs = config.columns.map((column) => {
+    let def = `${column.name} ${column.getSQLType()}`;
+    if (column.primary) def += " PRIMARY KEY";
+    else if (column.notNull) def += ` NOT NULL DEFAULT ${repairDefaultLiteral(column)}`;
+    return def;
+  });
+  const compositePk = config.primaryKeys[0];
+  if (compositePk) {
+    colDefs.push(`PRIMARY KEY (${compositePk.columns.map((c) => c.name).join(", ")})`);
+  }
+  const canonicalNames = new Set(config.columns.map((c) => c.name));
+  const shared = oldInfo.filter((c) => canonicalNames.has(c.name)).map((c) => c.name);
+  const tmpName = `${tableName}__repair_new`;
+
+  const rebuild = sqlite.transaction(() => {
+    sqlite.exec(`DROP TABLE IF EXISTS ${tmpName}`);
+    sqlite.exec(`CREATE TABLE ${tmpName} (${colDefs.join(", ")})`);
+    if (shared.length > 0) {
+      const cols = shared.join(", ");
+      sqlite.exec(`INSERT INTO ${tmpName} (${cols}) SELECT ${cols} FROM ${tableName}`);
+    }
+    sqlite.exec(`DROP TABLE ${tableName}`);
+    sqlite.exec(`ALTER TABLE ${tmpName} RENAME TO ${tableName}`);
+  });
+  rebuild();
+  return [`${tableName} (rebuilt to canonical shape)`];
+}
 
 export function repairExpectedColumns(sqlite: InstanceType<typeof Database>): string[] {
   const repaired: string[] = [];
-  for (const { table, column, ddl } of EXPECTED_COLUMNS) {
+  for (const table of Object.values(schema)) {
+    if (!is(table, SQLiteTable)) continue;
+    const config = getTableConfig(table);
+    const { name: tableName, columns } = config;
     const tableExists = sqlite
       .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
-      .get(table);
+      .get(tableName);
     if (!tableExists) continue;
-    const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
-    if (cols.some((c) => c.name === column)) continue;
-    sqlite.exec(ddl);
-    repaired.push(`${table}.${column}`);
+    const info = sqlite.prepare(`PRAGMA table_info(${tableName})`).all() as TableInfoRow[];
+    const canonicalNames = new Set(columns.map((c) => c.name));
+
+    // Extra NOT NULL columns without a default (divergent-lineage leftovers)
+    // make every insert from current code fail; only a rebuild can fix them.
+    const brokenExtras = info.filter(
+      (c) => !canonicalNames.has(c.name) && c.notnull === 1 && c.dflt_value === null,
+    );
+    if (brokenExtras.length > 0) {
+      if (config.foreignKeys.length > 0) {
+        // Rebuilding would drop FK actions (e.g. ON DELETE CASCADE); refuse and
+        // surface loudly rather than silently changing delete semantics.
+        console.error(
+          `[db] table ${tableName} has divergent NOT NULL columns (${brokenExtras
+            .map((c) => c.name)
+            .join(", ")}) but declares foreign keys; manual repair required`,
+        );
+      } else {
+        repaired.push(...rebuildTableToCanonicalShape(sqlite, tableName, config, info));
+        continue;
+      }
+    }
+
+    const existing = new Set(info.map((c) => c.name));
+    for (const column of columns) {
+      if (existing.has(column.name)) continue;
+      if (column.primary) {
+        console.error(
+          `[db] table ${tableName} is missing primary-key column ${column.name}; cannot repair via ALTER TABLE`,
+        );
+        continue;
+      }
+      let ddl = `ALTER TABLE ${tableName} ADD COLUMN ${column.name} ${column.getSQLType()}`;
+      if (column.notNull) {
+        ddl += ` NOT NULL DEFAULT ${repairDefaultLiteral(column)}`;
+      }
+      sqlite.exec(ddl);
+      repaired.push(`${tableName}.${column.name}`);
+    }
   }
   if (repaired.length > 0) {
-    console.warn(`[db] repaired missing columns: ${repaired.join(", ")}`);
+    console.warn(`[db] repaired schema drift: ${repaired.join(", ")}`);
   }
   return repaired;
 }
