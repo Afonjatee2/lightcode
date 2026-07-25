@@ -2,6 +2,17 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { ProjectLocation } from "@/shared/contracts";
 import { deriveLocationFromPath } from "@/shared/createProject";
+import type { EnsureCampaignWorkspaceDirPayload } from "@/shared/ipc/schemas";
+import { scaffoldCampaignWorkspaceBlueprint } from "./campaignWorkspaceBlueprint";
+
+export type { EnsureCampaignWorkspaceDirPayload };
+
+export interface EnsureCampaignWorkspaceDirResult {
+  /** Absolute native path to the ensured workspace directory. */
+  path: string;
+  /** The ProjectLocation derived from the path. */
+  location: ProjectLocation;
+}
 
 /**
  * Sanitizes a string for use as a directory name: replaces path separators and
@@ -9,25 +20,13 @@ import { deriveLocationFromPath } from "@/shared/createProject";
  * Never allows traversal above the parent.
  */
 export function sanitizeWorkspaceName(name: string): string {
-  return name
-    .replace(/[/\\:*?"<>|]/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 128) || "workspace";
-}
-
-export interface EnsureCampaignWorkspaceDirPayload {
-  /** The project id (UUID) — used as the directory name for stable re-opening. */
-  projectId: string;
-  /** Sanitized name component for human readability (not used for path safety). */
-  name?: string;
-}
-
-export interface EnsureCampaignWorkspaceDirResult {
-  /** Absolute native path to the ensured workspace directory. */
-  path: string;
-  /** The ProjectLocation derived from the path. */
-  location: ProjectLocation;
+  return (
+    name
+      .replace(/[/\\:*?"<>|]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 128) || "workspace"
+  );
 }
 
 /**
@@ -40,7 +39,7 @@ export interface EnsureCampaignWorkspaceDirResult {
  */
 export function ensureCampaignWorkspaceDir(
   baseDir: string,
-  payload: { projectId: string; name?: string | undefined },
+  payload: EnsureCampaignWorkspaceDirPayload,
 ): EnsureCampaignWorkspaceDirResult {
   // Defense-in-depth: projectId must be a UUID to prevent path traversal
   // even if a compromised renderer sends a malicious value.
@@ -55,6 +54,12 @@ export function ensureCampaignWorkspaceDir(
   const targetPath = join(workspacesRoot, dirName);
 
   mkdirSync(targetPath, { recursive: true });
+  scaffoldCampaignWorkspaceBlueprint(targetPath, {
+    ...(payload.name !== undefined ? { name: payload.name } : {}),
+    ...(payload.clientName !== undefined ? { clientName: payload.clientName } : {}),
+    ...(payload.campaignName !== undefined ? { campaignName: payload.campaignName } : {}),
+    ...(payload.jobNumber !== undefined ? { jobNumber: payload.jobNumber } : {}),
+  });
 
   const location = deriveLocationFromPath(targetPath, process.platform);
   return { path: targetPath, location };

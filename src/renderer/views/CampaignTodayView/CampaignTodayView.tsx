@@ -41,9 +41,12 @@ import { RelativeTime } from "@/renderer/components/common/RelativeTime";
 import { MorningBriefCard } from "./parts/MorningBriefCard";
 
 const ASK_SUGGESTIONS = [
-  msg`Which campaigns are off pace this week?`,
-  msg`Any sources stale right now?`,
-  msg`Summarize what needs approval today`,
+  msg`What is the current spend and pacing across Meta and Google Ads?`,
+  msg`Is one ad taking the whole budget? Find and pause budget-hogging creatives.`,
+  msg`Re-plan the remaining budget and propose updated daily budgets.`,
+  msg`Pull GA4 key events and conversion attribution for this campaign.`,
+  msg`Draft the client media rationale document from the latest performance data.`,
+  msg`Check all non-approved campaigns are paused and confirm targeting parameters.`,
 ] as const;
 
 function prioritySeverity(priority?: "P1" | "P2" | "P3" | "P4"): "crit" | "warn" | "info" {

@@ -1,4 +1,5 @@
 import type { ControlCentreCampaignGroup } from "@/shared/contracts/campaign/controlCentreCampaignGroupList";
+import { DEFAULT_MCP_PROFILE } from "@/shared/contracts/campaign/mcpProfile";
 
 const LIVE_STATUSES = new Set(["live", "active"]);
 
@@ -38,6 +39,6 @@ export function campaignGroupToExtension(group: ControlCentreCampaignGroup) {
     clientName: group.clientName?.trim() || group.name,
     campaignName: group.name,
     ...(group.jobNumber?.trim() ? { jobNumber: group.jobNumber.trim() } : {}),
-    mcpProfile: "monitoring" as const,
+    mcpProfile: DEFAULT_MCP_PROFILE,
   };
 }

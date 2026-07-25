@@ -28,7 +28,7 @@ describe("campaignGroupListUtils", () => {
       clientName: "Bright Horizon Group",
       campaignName: "Q4 Brand Refresh",
       jobNumber: "A55201",
-      mcpProfile: "monitoring",
+      mcpProfile: "plan_revision",
     });
   });
 });

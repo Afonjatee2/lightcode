@@ -1,5 +1,6 @@
 import { msg } from "@lingui/core/macro";
 import type { Project } from "@/shared/contracts";
+import { DEFAULT_MCP_PROFILE } from "@/shared/contracts/campaign/mcpProfile";
 import { getProjectPurpose } from "@/shared/contracts/project";
 import { i18n } from "@/renderer/i18n/i18n";
 import { readBridge } from "@/renderer/bridge";
@@ -104,7 +105,7 @@ async function ensureCampaignsHubProjectOnce(): Promise<EnsureCampaignsHubOutcom
       campaignGroupId: CAMPAIGNS_HUB_GROUP_ID,
       clientName: "All campaigns",
       campaignName: CAMPAIGNS_HUB_PROJECT_NAME,
-      mcpProfile: "monitoring",
+      mcpProfile: DEFAULT_MCP_PROFILE,
     },
     CAMPAIGNS_HUB_PROJECT_NAME,
     projectId,

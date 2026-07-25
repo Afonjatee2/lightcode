@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -105,5 +105,43 @@ describe("ensureCampaignWorkspaceDir", () => {
         projectId: "abc-123",
       }),
     ).toThrow(/Invalid projectId/);
+  });
+
+  it("scaffolds blueprint files on first creation", () => {
+    const result = ensureCampaignWorkspaceDir(baseDir, {
+      projectId: VALID_UUID,
+      name: "Q4 Brand Refresh",
+      clientName: "Bright Horizon Group",
+      campaignName: "Q4 Brand Refresh",
+      jobNumber: "A55201",
+    });
+
+    expect(existsSync(join(result.path, "README.md"))).toBe(true);
+    expect(existsSync(join(result.path, "PROJECT_DOCUMENTATION.md"))).toBe(true);
+    expect(existsSync(join(result.path, ".env.example"))).toBe(true);
+    expect(existsSync(join(result.path, "scripts", "README.md"))).toBe(true);
+
+    const readme = readFileSync(join(result.path, "README.md"), "utf8");
+    expect(readme).toContain("# Q4 Brand Refresh");
+    expect(readme).toContain("**Client:** Bright Horizon Group");
+    expect(readme).toContain("**Job number:** A55201");
+    expect(readme).toContain("## Goals / Targets");
+  });
+
+  it("does not clobber existing blueprint files on second call", () => {
+    const payload = {
+      projectId: "00000000-0000-4000-a000-000000000005",
+      name: "Edited Name",
+      clientName: "New Client",
+      campaignName: "New Campaign",
+      jobNumber: "NEW-001",
+    };
+
+    const first = ensureCampaignWorkspaceDir(baseDir, payload);
+    writeFileSync(join(first.path, "README.md"), "# Custom README\n", "utf8");
+
+    ensureCampaignWorkspaceDir(baseDir, payload);
+
+    expect(readFileSync(join(first.path, "README.md"), "utf8")).toBe("# Custom README\n");
   });
 });

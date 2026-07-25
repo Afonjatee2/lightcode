@@ -137,7 +137,7 @@ export function getProjectPurpose(project: Project): ProjectPurpose {
 
 /**
  * Resolve a campaign project's effective Control Centre MCP profile,
- * defaulting to `"monitoring"` when unset. Only meaningful for
+ * defaulting to `"plan_revision"` when unset. Only meaningful for
  * `purpose === "campaign"` projects, but safe to call on any project.
  */
 export function getCampaignMcpProfile(project: Project): McpProfile {

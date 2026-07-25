@@ -213,12 +213,12 @@ describe("getProjectPurpose", () => {
 // ============================================================================
 
 describe("getCampaignMcpProfile", () => {
-  it("defaults to 'monitoring' for project without campaignExtension", () => {
+  it("defaults to 'plan_revision' for project without campaignExtension", () => {
     const project = { ...baseProject };
-    expect(getCampaignMcpProfile(project)).toBe("monitoring");
+    expect(getCampaignMcpProfile(project)).toBe("plan_revision");
   });
 
-  it("defaults to 'monitoring' when mcpProfile is unset in extension", () => {
+  it("defaults to 'plan_revision' when mcpProfile is unset in extension", () => {
     const project = {
       ...baseProject,
       purpose: "campaign" as const,
@@ -228,7 +228,7 @@ describe("getCampaignMcpProfile", () => {
         campaignName: "Q4",
       },
     };
-    expect(getCampaignMcpProfile(project)).toBe("monitoring");
+    expect(getCampaignMcpProfile(project)).toBe("plan_revision");
   });
 
   it("returns the configured mcpProfile when set", () => {

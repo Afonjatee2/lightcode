@@ -67,10 +67,10 @@ describe("applyCampaignMcpProfile", () => {
     expect(result?.transport).not.toHaveProperty("headers." + CONTROL_CENTRE_MCP_PROFILE_HEADER);
   });
 
-  it("defaults to monitoring when no profile is given", () => {
+  it("defaults to plan_revision when no profile is given", () => {
     const [result] = applyCampaignMcpProfile([stdioServer()]);
     expect(result?.transport).toMatchObject({
-      env: { [CONTROL_CENTRE_MCP_PROFILE_ENV_VAR]: "monitoring" },
+      env: { [CONTROL_CENTRE_MCP_PROFILE_ENV_VAR]: "plan_revision" },
     });
   });
 
