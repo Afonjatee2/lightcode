@@ -1,9 +1,6 @@
 import { msg } from "@lingui/core/macro";
 import { toast } from "@heroui/react";
-import type {
-  CampaignProjectExtension,
-  ProjectLocation,
-} from "@/shared/contracts";
+import type { CampaignProjectExtension, ProjectLocation } from "@/shared/contracts";
 import { campaignProjectExtensionSchema } from "@/shared/contracts";
 import { resolveModelSelection } from "@/shared/agentSelection";
 import { i18n } from "@/renderer/i18n/i18n";
@@ -31,7 +28,7 @@ export function validateCampaignProjectInput(input: CreateCampaignProjectInput):
   const trimmedClient = input.campaignExtension.clientName.trim();
   const trimmedCampaign = input.campaignExtension.campaignName.trim();
 
-  if (!trimmedId) return "Campaign group ID is required.";
+  if (!trimmedId) return "Campaign reference is required.";
   if (!trimmedClient) return "Client name is required.";
   if (!trimmedCampaign) return "Campaign name is required.";
 
@@ -57,6 +54,13 @@ export function validateCampaignProjectInput(input: CreateCampaignProjectInput):
  * - Never fall back to a Claude model for a non-Claude provider.
  * - When no valid installed agent/model exists, return a structured error.
  */
+export function resolveAgentAndModelForCampaign(
+  explicitKind: string | undefined,
+  explicitModel: string | undefined,
+): { agentKind: string; model: string } | { error: string } {
+  return resolveAgentAndModel(explicitKind, explicitModel);
+}
+
 function resolveAgentAndModel(
   explicitKind: string | undefined,
   explicitModel: string | undefined,
@@ -65,15 +69,16 @@ function resolveAgentAndModel(
   const installedStatuses = statuses.filter((s) => s.installed);
 
   if (installedStatuses.length === 0) {
-    return { error: "No agent providers are installed. Install at least one agent to create a campaign workspace." };
+    return {
+      error:
+        "No agent providers are installed. Install at least one agent to create a campaign workspace.",
+    };
   }
 
   // Resolve the agent kind
   let agentStatus: (typeof installedStatuses)[number] | undefined;
   if (explicitKind) {
-    agentStatus = installedStatuses.find(
-      (s) => s.kind === explicitKind,
-    );
+    agentStatus = installedStatuses.find((s) => s.kind === explicitKind);
     if (!agentStatus) {
       return {
         error: `Agent "${explicitKind}" is not installed. Install it or choose a different agent.`,
@@ -82,7 +87,10 @@ function resolveAgentAndModel(
   } else {
     const first = installedStatuses[0];
     if (!first) {
-      return { error: "No agent providers are installed. Install at least one agent to create a campaign workspace." };
+      return {
+        error:
+          "No agent providers are installed. Install at least one agent to create a campaign workspace.",
+      };
     }
     agentStatus = first;
   }
@@ -91,9 +99,7 @@ function resolveAgentAndModel(
 
   // Resolve the model — explicit model must belong to this agent
   if (explicitModel) {
-    const modelExists = agentStatus.capabilities.models.some(
-      (m) => m.id === explicitModel,
-    );
+    const modelExists = agentStatus.capabilities.models.some((m) => m.id === explicitModel);
     if (!modelExists) {
       return {
         error: `Model "${explicitModel}" is not available for ${agentKind}. Choose a model supported by this agent.`,
@@ -119,14 +125,10 @@ function resolveAgentAndModel(
  * Find an existing project bound to the same campaign group.
  * Returns undefined when no duplicate exists.
  */
-function findExistingCampaignProject(
-  campaignGroupId: string,
-) {
+function findExistingCampaignProject(campaignGroupId: string) {
   const store = useAppStore.getState();
   return store.projects.find(
-    (p) =>
-      p.purpose === "campaign" &&
-      p.campaignExtension?.campaignGroupId === campaignGroupId,
+    (p) => p.purpose === "campaign" && p.campaignExtension?.campaignGroupId === campaignGroupId,
   );
 }
 
@@ -136,11 +138,7 @@ function findExistingCampaignProject(
  */
 function findExistingGuiThread(projectId: string) {
   const store = useAppStore.getState();
-  return store.threads.find(
-    (t) =>
-      t.projectId === projectId &&
-      t.presentationMode === "gui",
-  );
+  return store.threads.find((t) => t.projectId === projectId && t.presentationMode === "gui");
 }
 
 // ── Transactional creation ──────────────────────────────────────────
@@ -188,9 +186,7 @@ export async function createCampaignWorkspace(
     if (existingThread) {
       usePanelStore.getState().closeCreateCampaignProjectModal();
       useAppStore.getState().openThread(existingThread.id);
-      toast.success(
-        i18n._(msg`Opened existing campaign workspace "${existing.name}".`),
-      );
+      toast.success(i18n._(msg`Opened existing campaign workspace "${existing.name}".`));
       return {
         ok: true,
         outcome: "opened-existing",
@@ -224,17 +220,13 @@ export async function createCampaignWorkspace(
       if (newThread!) useAppStore.getState().deleteThread(newThread!.id);
       return {
         ok: false,
-        error: i18n._(
-          msg`Could not create a thread for the existing campaign workspace.`,
-        ),
+        error: i18n._(msg`Could not create a thread for the existing campaign workspace.`),
       };
     }
 
     usePanelStore.getState().closeCreateCampaignProjectModal();
     useAppStore.getState().openThread(newThread.id);
-    toast.success(
-      i18n._(msg`Opened existing campaign workspace "${existing.name}".`),
-    );
+    toast.success(i18n._(msg`Opened existing campaign workspace "${existing.name}".`));
     return {
       ok: true,
       outcome: "opened-existing",

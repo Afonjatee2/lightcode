@@ -12,6 +12,7 @@ import { useRecordCampaignDecision } from "@/renderer/hooks/useRecordCampaignDec
 import { useOperationsToday } from "@/renderer/hooks/useOperationsToday";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { useAppStore } from "@/renderer/state/appStore";
+import { CAMPAIGNS_HUB_GROUP_ID } from "@/renderer/campaign/ensureCampaignsHubProject";
 
 const SIDEBAR_MIN_WIDTH = 240;
 const PANEL_MIN_WIDTH = 320;
@@ -67,17 +68,32 @@ export function CampaignWorkspaceShell(props: { projectId: string }) {
     useState<PlanIntelligenceSession | null>(null);
   const project = useProject(props.projectId);
   const boundCampaignGroupId = project?.campaignExtension?.campaignGroupId ?? null;
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(boundCampaignGroupId);
+  const isHubProject = boundCampaignGroupId === CAMPAIGNS_HUB_GROUP_ID;
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(
+    isHubProject ? null : boundCampaignGroupId,
+  );
+  const pendingWorkspaceSelection = useAppStore((state) => state.pendingCampaignWorkspaceSelection);
+  const setPendingCampaignWorkspaceSelection = useAppStore(
+    (state) => state.setPendingCampaignWorkspaceSelection,
+  );
   const pendingApprovalsFocus = useAppStore((state) => state.pendingCampaignApprovalsFocus);
   const setPendingCampaignApprovalsFocus = useAppStore(
     (state) => state.setPendingCampaignApprovalsFocus,
   );
 
   const operationsToday = useOperationsToday(props.projectId);
-  const activeCampaignId = selectedCampaignId ?? boundCampaignGroupId;
+  const activeCampaignId = selectedCampaignId ?? (isHubProject ? null : boundCampaignGroupId);
   const campaignContext = useCampaignContext(props.projectId, activeCampaignId);
   const campaignDecisions = useCampaignDecisions(props.projectId, activeCampaignId);
   const recordDecision = useRecordCampaignDecision(props.projectId);
+
+  useEffect(() => {
+    if (!pendingWorkspaceSelection || pendingWorkspaceSelection.projectId !== props.projectId) {
+      return;
+    }
+    setSelectedCampaignId(pendingWorkspaceSelection.campaignGroupId);
+    setPendingCampaignWorkspaceSelection(null);
+  }, [pendingWorkspaceSelection, props.projectId, setPendingCampaignWorkspaceSelection]);
 
   useEffect(() => {
     if (

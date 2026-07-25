@@ -4,6 +4,7 @@ import type { z } from "zod";
 import { i18n } from "@/renderer/i18n/i18n";
 import {
   applyCampaignMcpProfile,
+  DEFAULT_MCP_PROFILE,
   diagnoseControlCentreMcpSetup,
   getCampaignMcpProfile,
   mergeMcpServers,
@@ -36,12 +37,21 @@ export type ControlCentreToolState<T> =
   | { status: "error"; message: string }
   | { status: "ready"; data: T };
 
+/** Finds the globally configured Control Centre MCP server. */
+export function resolveGlobalControlCentreServer(
+  userMcpServers: readonly McpServer[],
+): McpServer | undefined {
+  const setup = diagnoseControlCentreMcpSetup(userMcpServers);
+  if (setup.kind !== "ready") return undefined;
+  return applyCampaignMcpProfile([setup.server], DEFAULT_MCP_PROFILE)[0];
+}
+
 /** Finds this project's Control Centre MCP server and applies its campaign profile. */
 export function resolveControlCentreServer(
   project: Project | undefined,
   userMcpServers: readonly McpServer[],
 ): McpServer | undefined {
-  if (!project) return undefined;
+  if (!project) return resolveGlobalControlCentreServer(userMcpServers);
   const merged = mergeMcpServers(userMcpServers, project.mcpServers ?? []);
   const setup = diagnoseControlCentreMcpSetup(merged);
   if (setup.kind !== "ready") return undefined;
@@ -143,8 +153,10 @@ export function useControlCentreTool<T>(options: {
   schema: z.ZodType<T>;
   /** Skip the call and report `{ status: "empty" }` — e.g. no campaign linked yet. */
   skip: boolean;
+  /** When true and no project is given, use the global Control Centre server. */
+  useGlobalServer?: boolean;
 }): { state: ControlCentreToolState<T>; refetch: () => void } {
-  const { projectId, toolName, args, schema, skip } = options;
+  const { projectId, toolName, args, schema, skip, useGlobalServer = false } = options;
   const project = useProject(projectId);
   const userMcpServers = useSharedSettings((s) => s.mcpServers);
   const [state, setState] = useState<ControlCentreToolState<T>>({ status: "loading" });
@@ -159,7 +171,13 @@ export function useControlCentreTool<T>(options: {
     };
   }, []);
 
-  const server = skip ? undefined : resolveControlCentreServer(project, userMcpServers);
+  const server = skip
+    ? undefined
+    : project
+      ? resolveControlCentreServer(project, userMcpServers)
+      : useGlobalServer
+        ? resolveGlobalControlCentreServer(userMcpServers)
+        : undefined;
   const requestKey = JSON.stringify({
     skip,
     server: server ?? null,

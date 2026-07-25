@@ -34,7 +34,9 @@ function toSummaries(
 }
 
 /** Derives the flat nav-pane list from a `get_operations_today` fetch state. */
-export function campaignSummariesFromOperationsToday(state: OperationsTodayState): CampaignSummary[] {
+export function campaignSummariesFromOperationsToday(
+  state: OperationsTodayState,
+): CampaignSummary[] {
   if (state.status !== "ready") return [];
   return [
     ...toSummaries(state.data.needsAttention, "needsAttention"),
@@ -69,7 +71,7 @@ export function CampaignNavPane(props: {
         )}
         {props.operationsToday.status === "unauthorized" && (
           <p className="px-3 py-4 text-tiny text-default-400">
-            <Trans>Control Centre needs authorization. Reconnect it in MCP settings.</Trans>
+            <Trans>Control Centre needs authorization. Reconnect it in settings.</Trans>
           </p>
         )}
         {props.operationsToday.status === "unavailable" && (

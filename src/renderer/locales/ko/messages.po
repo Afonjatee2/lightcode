@@ -584,7 +584,7 @@ msgstr "@codex 예산 진행 속도 확인 또는 메시지 입력…"
 msgid "@codex check the budget pacing"
 msgstr "@codex 예산 진행 속도 확인"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "@media-plans"
 msgstr "@media-plans"
 
@@ -634,12 +634,12 @@ msgstr "7일"
 
 #. placeholder {0}: existingProject.name
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "A campaign workspace for \"{0}\" already exists with this campaign group ID. Opening it will switch to the existing workspace."
-msgstr "이 캠페인 그룹 ID로 \"{0}\"에 대한 캠페인 작업 영역이 이미 존재합니다. 열면 기존 작업 영역으로 전환됩니다."
+#~ msgid "A campaign workspace for \"{0}\" already exists with this campaign group ID. Opening it will switch to the existing workspace."
+#~ msgstr "이 캠페인 그룹 ID로 \"{0}\"에 대한 캠페인 작업 영역이 이미 존재합니다. 열면 기존 작업 영역으로 전환됩니다."
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "A campaign workspace links Poracode to your Control Centre campaigns — approvals, plan intelligence, and daily operations in one place."
-msgstr "캠페인 워크스페이스는 Poracode를 Control Centre 캠페인에 연결하여 승인, 플랜 인텔리전스, 일일 운영을 한곳에서 관리합니다."
+#~ msgid "A campaign workspace links Poracode to your Control Centre campaigns — approvals, plan intelligence, and daily operations in one place."
+#~ msgstr "캠페인 워크스페이스는 Poracode를 Control Centre 캠페인에 연결하여 승인, 플랜 인텔리전스, 일일 운영을 한곳에서 관리합니다."
 
 #: src/renderer/actions/experimentDecisionActions.ts
 #: src/renderer/actions/experimentWorktreeActions.ts
@@ -665,6 +665,11 @@ msgstr "강력한 루트 에이전트가 작업을 분해하고 별도의 Git �
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "a supported coding agent"
 msgstr "지원되는 코딩 에이전트"
+
+#. placeholder {0}: existingProject.name
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "A workspace for \"{0}\" already exists. Confirming opens the existing workspace."
+msgstr "\"{0}\" 워크스페이스가 이미 있습니다. 확인하면 기존 워크스페이스가 열립니다."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "A worktree owner requires a frozen branch source"
@@ -704,7 +709,7 @@ msgstr "계정 옵션"
 msgid "Accounts"
 msgstr "계정"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Acme Corp"
 msgstr "에크미 주식회사"
 
@@ -833,9 +838,13 @@ msgstr "할 일 추가…"
 msgid "Add action"
 msgstr "작업 추가"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Add Alias"
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Add alias"
 msgstr "별칭 추가"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#~ msgid "Add Alias"
+#~ msgstr "별칭 추가"
 
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Add an existing folder"
@@ -844,6 +853,10 @@ msgstr "기존 폴더 추가"
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "Add attachment or capability"
 msgstr "첨부 파일 또는 기능 추가"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Add campaign workspace"
+msgstr "캠페인 워크스페이스 추가"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Add candidate"
@@ -930,6 +943,10 @@ msgstr "홈 화면에 추가"
 msgid "Add to-do"
 msgstr "할 일 추가"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Add workspace"
+msgstr "워크스페이스 추가"
+
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "added"
 msgstr "추가됨"
@@ -941,6 +958,10 @@ msgstr "추가됨"
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Adjust the threshold"
 msgstr "임계값 조정"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Advanced"
+msgstr "고급"
 
 #: src/renderer/views/MainView/parts/CampaignModeGate.tsx
 msgid "Advanced Mode (Code)"
@@ -1362,6 +1383,10 @@ msgstr "승인 요청"
 #: src/renderer/views/WelcomeOverlay.tsx
 msgid "Ask Question"
 msgstr "질문하기"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask questions above anytime Control Centre is connected. Pin a campaign workspace here when you want a dedicated folder for one campaign."
+msgstr "Control Centre가 연결되면 위에서 언제든 질문할 수 있습니다. 한 캠페인 전용 폴더가 필요하면 여기에 캠페인 워크스페이스를 고정하세요."
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "At"
@@ -1836,12 +1861,12 @@ msgid "Campaign Exception: {0} · {1}"
 msgstr "캠페인 예외: {0} · {1}"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign group ID"
-msgstr "캠페인 그룹 ID"
+#~ msgid "Campaign group ID"
+#~ msgstr "캠페인 그룹 ID"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign Group ID"
-msgstr "캠페인 그룹 ID"
+#~ msgid "Campaign Group ID"
+#~ msgstr "캠페인 그룹 ID"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Campaign morning brief"
@@ -1853,16 +1878,20 @@ msgid "Campaign Morning Brief"
 msgstr "캠페인 모닝 브리핑"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign name"
-msgstr "캠페인 이름"
+#~ msgid "Campaign name"
+#~ msgstr "캠페인 이름"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign Name"
-msgstr "캠페인 이름"
+#~ msgid "Campaign Name"
+#~ msgstr "캠페인 이름"
 
 #: src/renderer/components/consultations/ContextWarnings.tsx
 msgid "Campaign plan not available"
 msgstr "캠페인 계획 사용 불가"
+
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Campaign reference"
+msgstr "캠페인 참조"
 
 #. placeholder {0}: input.name.trim()
 #: src/renderer/actions/campaignProjectActions.ts
@@ -2125,6 +2154,10 @@ msgstr "검사 통과"
 msgid "Checks pending"
 msgstr "검사 대기 중"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Choose a campaign from the list."
+msgstr "목록에서 캠페인을 선택하세요."
+
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Choose a different model for each worker."
 msgstr "Choose a different model for each worker."
@@ -2284,13 +2317,13 @@ msgstr "클라이언트"
 msgid "Client Comms"
 msgstr "클라이언트 커뮤니케이션"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Client name"
 msgstr "클라이언트 이름"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Client Name"
-msgstr "클라이언트 이름"
+#~ msgid "Client Name"
+#~ msgstr "클라이언트 이름"
 
 #: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Client Update"
@@ -2976,9 +3009,21 @@ msgstr "제어 센터 \"{toolName}\"이(가) 너무 크거나 잘못된 형식�
 msgid "Control Centre \"{toolName}\" returned a response this version of Tee's Cockpit doesn't understand."
 msgstr "제어 센터 \"{toolName}\"이(가) 이 버전의 Tee's Cockpit에서 이해할 수 없는 응답을 반환했습니다."
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Control Centre connection"
+msgstr "Control Centre 연결"
+
 #: src/renderer/components/consultations/ContextWarnings.tsx
 msgid "Control Centre connection unavailable"
 msgstr "제어 센터 연결 불가"
+
+#: src/renderer/campaign/controlCentreAvailabilityCopy.ts
+msgid "Control Centre is disabled. Turn it on in settings."
+msgstr "Control Centre가 비활성화되어 있습니다. 설정에서 켜세요."
+
+#: src/renderer/campaign/controlCentreAvailabilityCopy.ts
+msgid "Control Centre is not connected. Add a Control Centre connection in settings."
+msgstr "Control Centre가 연결되지 않았습니다. 설정에서 Control Centre 연결을 추가하세요."
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Control Centre isn't connected for this project yet."
@@ -2993,12 +3038,15 @@ msgid "Control Centre needs authorization to list decisions."
 msgstr "결정을 나열하려면 Control Centre 인증이 필요합니다."
 
 #: src/renderer/services/campaignDecisions/recordCampaignDecision.ts
+msgid "Control Centre needs authorization. Reconnect it in MCP settings."
+msgstr "제어 센터에 권한이 필요합니다. MCP 설정에서 다시 연결하세요."
+
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
-msgid "Control Centre needs authorization. Reconnect it in MCP settings."
-msgstr "제어 센터에 권한이 필요합니다. MCP 설정에서 다시 연결하세요."
+msgid "Control Centre needs authorization. Reconnect it in settings."
+msgstr "Control Centre에 인증이 필요합니다. 설정에서 다시 연결하세요."
 
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Control Centre reports the revised plan matches the published plan."
@@ -3144,6 +3192,10 @@ msgstr "교체 작업자를 이 스웜에 연결할 수 없습니다."
 msgid "Could not complete the merge"
 msgstr "병합을 완료할 수 없습니다."
 
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not create a thread for the campaigns workspace."
+msgstr "캠페인 워크스페이스용 스레드를 만들 수 없습니다."
+
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not create a thread for the existing campaign workspace."
 msgstr "기존 캠페인 작업 영역에 대한 스레드를 생성할 수 없습니다."
@@ -3155,6 +3207,14 @@ msgstr "캠페인 작업 영역 디렉터리를 생성할 수 없습니다."
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not create the campaign workspace thread."
 msgstr "캠페인 작업 영역 스레드를 생성할 수 없습니다."
+
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not create the campaigns workspace directory."
+msgstr "캠페인 워크스페이스 디렉터리를 만들 수 없습니다."
+
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not create the campaigns workspace thread."
+msgstr "캠페인 워크스페이스 스레드를 만들 수 없습니다."
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
@@ -3185,6 +3245,10 @@ msgstr "캠페인 프로젝트를 저장할 수 없습니다."
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not save the campaign workspace thread."
 msgstr "캠페인 작업 영역 스레드를 저장할 수 없습니다."
+
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not save the campaigns workspace."
+msgstr "캠페인 워크스페이스를 저장할 수 없습니다."
 
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "Could not save the topic thread."
@@ -3293,8 +3357,8 @@ msgid "Create approval proposal"
 msgstr "승인 제안 생성"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Create Campaign Workspace"
-msgstr "캠페인 작업 영역 만들기"
+#~ msgid "Create Campaign Workspace"
+#~ msgstr "캠페인 작업 영역 만들기"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CreatePrModal.tsx
 msgid "Create Draft PR"
@@ -3303,6 +3367,10 @@ msgstr "PR 초안 생성"
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 msgid "Create file"
 msgstr "파일 생성"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Create manually"
+msgstr "수동으로 만들기"
 
 #: src/renderer/components/common/BranchSelector/parts/BranchFooterActions.tsx
 msgid "Create new branch"
@@ -3549,13 +3617,13 @@ msgstr "DeepSeek"
 msgid "Default"
 msgstr "기본값"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Default agent"
 msgstr "기본 에이전트"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Default Agent"
-msgstr "기본 에이전트"
+#~ msgid "Default Agent"
+#~ msgstr "기본 에이전트"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
@@ -3567,13 +3635,13 @@ msgstr "기본 자동 새로고침(분)"
 msgid "Default Create PR action"
 msgstr "기본 PR 생성 작업"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Default model"
 msgstr "기본 모델"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Default Model"
-msgstr "기본 모델"
+#~ msgid "Default Model"
+#~ msgstr "기본 모델"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4059,14 +4127,14 @@ msgid "e.g. Allow TikTok to run up to 30% ahead of pace"
 msgstr "예: TikTok이 페이스보다 최대 30% 앞서도록 허용"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "e.g. cg-abc-123"
-msgstr "예: cg-abc-123"
+#~ msgid "e.g. cg-abc-123"
+#~ msgstr "예: cg-abc-123"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "e.g. claude-sonnet-4"
 msgstr "예: claude-sonnet-4"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "e.g. claude, codex, gemini"
 msgstr "예: claude, codex, gemini"
 
@@ -5604,13 +5672,13 @@ msgstr "이탤릭체"
 msgid "Job no."
 msgstr "작업 번호"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Job number"
 msgstr "작업 번호"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Job Number"
-msgstr "작업 번호"
+#~ msgid "Job Number"
+#~ msgstr "작업 번호"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "JSON"
@@ -5800,6 +5868,10 @@ msgstr "계정 로드 중…"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Loading campaign context…"
 msgstr "캠페인 컨텍스트 로드 중…"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Loading campaigns from Control Centre…"
+msgstr "Control Centre에서 캠페인 불러오는 중…"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Loading campaigns…"
@@ -6084,8 +6156,8 @@ msgid "Maximize browser"
 msgstr "브라우저 최대화"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "MCP Profile"
-msgstr "MCP 프로필"
+#~ msgid "MCP Profile"
+#~ msgstr "MCP 프로필"
 
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
@@ -6589,7 +6661,6 @@ msgstr "새 작업 이름"
 msgid "New branch name..."
 msgstr "새 브랜치 이름..."
 
-#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "New Campaign Project"
 msgstr "새 캠페인 프로젝트"
@@ -6806,6 +6877,10 @@ msgstr "예산이 구성되지 않음"
 msgid "No camera found"
 msgstr "카메라를 찾을 수 없음"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "No campaigns match your search."
+msgstr "검색과 일치하는 캠페인이 없습니다."
+
 #: src/renderer/components/diff/DiffCardList.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrReviewSidebar.tsx
 msgid "No changes"
@@ -6983,8 +7058,8 @@ msgid "No matching threads"
 msgstr "일치하는 스레드 없음"
 
 #: src/renderer/campaign/controlCentreAvailabilityCopy.ts
-msgid "No MCP server named \"control-centre\" is configured. Add one in MCP settings."
-msgstr "\"control-centre\"라는 이름의 MCP 서버가 구성되어 있지 않습니다. MCP 설정에서 추가하세요."
+#~ msgid "No MCP server named \"control-centre\" is configured. Add one in MCP settings."
+#~ msgstr "\"control-centre\"라는 이름의 MCP 서버가 구성되어 있지 않습니다. MCP 설정에서 추가하세요."
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "No MCP servers are enabled for this run"
@@ -7321,6 +7396,10 @@ msgstr "한 번"
 msgid "Online"
 msgstr "온라인"
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Only needed when Control Centre cannot be reached."
+msgstr "Control Centre에 연결할 수 없을 때만 필요합니다."
+
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Only when unfocused"
 msgstr "포커스가 없을 때만"
@@ -7621,6 +7700,10 @@ msgstr "운영 브리핑"
 msgid "Optional"
 msgstr "선택 사항"
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Optional Control Centre campaign id"
+msgstr "선택적 Control Centre 캠페인 ID"
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Optional note recorded with the approval"
 msgstr "승인 시 기록할 선택 메모"
@@ -7629,7 +7712,7 @@ msgstr "승인 시 기록할 선택 메모"
 msgid "Optional reason recorded with the rejection"
 msgstr "거부 시 기록할 선택 사유"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Optional reference number"
 msgstr "선택적 참조 번호"
 
@@ -7649,8 +7732,8 @@ msgid "Options"
 msgstr "옵션"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Or pick from Control Centre"
-msgstr "또는 제어 센터에서 선택"
+#~ msgid "Or pick from Control Centre"
+#~ msgstr "또는 제어 센터에서 선택"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/userInputForm.tsx
 msgid "Or write a custom answer"
@@ -7865,7 +7948,7 @@ msgstr "입력에 붙여넣기"
 msgid "Paste the SSH private key."
 msgstr "SSH 개인 키를 붙여 넣으세요."
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Path or URL"
 msgstr "경로 또는 URL"
 
@@ -7919,6 +8002,10 @@ msgstr "권한 제한 콘텐츠 숨김"
 msgid "Pi"
 msgstr "Pi"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Pick a live campaign from Control Centre. Everything else is filled in for you."
+msgstr "Control Centre에서 진행 중인 캠페인을 선택하세요. 나머지는 자동으로 채워집니다."
+
 #: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "Pick a thread from the list to follow the agent from here."
@@ -7939,6 +8026,10 @@ msgstr "선택기 실패"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
 msgid "Picker returned no attachment"
 msgstr "선택 도구가 첨부파일을 반환하지 않았습니다."
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Pin campaign workspace"
+msgstr "캠페인 워크스페이스 고정"
 
 #: src/mobile/ThreadTitleRow.tsx
 #: src/mobile/views/threadActionSurfaces.tsx
@@ -8395,8 +8486,8 @@ msgid "Push updates to paired mobile devices when threads finish or need you, ev
 msgstr "스레드가 완료되거나 응답이 필요할 때 앱이 닫혀 있어도 페어링된 모바일 기기로 업데이트를 푸시합니다."
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Q4 Brand Launch"
-msgstr "Q4 브랜드 출시"
+#~ msgid "Q4 Brand Launch"
+#~ msgstr "Q4 브랜드 출시"
 
 #: src/renderer/components/providers/qoder/manifest.ts
 msgid "Qoder CLI"
@@ -8730,7 +8821,7 @@ msgstr "<0>{0}</0>을(를) 제거하고 모든 스레드를 영구적으로 삭�
 msgid "Remove action"
 msgstr "작업 제거"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Remove alias"
 msgstr "별칭 제거"
 
@@ -8987,9 +9078,13 @@ msgstr "터미널 패널 크기 조정"
 msgid "Resolves merge conflicts during rebase or merge."
 msgstr "리베이스 또는 병합 중 병합 충돌을 해결합니다."
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Resource Aliases"
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Resource aliases"
 msgstr "리소스 별칭"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#~ msgid "Resource Aliases"
+#~ msgstr "리소스 별칭"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Restore"
@@ -9464,6 +9559,14 @@ msgstr "에이전트 검색..."
 msgid "Search branches..."
 msgstr "브랜치 검색..."
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Search by campaign, client, or job number…"
+msgstr "캠페인, 클라이언트 또는 작업 번호로 검색…"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Search campaigns"
+msgstr "캠페인 검색"
+
 #: src/mobile/views/FilesView.tsx
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/ProjectTreeView.tsx
 msgid "Search files"
@@ -9874,6 +9977,10 @@ msgstr "{0, plural, other {#개 스킬 표시 중}}"
 #: src/mobile/views/HostFolderPicker.tsx
 msgid "Showing the first 4,000 entries."
 msgstr "처음 4,000개 항목을 표시합니다."
+
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Shown in the sidebar"
+msgstr "사이드바에 표시"
 
 #. Toggle: show this provider's usage ring in the sidebar
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
@@ -10798,12 +10905,12 @@ msgid "the chosen folder"
 msgstr "선택한 폴더"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "The Control Centre campaign group this workspace binds to."
-msgstr "이 작업 영역이 바인딩되는 제어 센터 캠페인 그룹입니다."
+#~ msgid "The Control Centre campaign group this workspace binds to."
+#~ msgstr "이 작업 영역이 바인딩되는 제어 센터 캠페인 그룹입니다."
 
 #: src/renderer/campaign/controlCentreAvailabilityCopy.ts
-msgid "The Control Centre MCP server is disabled. Enable it in MCP settings."
-msgstr "Control Centre MCP 서버가 비활성화되어 있습니다. MCP 설정에서 활성화하세요."
+#~ msgid "The Control Centre MCP server is disabled. Enable it in MCP settings."
+#~ msgstr "Control Centre MCP 서버가 비활성화되어 있습니다. MCP 설정에서 활성화하세요."
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "The decision could not be submitted"
@@ -11651,6 +11758,10 @@ msgstr "제거"
 msgid "Unknown"
 msgstr "알 수 없음"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Unknown client"
+msgstr "알 수 없는 클라이언트"
+
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "Unknown mention. Try @codex, @claude, @daily-operator, @verify, etc."
 msgstr "알 수 없는 언급입니다. @codex, @claude, @daily-operator, @verify 등을 시도해 보세요."
@@ -12353,6 +12464,10 @@ msgstr "작업 영역"
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Workspace MCP servers override user servers with the same name and are added only when agents start in this project."
 msgstr "작업 영역 MCP 서버는 이름이 같은 사용자 서버를 재정의하며, 이 프로젝트에서 에이전트가 시작될 때만 추가됩니다."
+
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Workspace name"
+msgstr "워크스페이스 이름"
 
 #: src/mobile/views/WorkspaceView.tsx
 msgid "Workspace view"

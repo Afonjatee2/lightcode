@@ -584,7 +584,7 @@ msgstr "@codex 检查预算进度，或输入消息…"
 msgid "@codex check the budget pacing"
 msgstr "@codex 检查预算进度"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "@media-plans"
 msgstr "@media-plans"
 
@@ -634,12 +634,12 @@ msgstr "7天"
 
 #. placeholder {0}: existingProject.name
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "A campaign workspace for \"{0}\" already exists with this campaign group ID. Opening it will switch to the existing workspace."
-msgstr "\"{0}\" 的此活动组 ID 已存在一个活动工作区。打开它将切换到现有工作区。"
+#~ msgid "A campaign workspace for \"{0}\" already exists with this campaign group ID. Opening it will switch to the existing workspace."
+#~ msgstr "\"{0}\" 的此活动组 ID 已存在一个活动工作区。打开它将切换到现有工作区。"
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "A campaign workspace links Poracode to your Control Centre campaigns — approvals, plan intelligence, and daily operations in one place."
-msgstr "营销活动工作区将 Poracode 与您的 Control Centre 营销活动相连——审批、计划智能和日常运营尽在一处。"
+#~ msgid "A campaign workspace links Poracode to your Control Centre campaigns — approvals, plan intelligence, and daily operations in one place."
+#~ msgstr "营销活动工作区将 Poracode 与您的 Control Centre 营销活动相连——审批、计划智能和日常运营尽在一处。"
 
 #: src/renderer/actions/experimentDecisionActions.ts
 #: src/renderer/actions/experimentWorktreeActions.ts
@@ -665,6 +665,11 @@ msgstr "强大的根代理会拆解任务，在独立的 Git 工作树中启动�
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "a supported coding agent"
 msgstr "支持的编码代理"
+
+#. placeholder {0}: existingProject.name
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "A workspace for \"{0}\" already exists. Confirming opens the existing workspace."
+msgstr "“{0}”的工作区已存在。确认后将打开现有工作区。"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "A worktree owner requires a frozen branch source"
@@ -704,7 +709,7 @@ msgstr "账户选项"
 msgid "Accounts"
 msgstr "账户"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Acme Corp"
 msgstr "阿克米公司"
 
@@ -833,9 +838,13 @@ msgstr "添加待办事项..."
 msgid "Add action"
 msgstr "添加操作"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Add Alias"
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Add alias"
 msgstr "添加别名"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#~ msgid "Add Alias"
+#~ msgstr "添加别名"
 
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Add an existing folder"
@@ -844,6 +853,10 @@ msgstr "添加现有文件夹"
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "Add attachment or capability"
 msgstr "添加附件或功能"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Add campaign workspace"
+msgstr "添加活动工作区"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Add candidate"
@@ -930,6 +943,10 @@ msgstr "添加到主屏幕"
 msgid "Add to-do"
 msgstr "添加待办"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Add workspace"
+msgstr "添加工作区"
+
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "added"
 msgstr "已添加"
@@ -941,6 +958,10 @@ msgstr "已添加"
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Adjust the threshold"
 msgstr "调整阈值"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Advanced"
+msgstr "高级"
 
 #: src/renderer/views/MainView/parts/CampaignModeGate.tsx
 msgid "Advanced Mode (Code)"
@@ -1362,6 +1383,10 @@ msgstr "请求批准"
 #: src/renderer/views/WelcomeOverlay.tsx
 msgid "Ask Question"
 msgstr "提问"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask questions above anytime Control Centre is connected. Pin a campaign workspace here when you want a dedicated folder for one campaign."
+msgstr "连接 Control Centre 后，可随时在上方提问。需要为单个活动准备专用文件夹时，可在此固定活动工作区。"
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "At"
@@ -1836,12 +1861,12 @@ msgid "Campaign Exception: {0} · {1}"
 msgstr "活动异常: {0} · {1}"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign group ID"
-msgstr "活动组 ID"
+#~ msgid "Campaign group ID"
+#~ msgstr "活动组 ID"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign Group ID"
-msgstr "活动组 ID"
+#~ msgid "Campaign Group ID"
+#~ msgstr "活动组 ID"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Campaign morning brief"
@@ -1853,16 +1878,20 @@ msgid "Campaign Morning Brief"
 msgstr "活动晨报"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign name"
-msgstr "活动名称"
+#~ msgid "Campaign name"
+#~ msgstr "活动名称"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign Name"
-msgstr "活动名称"
+#~ msgid "Campaign Name"
+#~ msgstr "活动名称"
 
 #: src/renderer/components/consultations/ContextWarnings.tsx
 msgid "Campaign plan not available"
 msgstr "广告计划不可用"
+
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Campaign reference"
+msgstr "活动引用"
 
 #. placeholder {0}: input.name.trim()
 #: src/renderer/actions/campaignProjectActions.ts
@@ -2125,6 +2154,10 @@ msgstr "检查通过"
 msgid "Checks pending"
 msgstr "检查待定"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Choose a campaign from the list."
+msgstr "请从列表中选择一项活动。"
+
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Choose a different model for each worker."
 msgstr "Choose a different model for each worker."
@@ -2284,13 +2317,13 @@ msgstr "客户"
 msgid "Client Comms"
 msgstr "客户沟通"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Client name"
 msgstr "客户名称"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Client Name"
-msgstr "客户名称"
+#~ msgid "Client Name"
+#~ msgstr "客户名称"
 
 #: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Client Update"
@@ -2976,9 +3009,21 @@ msgstr "控制中心「{toolName}」返回的响应过大或格式错误。请�
 msgid "Control Centre \"{toolName}\" returned a response this version of Tee's Cockpit doesn't understand."
 msgstr "控制中心「{toolName}」返回了此版本 Tee's Cockpit 无法理解的响应。"
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Control Centre connection"
+msgstr "Control Centre 连接"
+
 #: src/renderer/components/consultations/ContextWarnings.tsx
 msgid "Control Centre connection unavailable"
 msgstr "控制中心连接不可用"
+
+#: src/renderer/campaign/controlCentreAvailabilityCopy.ts
+msgid "Control Centre is disabled. Turn it on in settings."
+msgstr "Control Centre 已禁用。请在设置中启用。"
+
+#: src/renderer/campaign/controlCentreAvailabilityCopy.ts
+msgid "Control Centre is not connected. Add a Control Centre connection in settings."
+msgstr "Control Centre 未连接。请在设置中添加 Control Centre 连接。"
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Control Centre isn't connected for this project yet."
@@ -2993,12 +3038,15 @@ msgid "Control Centre needs authorization to list decisions."
 msgstr "Control Centre 需要授权才能列出决策。"
 
 #: src/renderer/services/campaignDecisions/recordCampaignDecision.ts
+msgid "Control Centre needs authorization. Reconnect it in MCP settings."
+msgstr "控制中心需要授权。请在 MCP 设置中重新连接。"
+
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
-msgid "Control Centre needs authorization. Reconnect it in MCP settings."
-msgstr "控制中心需要授权。请在 MCP 设置中重新连接。"
+msgid "Control Centre needs authorization. Reconnect it in settings."
+msgstr "Control Centre 需要授权。请在设置中重新连接。"
 
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Control Centre reports the revised plan matches the published plan."
@@ -3144,6 +3192,10 @@ msgstr "无法将替代工作智能体添加到此集群。"
 msgid "Could not complete the merge"
 msgstr "无法完成合并"
 
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not create a thread for the campaigns workspace."
+msgstr "无法为活动工作区创建线程。"
+
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not create a thread for the existing campaign workspace."
 msgstr "无法为现有活动工作区创建线程。"
@@ -3154,6 +3206,14 @@ msgstr "无法创建活动工作区目录。"
 
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not create the campaign workspace thread."
+msgstr "无法创建活动工作区线程。"
+
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not create the campaigns workspace directory."
+msgstr "无法创建活动工作区目录。"
+
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not create the campaigns workspace thread."
 msgstr "无法创建活动工作区线程。"
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
@@ -3185,6 +3245,10 @@ msgstr "无法保存活动项目。"
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not save the campaign workspace thread."
 msgstr "无法保存活动工作区线程。"
+
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not save the campaigns workspace."
+msgstr "无法保存活动工作区。"
 
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "Could not save the topic thread."
@@ -3293,8 +3357,8 @@ msgid "Create approval proposal"
 msgstr "创建审批提案"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Create Campaign Workspace"
-msgstr "创建活动工作区"
+#~ msgid "Create Campaign Workspace"
+#~ msgstr "创建活动工作区"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CreatePrModal.tsx
 msgid "Create Draft PR"
@@ -3303,6 +3367,10 @@ msgstr "创建 PR 草稿"
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 msgid "Create file"
 msgstr "创建文件"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Create manually"
+msgstr "手动创建"
 
 #: src/renderer/components/common/BranchSelector/parts/BranchFooterActions.tsx
 msgid "Create new branch"
@@ -3549,13 +3617,13 @@ msgstr "DeepSeek"
 msgid "Default"
 msgstr "默认"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Default agent"
 msgstr "默认代理"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Default Agent"
-msgstr "默认代理"
+#~ msgid "Default Agent"
+#~ msgstr "默认代理"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
@@ -3567,13 +3635,13 @@ msgstr "默认自动刷新（分钟）"
 msgid "Default Create PR action"
 msgstr "默认创建 PR 操作"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Default model"
 msgstr "默认模型"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Default Model"
-msgstr "默认模型"
+#~ msgid "Default Model"
+#~ msgstr "默认模型"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4059,14 +4127,14 @@ msgid "e.g. Allow TikTok to run up to 30% ahead of pace"
 msgstr "例如 允许 TikTok 领先节奏最多 30%"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "e.g. cg-abc-123"
-msgstr "例如 cg-abc-123"
+#~ msgid "e.g. cg-abc-123"
+#~ msgstr "例如 cg-abc-123"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "e.g. claude-sonnet-4"
 msgstr "例如 claude-sonnet-4"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "e.g. claude, codex, gemini"
 msgstr "例如 claude、codex、gemini"
 
@@ -5604,13 +5672,13 @@ msgstr "斜体"
 msgid "Job no."
 msgstr "工单号"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Job number"
 msgstr "工单号"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Job Number"
-msgstr "工单号"
+#~ msgid "Job Number"
+#~ msgstr "工单号"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "JSON"
@@ -5800,6 +5868,10 @@ msgstr "正在加载帐户..."
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Loading campaign context…"
 msgstr "正在加载活动上下文…"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Loading campaigns from Control Centre…"
+msgstr "正在从 Control Centre 加载活动…"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Loading campaigns…"
@@ -6084,8 +6156,8 @@ msgid "Maximize browser"
 msgstr "最大化浏览器"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "MCP Profile"
-msgstr "MCP 配置文件"
+#~ msgid "MCP Profile"
+#~ msgstr "MCP 配置文件"
 
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
@@ -6588,7 +6660,6 @@ msgstr "新动作名称"
 msgid "New branch name..."
 msgstr "新分支名称..."
 
-#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "New Campaign Project"
 msgstr "新建活动项目"
@@ -6805,6 +6876,10 @@ msgstr "未配置预算"
 msgid "No camera found"
 msgstr "未找到摄像头"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "No campaigns match your search."
+msgstr "没有与搜索匹配的活动。"
+
 #: src/renderer/components/diff/DiffCardList.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrReviewSidebar.tsx
 msgid "No changes"
@@ -6982,8 +7057,8 @@ msgid "No matching threads"
 msgstr "没有匹配的线程"
 
 #: src/renderer/campaign/controlCentreAvailabilityCopy.ts
-msgid "No MCP server named \"control-centre\" is configured. Add one in MCP settings."
-msgstr "未配置名为 \"control-centre\" 的 MCP 服务器。请在 MCP 设置中添加。"
+#~ msgid "No MCP server named \"control-centre\" is configured. Add one in MCP settings."
+#~ msgstr "未配置名为 \"control-centre\" 的 MCP 服务器。请在 MCP 设置中添加。"
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "No MCP servers are enabled for this run"
@@ -7320,6 +7395,10 @@ msgstr "仅一次"
 msgid "Online"
 msgstr "在线"
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Only needed when Control Centre cannot be reached."
+msgstr "仅在无法访问 Control Centre 时需要。"
+
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Only when unfocused"
 msgstr "仅当窗口失去焦点时"
@@ -7620,6 +7699,10 @@ msgstr "运营简报"
 msgid "Optional"
 msgstr "可选"
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Optional Control Centre campaign id"
+msgstr "可选的 Control Centre 活动 ID"
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Optional note recorded with the approval"
 msgstr "批准时记录的可选备注"
@@ -7628,7 +7711,7 @@ msgstr "批准时记录的可选备注"
 msgid "Optional reason recorded with the rejection"
 msgstr "拒绝时记录的可选原因"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Optional reference number"
 msgstr "可选参考编号"
 
@@ -7648,8 +7731,8 @@ msgid "Options"
 msgstr "选项"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Or pick from Control Centre"
-msgstr "或从控制中心选取"
+#~ msgid "Or pick from Control Centre"
+#~ msgstr "或从控制中心选取"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/userInputForm.tsx
 msgid "Or write a custom answer"
@@ -7864,7 +7947,7 @@ msgstr "粘贴到输入中"
 msgid "Paste the SSH private key."
 msgstr "请粘贴 SSH 私钥。"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Path or URL"
 msgstr "路径或 URL"
 
@@ -7918,6 +8001,10 @@ msgstr "权限受限内容已隐藏"
 msgid "Pi"
 msgstr "Pi"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Pick a live campaign from Control Centre. Everything else is filled in for you."
+msgstr "从 Control Centre 选择一项进行中的活动，其余信息会自动填写。"
+
 #: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "Pick a thread from the list to follow the agent from here."
@@ -7938,6 +8025,10 @@ msgstr "选取器失败"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
 msgid "Picker returned no attachment"
 msgstr "选择器未返回任何附件"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Pin campaign workspace"
+msgstr "固定活动工作区"
 
 #: src/mobile/ThreadTitleRow.tsx
 #: src/mobile/views/threadActionSurfaces.tsx
@@ -8394,8 +8485,8 @@ msgid "Push updates to paired mobile devices when threads finish or need you, ev
 msgstr "当线程完成或需要你处理时，向已配对的移动设备推送更新，即使应用已关闭。"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Q4 Brand Launch"
-msgstr "Q4 品牌发布"
+#~ msgid "Q4 Brand Launch"
+#~ msgstr "Q4 品牌发布"
 
 #: src/renderer/components/providers/qoder/manifest.ts
 msgid "Qoder CLI"
@@ -8729,7 +8820,7 @@ msgstr "移除 <0>{0}</0> 并永久删除其所有线程？此操作无法撤销
 msgid "Remove action"
 msgstr "删除动作"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Remove alias"
 msgstr "移除别名"
 
@@ -8986,9 +9077,13 @@ msgstr "调整终端面板大小"
 msgid "Resolves merge conflicts during rebase or merge."
 msgstr "解决变基或合并期间的合并冲突。"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Resource Aliases"
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Resource aliases"
 msgstr "资源别名"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#~ msgid "Resource Aliases"
+#~ msgstr "资源别名"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Restore"
@@ -9463,6 +9558,14 @@ msgstr "搜索代理..."
 msgid "Search branches..."
 msgstr "搜索分支..."
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Search by campaign, client, or job number…"
+msgstr "按活动、客户或工单号搜索…"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Search campaigns"
+msgstr "搜索活动"
+
 #: src/mobile/views/FilesView.tsx
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/ProjectTreeView.tsx
 msgid "Search files"
@@ -9873,6 +9976,10 @@ msgstr "正在显示 {0, plural, other {# 个技能}}"
 #: src/mobile/views/HostFolderPicker.tsx
 msgid "Showing the first 4,000 entries."
 msgstr "仅显示前 4,000 个条目。"
+
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Shown in the sidebar"
+msgstr "显示在侧边栏"
 
 #. Toggle: show this provider's usage ring in the sidebar
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
@@ -10797,12 +10904,12 @@ msgid "the chosen folder"
 msgstr "所选文件夹"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "The Control Centre campaign group this workspace binds to."
-msgstr "此工作区绑定的控制中心活动组。"
+#~ msgid "The Control Centre campaign group this workspace binds to."
+#~ msgstr "此工作区绑定的控制中心活动组。"
 
 #: src/renderer/campaign/controlCentreAvailabilityCopy.ts
-msgid "The Control Centre MCP server is disabled. Enable it in MCP settings."
-msgstr "Control Centre MCP 服务器已禁用。请在 MCP 设置中启用。"
+#~ msgid "The Control Centre MCP server is disabled. Enable it in MCP settings."
+#~ msgstr "Control Centre MCP 服务器已禁用。请在 MCP 设置中启用。"
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "The decision could not be submitted"
@@ -11650,6 +11757,10 @@ msgstr "卸载"
 msgid "Unknown"
 msgstr "未知"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Unknown client"
+msgstr "未知客户"
+
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "Unknown mention. Try @codex, @claude, @daily-operator, @verify, etc."
 msgstr "未知提及。请尝试 @codex、@claude、@daily-operator、@verify 等。"
@@ -12352,6 +12463,10 @@ msgstr "工作区"
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Workspace MCP servers override user servers with the same name and are added only when agents start in this project."
 msgstr "工作区 MCP 服务器会覆盖同名的用户服务器，并且仅在代理于此项目中启动时添加。"
+
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Workspace name"
+msgstr "工作区名称"
 
 #: src/mobile/views/WorkspaceView.tsx
 msgid "Workspace view"

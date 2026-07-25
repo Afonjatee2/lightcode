@@ -26,6 +26,7 @@ export * from "./campaignMcpLaunch";
 export * from "./controlCentreCampaignContext";
 export * from "./controlCentreCampaignDecision";
 export * from "./controlCentreOperationsToday";
+export * from "./controlCentreCampaignGroupList";
 export * from "./planIntelligence";
 
 // Legacy re-exports — keep backward compatibility for existing consumers

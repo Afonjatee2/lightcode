@@ -150,7 +150,7 @@ export function CampaignApprovalsPane(props: {
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           {!client ? (
             <div className="flex items-center gap-2 text-small text-default-400">
-              <Trans>Control Centre needs authorization. Reconnect it in MCP settings.</Trans>
+              <Trans>Control Centre needs authorization. Reconnect it in settings.</Trans>
             </div>
           ) : loading && !viewModel ? (
             <div className="flex items-center gap-2 text-small text-default-400">

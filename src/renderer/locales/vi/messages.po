@@ -584,7 +584,7 @@ msgstr "@codex kiểm tra tiến độ ngân sách hoặc nhập tin nhắn…"
 msgid "@codex check the budget pacing"
 msgstr "@codex kiểm tra tiến độ ngân sách"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "@media-plans"
 msgstr "@media-plans"
 
@@ -634,12 +634,12 @@ msgstr "7 ngày"
 
 #. placeholder {0}: existingProject.name
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "A campaign workspace for \"{0}\" already exists with this campaign group ID. Opening it will switch to the existing workspace."
-msgstr "Không gian làm việc chiến dịch cho \"{0}\" đã tồn tại với ID nhóm chiến dịch này. Mở nó sẽ chuyển sang không gian làm việc hiện có."
+#~ msgid "A campaign workspace for \"{0}\" already exists with this campaign group ID. Opening it will switch to the existing workspace."
+#~ msgstr "Không gian làm việc chiến dịch cho \"{0}\" đã tồn tại với ID nhóm chiến dịch này. Mở nó sẽ chuyển sang không gian làm việc hiện có."
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "A campaign workspace links Poracode to your Control Centre campaigns — approvals, plan intelligence, and daily operations in one place."
-msgstr "Không gian làm việc chiến dịch liên kết Poracode với các chiến dịch Control Centre của bạn — phê duyệt, trí tuệ kế hoạch và vận hành hàng ngày ở một nơi."
+#~ msgid "A campaign workspace links Poracode to your Control Centre campaigns — approvals, plan intelligence, and daily operations in one place."
+#~ msgstr "Không gian làm việc chiến dịch liên kết Poracode với các chiến dịch Control Centre của bạn — phê duyệt, trí tuệ kế hoạch và vận hành hàng ngày ở một nơi."
 
 #: src/renderer/actions/experimentDecisionActions.ts
 #: src/renderer/actions/experimentWorktreeActions.ts
@@ -665,6 +665,11 @@ msgstr "Một tác nhân gốc mạnh sẽ chia nhỏ tác vụ, khởi chạy c
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "a supported coding agent"
 msgstr "một tác nhân mã hóa được hỗ trợ"
+
+#. placeholder {0}: existingProject.name
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "A workspace for \"{0}\" already exists. Confirming opens the existing workspace."
+msgstr "Không gian làm việc cho \"{0}\" đã tồn tại. Xác nhận sẽ mở không gian hiện có."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "A worktree owner requires a frozen branch source"
@@ -704,7 +709,7 @@ msgstr "Tùy chọn tài khoản"
 msgid "Accounts"
 msgstr "Tài khoản"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Acme Corp"
 msgstr "Công ty Acme"
 
@@ -833,9 +838,13 @@ msgstr "Thêm việc cần làm…"
 msgid "Add action"
 msgstr "Thêm hành động"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Add Alias"
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Add alias"
 msgstr "Thêm bí danh"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#~ msgid "Add Alias"
+#~ msgstr "Thêm bí danh"
 
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Add an existing folder"
@@ -844,6 +853,10 @@ msgstr "Thêm thư mục hiện có"
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "Add attachment or capability"
 msgstr "Thêm tệp đính kèm hoặc khả năng"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Add campaign workspace"
+msgstr "Thêm không gian chiến dịch"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Add candidate"
@@ -930,6 +943,10 @@ msgstr "Thêm vào màn hình chính"
 msgid "Add to-do"
 msgstr "Thêm việc cần làm"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Add workspace"
+msgstr "Thêm không gian"
+
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "added"
 msgstr "đã thêm"
@@ -941,6 +958,10 @@ msgstr "Đã thêm"
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Adjust the threshold"
 msgstr "Điều chỉnh ngưỡng"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Advanced"
+msgstr "Nâng cao"
 
 #: src/renderer/views/MainView/parts/CampaignModeGate.tsx
 msgid "Advanced Mode (Code)"
@@ -1362,6 +1383,10 @@ msgstr "Yêu cầu phê duyệt"
 #: src/renderer/views/WelcomeOverlay.tsx
 msgid "Ask Question"
 msgstr "Đặt câu hỏi"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask questions above anytime Control Centre is connected. Pin a campaign workspace here when you want a dedicated folder for one campaign."
+msgstr "Đặt câu hỏi ở trên bất cứ khi nào Control Centre được kết nối. Ghim không gian chiến dịch tại đây khi bạn muốn một thư mục riêng cho một chiến dịch."
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "At"
@@ -1836,12 +1861,12 @@ msgid "Campaign Exception: {0} · {1}"
 msgstr "Ngoại lệ chiến dịch: {0} · {1}"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign group ID"
-msgstr "ID nhóm chiến dịch"
+#~ msgid "Campaign group ID"
+#~ msgstr "ID nhóm chiến dịch"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign Group ID"
-msgstr "ID nhóm chiến dịch"
+#~ msgid "Campaign Group ID"
+#~ msgstr "ID nhóm chiến dịch"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Campaign morning brief"
@@ -1853,16 +1878,20 @@ msgid "Campaign Morning Brief"
 msgstr "Tóm tắt buổi sáng của chiến dịch"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign name"
-msgstr "Tên chiến dịch"
+#~ msgid "Campaign name"
+#~ msgstr "Tên chiến dịch"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign Name"
-msgstr "Tên chiến dịch"
+#~ msgid "Campaign Name"
+#~ msgstr "Tên chiến dịch"
 
 #: src/renderer/components/consultations/ContextWarnings.tsx
 msgid "Campaign plan not available"
 msgstr "Kế hoạch chiến dịch không khả dụng"
+
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Campaign reference"
+msgstr "Tham chiếu chiến dịch"
 
 #. placeholder {0}: input.name.trim()
 #: src/renderer/actions/campaignProjectActions.ts
@@ -2125,6 +2154,10 @@ msgstr "Kiểm tra thành công"
 msgid "Checks pending"
 msgstr "Kiểm tra đang chờ"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Choose a campaign from the list."
+msgstr "Chọn một chiến dịch từ danh sách."
+
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Choose a different model for each worker."
 msgstr "Choose a different model for each worker."
@@ -2284,13 +2317,13 @@ msgstr "Khách hàng"
 msgid "Client Comms"
 msgstr "Liên lạc với khách hàng"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Client name"
 msgstr "Tên khách hàng"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Client Name"
-msgstr "Tên khách hàng"
+#~ msgid "Client Name"
+#~ msgstr "Tên khách hàng"
 
 #: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Client Update"
@@ -2976,9 +3009,21 @@ msgstr "Trung tâm điều khiển \"{toolName}\" đã trả về phản hồi q
 msgid "Control Centre \"{toolName}\" returned a response this version of Tee's Cockpit doesn't understand."
 msgstr "Trung tâm điều khiển \"{toolName}\" đã trả về phản hồi mà phiên bản Tee's Cockpit này không hiểu được."
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Control Centre connection"
+msgstr "Kết nối Control Centre"
+
 #: src/renderer/components/consultations/ContextWarnings.tsx
 msgid "Control Centre connection unavailable"
 msgstr "Trung tâm điều khiển không khả dụng"
+
+#: src/renderer/campaign/controlCentreAvailabilityCopy.ts
+msgid "Control Centre is disabled. Turn it on in settings."
+msgstr "Control Centre đã tắt. Bật trong cài đặt."
+
+#: src/renderer/campaign/controlCentreAvailabilityCopy.ts
+msgid "Control Centre is not connected. Add a Control Centre connection in settings."
+msgstr "Control Centre chưa được kết nối. Thêm kết nối Control Centre trong cài đặt."
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Control Centre isn't connected for this project yet."
@@ -2993,12 +3038,15 @@ msgid "Control Centre needs authorization to list decisions."
 msgstr "Control Centre cần được ủy quyền để liệt kê các quyết định."
 
 #: src/renderer/services/campaignDecisions/recordCampaignDecision.ts
+msgid "Control Centre needs authorization. Reconnect it in MCP settings."
+msgstr "Trung tâm điều khiển cần được ủy quyền. Kết nối lại trong cài đặt MCP."
+
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
-msgid "Control Centre needs authorization. Reconnect it in MCP settings."
-msgstr "Trung tâm điều khiển cần được ủy quyền. Kết nối lại trong cài đặt MCP."
+msgid "Control Centre needs authorization. Reconnect it in settings."
+msgstr "Control Centre cần được ủy quyền. Kết nối lại trong cài đặt."
 
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Control Centre reports the revised plan matches the published plan."
@@ -3144,6 +3192,10 @@ msgstr "Không thể gắn tác nhân thay thế vào nhóm này."
 msgid "Could not complete the merge"
 msgstr "Không thể hoàn tất việc hợp nhất"
 
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not create a thread for the campaigns workspace."
+msgstr "Không thể tạo luồng cho không gian chiến dịch."
+
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not create a thread for the existing campaign workspace."
 msgstr "Không thể tạo luồng cho không gian làm việc chiến dịch hiện có."
@@ -3155,6 +3207,14 @@ msgstr "Không thể tạo thư mục không gian làm việc chiến dịch."
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not create the campaign workspace thread."
 msgstr "Không thể tạo luồng không gian làm việc chiến dịch."
+
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not create the campaigns workspace directory."
+msgstr "Không thể tạo thư mục không gian chiến dịch."
+
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not create the campaigns workspace thread."
+msgstr "Không thể tạo luồng không gian chiến dịch."
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
@@ -3185,6 +3245,10 @@ msgstr "Không thể lưu dự án chiến dịch."
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not save the campaign workspace thread."
 msgstr "Không thể lưu luồng không gian làm việc chiến dịch."
+
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not save the campaigns workspace."
+msgstr "Không thể lưu không gian chiến dịch."
 
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "Could not save the topic thread."
@@ -3293,8 +3357,8 @@ msgid "Create approval proposal"
 msgstr "Tạo đề xuất phê duyệt"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Create Campaign Workspace"
-msgstr "Tạo không gian làm việc chiến dịch"
+#~ msgid "Create Campaign Workspace"
+#~ msgstr "Tạo không gian làm việc chiến dịch"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CreatePrModal.tsx
 msgid "Create Draft PR"
@@ -3303,6 +3367,10 @@ msgstr "Tạo dự thảo PR"
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 msgid "Create file"
 msgstr "Tạo tập tin"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Create manually"
+msgstr "Tạo thủ công"
 
 #: src/renderer/components/common/BranchSelector/parts/BranchFooterActions.tsx
 msgid "Create new branch"
@@ -3549,13 +3617,13 @@ msgstr "DeepSeek"
 msgid "Default"
 msgstr "Mặc định"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Default agent"
 msgstr "Tác nhân mặc định"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Default Agent"
-msgstr "Tác nhân mặc định"
+#~ msgid "Default Agent"
+#~ msgstr "Tác nhân mặc định"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
@@ -3567,13 +3635,13 @@ msgstr "Tự động làm mới mặc định (phút)"
 msgid "Default Create PR action"
 msgstr "Hành động Tạo PR mặc định"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Default model"
 msgstr "Mô hình mặc định"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Default Model"
-msgstr "Mô hình mặc định"
+#~ msgid "Default Model"
+#~ msgstr "Mô hình mặc định"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4059,14 +4127,14 @@ msgid "e.g. Allow TikTok to run up to 30% ahead of pace"
 msgstr "ví dụ: Cho phép TikTok chạy vượt tiến độ tới 30%"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "e.g. cg-abc-123"
-msgstr "vd: cg-abc-123"
+#~ msgid "e.g. cg-abc-123"
+#~ msgstr "vd: cg-abc-123"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "e.g. claude-sonnet-4"
 msgstr "vd: claude-sonnet-4"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "e.g. claude, codex, gemini"
 msgstr "vd: claude, codex, gemini"
 
@@ -5604,13 +5672,13 @@ msgstr "Nghiêng"
 msgid "Job no."
 msgstr "Số công việc"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Job number"
 msgstr "Số công việc"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Job Number"
-msgstr "Số công việc"
+#~ msgid "Job Number"
+#~ msgstr "Số công việc"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "JSON"
@@ -5800,6 +5868,10 @@ msgstr "Đang tải tài khoản…"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Loading campaign context…"
 msgstr "Đang tải ngữ cảnh chiến dịch…"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Loading campaigns from Control Centre…"
+msgstr "Đang tải chiến dịch từ Control Centre…"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Loading campaigns…"
@@ -6084,8 +6156,8 @@ msgid "Maximize browser"
 msgstr "Tối đa hóa trình duyệt"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "MCP Profile"
-msgstr "Hồ sơ MCP"
+#~ msgid "MCP Profile"
+#~ msgstr "Hồ sơ MCP"
 
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
@@ -6589,7 +6661,6 @@ msgstr "Tên hành động mới"
 msgid "New branch name..."
 msgstr "Tên chi nhánh mới..."
 
-#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "New Campaign Project"
 msgstr "Dự án chiến dịch mới"
@@ -6806,6 +6877,10 @@ msgstr "Chưa cấu hình ngân sách"
 msgid "No camera found"
 msgstr "Không tìm thấy camera"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "No campaigns match your search."
+msgstr "Không có chiến dịch nào khớp với tìm kiếm."
+
 #: src/renderer/components/diff/DiffCardList.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrReviewSidebar.tsx
 msgid "No changes"
@@ -6983,8 +7058,8 @@ msgid "No matching threads"
 msgstr "Không có luồng nào phù hợp"
 
 #: src/renderer/campaign/controlCentreAvailabilityCopy.ts
-msgid "No MCP server named \"control-centre\" is configured. Add one in MCP settings."
-msgstr "Chưa có máy chủ MCP nào tên \"control-centre\" được cấu hình. Thêm một máy chủ trong cài đặt MCP."
+#~ msgid "No MCP server named \"control-centre\" is configured. Add one in MCP settings."
+#~ msgstr "Chưa có máy chủ MCP nào tên \"control-centre\" được cấu hình. Thêm một máy chủ trong cài đặt MCP."
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "No MCP servers are enabled for this run"
@@ -7321,6 +7396,10 @@ msgstr "Một lần"
 msgid "Online"
 msgstr "Trực tuyến"
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Only needed when Control Centre cannot be reached."
+msgstr "Chỉ cần khi không thể truy cập Control Centre."
+
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Only when unfocused"
 msgstr "Chỉ khi không tập trung"
@@ -7621,6 +7700,10 @@ msgstr "Tóm tắt vận hành"
 msgid "Optional"
 msgstr "Không bắt buộc"
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Optional Control Centre campaign id"
+msgstr "ID chiến dịch Control Centre tùy chọn"
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Optional note recorded with the approval"
 msgstr "Ghi chú tùy chọn khi phê duyệt"
@@ -7629,7 +7712,7 @@ msgstr "Ghi chú tùy chọn khi phê duyệt"
 msgid "Optional reason recorded with the rejection"
 msgstr "Lý do tùy chọn khi từ chối"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Optional reference number"
 msgstr "Số tham chiếu tùy chọn"
 
@@ -7649,8 +7732,8 @@ msgid "Options"
 msgstr "Tùy chọn"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Or pick from Control Centre"
-msgstr "Hoặc chọn từ Trung tâm điều khiển"
+#~ msgid "Or pick from Control Centre"
+#~ msgstr "Hoặc chọn từ Trung tâm điều khiển"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/userInputForm.tsx
 msgid "Or write a custom answer"
@@ -7865,7 +7948,7 @@ msgstr "Dán vào đầu vào"
 msgid "Paste the SSH private key."
 msgstr "Dán khóa riêng SSH."
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Path or URL"
 msgstr "Đường dẫn hoặc URL"
 
@@ -7919,6 +8002,10 @@ msgstr "Nội dung bị hạn chế quyền đã ẩn"
 msgid "Pi"
 msgstr "Pi"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Pick a live campaign from Control Centre. Everything else is filled in for you."
+msgstr "Chọn một chiến dịch đang chạy từ Control Centre. Mọi thứ khác sẽ được điền tự động."
+
 #: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "Pick a thread from the list to follow the agent from here."
@@ -7939,6 +8026,10 @@ msgstr "Bộ chọn không thành công"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
 msgid "Picker returned no attachment"
 msgstr "Bộ chọn không trả về tệp đính kèm nào"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Pin campaign workspace"
+msgstr "Ghim không gian chiến dịch"
 
 #: src/mobile/ThreadTitleRow.tsx
 #: src/mobile/views/threadActionSurfaces.tsx
@@ -8395,8 +8486,8 @@ msgid "Push updates to paired mobile devices when threads finish or need you, ev
 msgstr "Đẩy các cập nhật đến những thiết bị di động đã ghép nối khi luồng hoàn tất hoặc cần bạn, ngay cả khi ứng dụng đã đóng."
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Q4 Brand Launch"
-msgstr "Ra mắt thương hiệu Q4"
+#~ msgid "Q4 Brand Launch"
+#~ msgstr "Ra mắt thương hiệu Q4"
 
 #: src/renderer/components/providers/qoder/manifest.ts
 msgid "Qoder CLI"
@@ -8730,7 +8821,7 @@ msgstr "Xóa <0>{0}</0> và xóa vĩnh viễn tất cả các luồng của dự
 msgid "Remove action"
 msgstr "Xóa hành động"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Remove alias"
 msgstr "Xóa bí danh"
 
@@ -8987,9 +9078,13 @@ msgstr "Thay đổi kích thước bảng điều khiển thiết bị đầu cu
 msgid "Resolves merge conflicts during rebase or merge."
 msgstr "Giải quyết xung đột hợp nhất trong quá trình rebase hoặc hợp nhất."
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Resource Aliases"
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Resource aliases"
 msgstr "Bí danh tài nguyên"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#~ msgid "Resource Aliases"
+#~ msgstr "Bí danh tài nguyên"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Restore"
@@ -9464,6 +9559,14 @@ msgstr "Tìm kiếm tác nhân..."
 msgid "Search branches..."
 msgstr "Tìm kiếm nhánh..."
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Search by campaign, client, or job number…"
+msgstr "Tìm theo chiến dịch, khách hàng hoặc số việc…"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Search campaigns"
+msgstr "Tìm chiến dịch"
+
 #: src/mobile/views/FilesView.tsx
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/ProjectTreeView.tsx
 msgid "Search files"
@@ -9874,6 +9977,10 @@ msgstr "Đang hiển thị {0, plural, other {# skill}}"
 #: src/mobile/views/HostFolderPicker.tsx
 msgid "Showing the first 4,000 entries."
 msgstr "Đang hiển thị 4.000 mục đầu tiên."
+
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Shown in the sidebar"
+msgstr "Hiển thị trên thanh bên"
 
 #. Toggle: show this provider's usage ring in the sidebar
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
@@ -10798,12 +10905,12 @@ msgid "the chosen folder"
 msgstr "thư mục đã chọn"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "The Control Centre campaign group this workspace binds to."
-msgstr "Nhóm chiến dịch Trung tâm điều khiển mà không gian làm việc này liên kết đến."
+#~ msgid "The Control Centre campaign group this workspace binds to."
+#~ msgstr "Nhóm chiến dịch Trung tâm điều khiển mà không gian làm việc này liên kết đến."
 
 #: src/renderer/campaign/controlCentreAvailabilityCopy.ts
-msgid "The Control Centre MCP server is disabled. Enable it in MCP settings."
-msgstr "Máy chủ MCP Control Centre đang bị tắt. Bật lại trong cài đặt MCP."
+#~ msgid "The Control Centre MCP server is disabled. Enable it in MCP settings."
+#~ msgstr "Máy chủ MCP Control Centre đang bị tắt. Bật lại trong cài đặt MCP."
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "The decision could not be submitted"
@@ -11651,6 +11758,10 @@ msgstr "Gỡ cài đặt"
 msgid "Unknown"
 msgstr "Không xác định"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Unknown client"
+msgstr "Khách hàng không xác định"
+
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "Unknown mention. Try @codex, @claude, @daily-operator, @verify, etc."
 msgstr "Đề cập không xác định. Hãy thử @codex, @claude, @daily-operator, @verify, v.v."
@@ -12353,6 +12464,10 @@ msgstr "Không gian làm việc"
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Workspace MCP servers override user servers with the same name and are added only when agents start in this project."
 msgstr "Máy chủ MCP trong không gian làm việc sẽ ghi đè máy chủ người dùng có cùng tên và chỉ được thêm khi tác nhân khởi động trong dự án này."
+
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Workspace name"
+msgstr "Tên không gian"
 
 #: src/mobile/views/WorkspaceView.tsx
 msgid "Workspace view"

@@ -221,7 +221,7 @@ export function CampaignThreadPane(props: {
         <CampaignThreadComposer
           projectId={props.projectId}
           parentThreadId={threadId}
-          campaignGroupId={props.identity.campaignGroupId}
+          campaignGroupId={props.identity?.campaignGroupId ?? ""}
           defaultProvider={defaultProvider}
           suggestedQuestions={props.suggestedQuestions ?? []}
           {...(props.onAnalyzeMediaPlan ? { onAnalyzeMediaPlan: props.onAnalyzeMediaPlan } : {})}

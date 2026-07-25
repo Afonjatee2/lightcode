@@ -584,7 +584,7 @@ msgstr "@codex sprawdź tempo budżetu lub wpisz wiadomość…"
 msgid "@codex check the budget pacing"
 msgstr "@codex sprawdź tempo budżetu"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "@media-plans"
 msgstr "@media-plans"
 
@@ -634,12 +634,12 @@ msgstr "7d"
 
 #. placeholder {0}: existingProject.name
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "A campaign workspace for \"{0}\" already exists with this campaign group ID. Opening it will switch to the existing workspace."
-msgstr "Przestrzeń robocza kampanii dla \"{0}\" już istnieje z tym identyfikatorem grupy kampanii. Otwarcie jej spowoduje przełączenie do istniejącej przestrzeni roboczej."
+#~ msgid "A campaign workspace for \"{0}\" already exists with this campaign group ID. Opening it will switch to the existing workspace."
+#~ msgstr "Przestrzeń robocza kampanii dla \"{0}\" już istnieje z tym identyfikatorem grupy kampanii. Otwarcie jej spowoduje przełączenie do istniejącej przestrzeni roboczej."
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "A campaign workspace links Poracode to your Control Centre campaigns — approvals, plan intelligence, and daily operations in one place."
-msgstr "Obszar roboczy kampanii łączy Poracode z kampaniami Control Centre — zatwierdzenia, inteligencja planu i codzienne operacje w jednym miejscu."
+#~ msgid "A campaign workspace links Poracode to your Control Centre campaigns — approvals, plan intelligence, and daily operations in one place."
+#~ msgstr "Obszar roboczy kampanii łączy Poracode z kampaniami Control Centre — zatwierdzenia, inteligencja planu i codzienne operacje w jednym miejscu."
 
 #: src/renderer/actions/experimentDecisionActions.ts
 #: src/renderer/actions/experimentWorktreeActions.ts
@@ -665,6 +665,11 @@ msgstr "Wydajny agent główny dzieli zadanie, uruchamia workerów w osobnych dr
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "a supported coding agent"
 msgstr "obsługiwany agent kodujący"
+
+#. placeholder {0}: existingProject.name
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "A workspace for \"{0}\" already exists. Confirming opens the existing workspace."
+msgstr "Obszar roboczy dla „{0}” już istnieje. Potwierdzenie otworzy istniejący obszar."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "A worktree owner requires a frozen branch source"
@@ -704,7 +709,7 @@ msgstr "Opcje konta"
 msgid "Accounts"
 msgstr "Konta"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Acme Corp"
 msgstr "Acme Sp. z o.o."
 
@@ -833,9 +838,13 @@ msgstr "Dodaj zadanie…"
 msgid "Add action"
 msgstr "Dodaj akcję"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Add Alias"
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Add alias"
 msgstr "Dodaj alias"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#~ msgid "Add Alias"
+#~ msgstr "Dodaj alias"
 
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Add an existing folder"
@@ -844,6 +853,10 @@ msgstr "Dodaj istniejący folder"
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "Add attachment or capability"
 msgstr "Dodaj załącznik lub możliwość"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Add campaign workspace"
+msgstr "Dodaj obszar kampanii"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Add candidate"
@@ -930,6 +943,10 @@ msgstr "Dodaj do ekranu głównego"
 msgid "Add to-do"
 msgstr "Dodaj zadanie"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Add workspace"
+msgstr "Dodaj obszar"
+
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "added"
 msgstr "dodano"
@@ -941,6 +958,10 @@ msgstr "Dodano"
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Adjust the threshold"
 msgstr "Dostosuj próg"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Advanced"
+msgstr "Zaawansowane"
 
 #: src/renderer/views/MainView/parts/CampaignModeGate.tsx
 msgid "Advanced Mode (Code)"
@@ -1362,6 +1383,10 @@ msgstr "Poproś o zatwierdzenie"
 #: src/renderer/views/WelcomeOverlay.tsx
 msgid "Ask Question"
 msgstr "Zadaj pytanie"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask questions above anytime Control Centre is connected. Pin a campaign workspace here when you want a dedicated folder for one campaign."
+msgstr "Zadawaj pytania powyżej, gdy Control Centre jest połączone. Przypnij tutaj obszar kampanii, gdy chcesz osobny folder dla jednej kampanii."
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "At"
@@ -1836,12 +1861,12 @@ msgid "Campaign Exception: {0} · {1}"
 msgstr "Wyjątek kampanii: {0} · {1}"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign group ID"
-msgstr "ID grupy kampanii"
+#~ msgid "Campaign group ID"
+#~ msgstr "ID grupy kampanii"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign Group ID"
-msgstr "ID grupy kampanii"
+#~ msgid "Campaign Group ID"
+#~ msgstr "ID grupy kampanii"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Campaign morning brief"
@@ -1853,16 +1878,20 @@ msgid "Campaign Morning Brief"
 msgstr "Poranny raport kampanii"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign name"
-msgstr "Nazwa kampanii"
+#~ msgid "Campaign name"
+#~ msgstr "Nazwa kampanii"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign Name"
-msgstr "Nazwa kampanii"
+#~ msgid "Campaign Name"
+#~ msgstr "Nazwa kampanii"
 
 #: src/renderer/components/consultations/ContextWarnings.tsx
 msgid "Campaign plan not available"
 msgstr "Plan kampanii niedostępny"
+
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Campaign reference"
+msgstr "Referencja kampanii"
 
 #. placeholder {0}: input.name.trim()
 #: src/renderer/actions/campaignProjectActions.ts
@@ -2125,6 +2154,10 @@ msgstr "Kontrole zaliczone"
 msgid "Checks pending"
 msgstr "Kontrole oczekują na realizację"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Choose a campaign from the list."
+msgstr "Wybierz kampanię z listy."
+
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Choose a different model for each worker."
 msgstr "Choose a different model for each worker."
@@ -2284,13 +2317,13 @@ msgstr "Klient"
 msgid "Client Comms"
 msgstr "Komunikacja z klientem"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Client name"
 msgstr "Nazwa klienta"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Client Name"
-msgstr "Nazwa klienta"
+#~ msgid "Client Name"
+#~ msgstr "Nazwa klienta"
 
 #: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Client Update"
@@ -2976,9 +3009,21 @@ msgstr "Centrum sterowania „{toolName}” zwróciło odpowiedź, która była 
 msgid "Control Centre \"{toolName}\" returned a response this version of Tee's Cockpit doesn't understand."
 msgstr "Centrum sterowania „{toolName}” zwróciło odpowiedź, której ta wersja Tee's Cockpit nie rozumie."
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Control Centre connection"
+msgstr "Połączenie z Control Centre"
+
 #: src/renderer/components/consultations/ContextWarnings.tsx
 msgid "Control Centre connection unavailable"
 msgstr "Centrum sterowania niedostępne"
+
+#: src/renderer/campaign/controlCentreAvailabilityCopy.ts
+msgid "Control Centre is disabled. Turn it on in settings."
+msgstr "Control Centre jest wyłączone. Włącz je w ustawieniach."
+
+#: src/renderer/campaign/controlCentreAvailabilityCopy.ts
+msgid "Control Centre is not connected. Add a Control Centre connection in settings."
+msgstr "Control Centre nie jest połączone. Dodaj połączenie Control Centre w ustawieniach."
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Control Centre isn't connected for this project yet."
@@ -2993,12 +3038,15 @@ msgid "Control Centre needs authorization to list decisions."
 msgstr "Control Centre wymaga autoryzacji, aby wyświetlić decyzje."
 
 #: src/renderer/services/campaignDecisions/recordCampaignDecision.ts
+msgid "Control Centre needs authorization. Reconnect it in MCP settings."
+msgstr "Centrum sterowania wymaga autoryzacji. Połącz je ponownie w ustawieniach MCP."
+
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
-msgid "Control Centre needs authorization. Reconnect it in MCP settings."
-msgstr "Centrum sterowania wymaga autoryzacji. Połącz je ponownie w ustawieniach MCP."
+msgid "Control Centre needs authorization. Reconnect it in settings."
+msgstr "Control Centre wymaga autoryzacji. Połącz ponownie w ustawieniach."
 
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Control Centre reports the revised plan matches the published plan."
@@ -3144,6 +3192,10 @@ msgstr "Nie udało się dołączyć zastępczego agenta do tego roju."
 msgid "Could not complete the merge"
 msgstr "Nie można dokończyć scalania"
 
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not create a thread for the campaigns workspace."
+msgstr "Nie udało się utworzyć wątku dla obszaru kampanii."
+
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not create a thread for the existing campaign workspace."
 msgstr "Nie można utworzyć wątku dla istniejącej przestrzeni roboczej kampanii."
@@ -3155,6 +3207,14 @@ msgstr "Nie można utworzyć katalogu przestrzeni roboczej kampanii."
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not create the campaign workspace thread."
 msgstr "Nie można utworzyć wątku przestrzeni roboczej kampanii."
+
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not create the campaigns workspace directory."
+msgstr "Nie udało się utworzyć katalogu obszaru kampanii."
+
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not create the campaigns workspace thread."
+msgstr "Nie udało się utworzyć wątku obszaru kampanii."
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
@@ -3185,6 +3245,10 @@ msgstr "Nie można zapisać projektu kampanii."
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not save the campaign workspace thread."
 msgstr "Nie można zapisać wątku przestrzeni roboczej kampanii."
+
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not save the campaigns workspace."
+msgstr "Nie udało się zapisać obszaru kampanii."
 
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "Could not save the topic thread."
@@ -3293,8 +3357,8 @@ msgid "Create approval proposal"
 msgstr "Utwórz propozycję zatwierdzenia"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Create Campaign Workspace"
-msgstr "Utwórz przestrzeń roboczą kampanii"
+#~ msgid "Create Campaign Workspace"
+#~ msgstr "Utwórz przestrzeń roboczą kampanii"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CreatePrModal.tsx
 msgid "Create Draft PR"
@@ -3303,6 +3367,10 @@ msgstr "Utwórz wersję roboczą PR"
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 msgid "Create file"
 msgstr "Utwórz plik"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Create manually"
+msgstr "Utwórz ręcznie"
 
 #: src/renderer/components/common/BranchSelector/parts/BranchFooterActions.tsx
 msgid "Create new branch"
@@ -3549,13 +3617,13 @@ msgstr "DeepSeek"
 msgid "Default"
 msgstr "Domyślne"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Default agent"
 msgstr "Domyślny agent"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Default Agent"
-msgstr "Domyślny agent"
+#~ msgid "Default Agent"
+#~ msgstr "Domyślny agent"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
@@ -3567,13 +3635,13 @@ msgstr "Domyślne automatyczne odświeżanie (minuty)"
 msgid "Default Create PR action"
 msgstr "Domyślna akcja Utwórz PR"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Default model"
 msgstr "Domyślny model"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Default Model"
-msgstr "Domyślny model"
+#~ msgid "Default Model"
+#~ msgstr "Domyślny model"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4059,14 +4127,14 @@ msgid "e.g. Allow TikTok to run up to 30% ahead of pace"
 msgstr "np. Pozwól, aby TikTok wyprzedzał tempo o maks. 30%"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "e.g. cg-abc-123"
-msgstr "np. cg-abc-123"
+#~ msgid "e.g. cg-abc-123"
+#~ msgstr "np. cg-abc-123"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "e.g. claude-sonnet-4"
 msgstr "np. claude-sonnet-4"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "e.g. claude, codex, gemini"
 msgstr "np. claude, codex, gemini"
 
@@ -5604,13 +5672,13 @@ msgstr "Kursywa"
 msgid "Job no."
 msgstr "Nr zlecenia"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Job number"
 msgstr "Numer zlecenia"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Job Number"
-msgstr "Numer zlecenia"
+#~ msgid "Job Number"
+#~ msgstr "Numer zlecenia"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "JSON"
@@ -5800,6 +5868,10 @@ msgstr "Ładuję konta…"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Loading campaign context…"
 msgstr "Ładowanie kontekstu kampanii…"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Loading campaigns from Control Centre…"
+msgstr "Ładowanie kampanii z Control Centre…"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Loading campaigns…"
@@ -6084,8 +6156,8 @@ msgid "Maximize browser"
 msgstr "Zmaksymalizuj przeglądarkę"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "MCP Profile"
-msgstr "Profil MCP"
+#~ msgid "MCP Profile"
+#~ msgstr "Profil MCP"
 
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
@@ -6589,7 +6661,6 @@ msgstr "Nowa nazwa akcji"
 msgid "New branch name..."
 msgstr "Nowa nazwa gałęzi..."
 
-#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "New Campaign Project"
 msgstr "Nowy projekt kampanii"
@@ -6806,6 +6877,10 @@ msgstr "Nie skonfigurowano budżetu"
 msgid "No camera found"
 msgstr "Nie znaleziono kamery"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "No campaigns match your search."
+msgstr "Żadna kampania nie pasuje do wyszukiwania."
+
 #: src/renderer/components/diff/DiffCardList.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrReviewSidebar.tsx
 msgid "No changes"
@@ -6983,8 +7058,8 @@ msgid "No matching threads"
 msgstr "Brak pasujących wątków"
 
 #: src/renderer/campaign/controlCentreAvailabilityCopy.ts
-msgid "No MCP server named \"control-centre\" is configured. Add one in MCP settings."
-msgstr "Nie skonfigurowano serwera MCP o nazwie „control-centre”. Dodaj go w ustawieniach MCP."
+#~ msgid "No MCP server named \"control-centre\" is configured. Add one in MCP settings."
+#~ msgstr "Nie skonfigurowano serwera MCP o nazwie „control-centre”. Dodaj go w ustawieniach MCP."
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "No MCP servers are enabled for this run"
@@ -7321,6 +7396,10 @@ msgstr "Jednorazowo"
 msgid "Online"
 msgstr "Online"
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Only needed when Control Centre cannot be reached."
+msgstr "Potrzebne tylko, gdy Control Centre jest niedostępne."
+
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Only when unfocused"
 msgstr "Tylko gdy nieaktywne"
@@ -7621,6 +7700,10 @@ msgstr "Przegląd operacji"
 msgid "Optional"
 msgstr "Opcjonalnie"
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Optional Control Centre campaign id"
+msgstr "Opcjonalny identyfikator kampanii Control Centre"
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Optional note recorded with the approval"
 msgstr "Opcjonalna notatka przy zatwierdzeniu"
@@ -7629,7 +7712,7 @@ msgstr "Opcjonalna notatka przy zatwierdzeniu"
 msgid "Optional reason recorded with the rejection"
 msgstr "Opcjonalny powód przy odrzuceniu"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Optional reference number"
 msgstr "Opcjonalny numer referencyjny"
 
@@ -7649,8 +7732,8 @@ msgid "Options"
 msgstr "Opcje"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Or pick from Control Centre"
-msgstr "Lub wybierz z Centrum sterowania"
+#~ msgid "Or pick from Control Centre"
+#~ msgstr "Lub wybierz z Centrum sterowania"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/userInputForm.tsx
 msgid "Or write a custom answer"
@@ -7865,7 +7948,7 @@ msgstr "Wklej do pola"
 msgid "Paste the SSH private key."
 msgstr "Wklej klucz prywatny SSH."
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Path or URL"
 msgstr "Ścieżka lub URL"
 
@@ -7919,6 +8002,10 @@ msgstr "Treść z ograniczeniami uprawnień ukryta"
 msgid "Pi"
 msgstr "Pi"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Pick a live campaign from Control Centre. Everything else is filled in for you."
+msgstr "Wybierz aktywną kampanię z Control Centre. Reszta zostanie uzupełniona automatycznie."
+
 #: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "Pick a thread from the list to follow the agent from here."
@@ -7939,6 +8026,10 @@ msgstr "Selektor nie powiódł się"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
 msgid "Picker returned no attachment"
 msgstr "Selektor nie zwrócił żadnego załącznika"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Pin campaign workspace"
+msgstr "Przypnij obszar kampanii"
 
 #: src/mobile/ThreadTitleRow.tsx
 #: src/mobile/views/threadActionSurfaces.tsx
@@ -8395,8 +8486,8 @@ msgid "Push updates to paired mobile devices when threads finish or need you, ev
 msgstr "Wysyłaj aktualizacje na sparowane urządzenia mobilne, gdy wątki się kończą lub wymagają Twojej uwagi, nawet gdy aplikacja jest zamknięta."
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Q4 Brand Launch"
-msgstr "Premiera marki Q4"
+#~ msgid "Q4 Brand Launch"
+#~ msgstr "Premiera marki Q4"
 
 #: src/renderer/components/providers/qoder/manifest.ts
 msgid "Qoder CLI"
@@ -8730,7 +8821,7 @@ msgstr "Usunąć <0>{0}</0> i trwale usunąć wszystkie jego wątki? Tego nie mo
 msgid "Remove action"
 msgstr "Usuń akcję"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Remove alias"
 msgstr "Usuń alias"
 
@@ -8987,9 +9078,13 @@ msgstr "Zmień rozmiar panelu terminali"
 msgid "Resolves merge conflicts during rebase or merge."
 msgstr "Rozwiązuje konflikty scalania podczas zmiany bazy lub scalania."
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Resource Aliases"
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Resource aliases"
 msgstr "Aliasy zasobów"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#~ msgid "Resource Aliases"
+#~ msgstr "Aliasy zasobów"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Restore"
@@ -9464,6 +9559,14 @@ msgstr "Wyszukaj agentów..."
 msgid "Search branches..."
 msgstr "Szukaj gałęzi..."
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Search by campaign, client, or job number…"
+msgstr "Szukaj po kampanii, kliencie lub numerze zlecenia…"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Search campaigns"
+msgstr "Szukaj kampanii"
+
 #: src/mobile/views/FilesView.tsx
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/ProjectTreeView.tsx
 msgid "Search files"
@@ -9874,6 +9977,10 @@ msgstr "Wyświetlanie {0, plural, one {# umiejętności} few {# umiejętności} 
 #: src/mobile/views/HostFolderPicker.tsx
 msgid "Showing the first 4,000 entries."
 msgstr "Wyświetlanie pierwszych 4000 wpisów."
+
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Shown in the sidebar"
+msgstr "Wyświetlane na pasku bocznym"
 
 #. Toggle: show this provider's usage ring in the sidebar
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
@@ -10798,12 +10905,12 @@ msgid "the chosen folder"
 msgstr "wybrany folder"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "The Control Centre campaign group this workspace binds to."
-msgstr "Grupa kampanii Centrum sterowania, z którą powiązana jest ta przestrzeń robocza."
+#~ msgid "The Control Centre campaign group this workspace binds to."
+#~ msgstr "Grupa kampanii Centrum sterowania, z którą powiązana jest ta przestrzeń robocza."
 
 #: src/renderer/campaign/controlCentreAvailabilityCopy.ts
-msgid "The Control Centre MCP server is disabled. Enable it in MCP settings."
-msgstr "Serwer MCP Control Centre jest wyłączony. Włącz go w ustawieniach MCP."
+#~ msgid "The Control Centre MCP server is disabled. Enable it in MCP settings."
+#~ msgstr "Serwer MCP Control Centre jest wyłączony. Włącz go w ustawieniach MCP."
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "The decision could not be submitted"
@@ -11651,6 +11758,10 @@ msgstr "Odinstaluj"
 msgid "Unknown"
 msgstr "Nieznany"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Unknown client"
+msgstr "Nieznany klient"
+
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "Unknown mention. Try @codex, @claude, @daily-operator, @verify, etc."
 msgstr "Nieznana wzmianka. Spróbuj @codex, @claude, @daily-operator, @verify itp."
@@ -12353,6 +12464,10 @@ msgstr "Obszar roboczy"
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Workspace MCP servers override user servers with the same name and are added only when agents start in this project."
 msgstr "Serwery MCP obszaru roboczego zastępują serwery użytkownika o tej samej nazwie i są dodawane tylko podczas uruchamiania agentów w tym projekcie."
+
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Workspace name"
+msgstr "Nazwa obszaru"
 
 #: src/mobile/views/WorkspaceView.tsx
 msgid "Workspace view"

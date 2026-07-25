@@ -584,7 +584,7 @@ msgstr "@codex bütçe ilerlemesini kontrol et veya bir mesaj yazın…"
 msgid "@codex check the budget pacing"
 msgstr "@codex bütçe ilerlemesini kontrol et"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "@media-plans"
 msgstr "@media-plans"
 
@@ -634,12 +634,12 @@ msgstr "7g"
 
 #. placeholder {0}: existingProject.name
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "A campaign workspace for \"{0}\" already exists with this campaign group ID. Opening it will switch to the existing workspace."
-msgstr "\"{0}\" için bu kampanya grubu kimliğiyle zaten bir kampanya çalışma alanı mevcut. Açıldığında mevcut çalışma alanına geçilecektir."
+#~ msgid "A campaign workspace for \"{0}\" already exists with this campaign group ID. Opening it will switch to the existing workspace."
+#~ msgstr "\"{0}\" için bu kampanya grubu kimliğiyle zaten bir kampanya çalışma alanı mevcut. Açıldığında mevcut çalışma alanına geçilecektir."
 
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
-msgid "A campaign workspace links Poracode to your Control Centre campaigns — approvals, plan intelligence, and daily operations in one place."
-msgstr "Bir kampanya çalışma alanı, Poracode'u Control Centre kampanyalarınıza bağlar — onaylar, plan istihbaratı ve günlük operasyonlar tek bir yerde."
+#~ msgid "A campaign workspace links Poracode to your Control Centre campaigns — approvals, plan intelligence, and daily operations in one place."
+#~ msgstr "Bir kampanya çalışma alanı, Poracode'u Control Centre kampanyalarınıza bağlar — onaylar, plan istihbaratı ve günlük operasyonlar tek bir yerde."
 
 #: src/renderer/actions/experimentDecisionActions.ts
 #: src/renderer/actions/experimentWorktreeActions.ts
@@ -665,6 +665,11 @@ msgstr "Güçlü bir kök ajan görevi parçalara ayırır, çalışanları ayr�
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "a supported coding agent"
 msgstr "desteklenen bir kodlama aracısı"
+
+#. placeholder {0}: existingProject.name
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "A workspace for \"{0}\" already exists. Confirming opens the existing workspace."
+msgstr "\"{0}\" için bir çalışma alanı zaten var. Onaylamak mevcut çalışma alanını açar."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "A worktree owner requires a frozen branch source"
@@ -704,7 +709,7 @@ msgstr "Hesap seçenekleri"
 msgid "Accounts"
 msgstr "Hesaplar"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Acme Corp"
 msgstr "Acme A.Ş."
 
@@ -833,9 +838,13 @@ msgstr "Yapılacak iş ekleyin…"
 msgid "Add action"
 msgstr "İşlem ekle"
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Add alias"
+msgstr "Takma ad ekle"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Add Alias"
-msgstr "Takma Ad Ekle"
+#~ msgid "Add Alias"
+#~ msgstr "Takma Ad Ekle"
 
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Add an existing folder"
@@ -844,6 +853,10 @@ msgstr "Mevcut klasör ekle"
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "Add attachment or capability"
 msgstr "Ek veya yetenek ekleyin"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Add campaign workspace"
+msgstr "Kampanya çalışma alanı ekle"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Add candidate"
@@ -930,6 +943,10 @@ msgstr "Ana Ekrana ekle"
 msgid "Add to-do"
 msgstr "Yapılacak ekle"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Add workspace"
+msgstr "Çalışma alanı ekle"
+
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "added"
 msgstr "eklendi"
@@ -941,6 +958,10 @@ msgstr "Eklendi"
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Adjust the threshold"
 msgstr "Eşiği ayarla"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Advanced"
+msgstr "Gelişmiş"
 
 #: src/renderer/views/MainView/parts/CampaignModeGate.tsx
 msgid "Advanced Mode (Code)"
@@ -1362,6 +1383,10 @@ msgstr "Onay iste"
 #: src/renderer/views/WelcomeOverlay.tsx
 msgid "Ask Question"
 msgstr "Soru Sor"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Ask questions above anytime Control Centre is connected. Pin a campaign workspace here when you want a dedicated folder for one campaign."
+msgstr "Control Centre bağlıyken yukarıdan istediğiniz zaman soru sorun. Tek bir kampanya için ayrı bir klasör istediğinizde kampanya çalışma alanını buraya sabitleyin."
 
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "At"
@@ -1836,12 +1861,12 @@ msgid "Campaign Exception: {0} · {1}"
 msgstr "Kampanya İstisnası: {0} · {1}"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign group ID"
-msgstr "Kampanya grubu kimliği"
+#~ msgid "Campaign group ID"
+#~ msgstr "Kampanya grubu kimliği"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign Group ID"
-msgstr "Kampanya Grubu Kimliği"
+#~ msgid "Campaign Group ID"
+#~ msgstr "Kampanya Grubu Kimliği"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Campaign morning brief"
@@ -1853,16 +1878,20 @@ msgid "Campaign Morning Brief"
 msgstr "Kampanya Sabah Özeti"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign name"
-msgstr "Kampanya adı"
+#~ msgid "Campaign name"
+#~ msgstr "Kampanya adı"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Campaign Name"
-msgstr "Kampanya Adı"
+#~ msgid "Campaign Name"
+#~ msgstr "Kampanya Adı"
 
 #: src/renderer/components/consultations/ContextWarnings.tsx
 msgid "Campaign plan not available"
 msgstr "Kampanya planı mevcut değil"
+
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Campaign reference"
+msgstr "Kampanya referansı"
 
 #. placeholder {0}: input.name.trim()
 #: src/renderer/actions/campaignProjectActions.ts
@@ -2125,6 +2154,10 @@ msgstr "Kontroller başarılı"
 msgid "Checks pending"
 msgstr "Kontroller beklemede"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Choose a campaign from the list."
+msgstr "Listeden bir kampanya seçin."
+
 #: src/renderer/views/SwarmView/SwarmView.tsx
 msgid "Choose a different model for each worker."
 msgstr "Choose a different model for each worker."
@@ -2284,13 +2317,13 @@ msgstr "Müşteri"
 msgid "Client Comms"
 msgstr "Müşteri İletişimi"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Client name"
 msgstr "Müşteri adı"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Client Name"
-msgstr "Müşteri Adı"
+#~ msgid "Client Name"
+#~ msgstr "Müşteri Adı"
 
 #: src/renderer/views/CampaignWorkspace/parts/campaignTopics.ts
 msgid "Client Update"
@@ -2976,9 +3009,21 @@ msgstr "Kontrol Merkezi \"{toolName}\" çok büyük veya hatalı biçimde bir ya
 msgid "Control Centre \"{toolName}\" returned a response this version of Tee's Cockpit doesn't understand."
 msgstr "Kontrol Merkezi \"{toolName}\", Tee's Cockpit'un bu sürümünün anlamadığı bir yanıt döndürdü."
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Control Centre connection"
+msgstr "Control Centre bağlantısı"
+
 #: src/renderer/components/consultations/ContextWarnings.tsx
 msgid "Control Centre connection unavailable"
 msgstr "Kontrol Merkezi bağlantısı yok"
+
+#: src/renderer/campaign/controlCentreAvailabilityCopy.ts
+msgid "Control Centre is disabled. Turn it on in settings."
+msgstr "Control Centre devre dışı. Ayarlardan açın."
+
+#: src/renderer/campaign/controlCentreAvailabilityCopy.ts
+msgid "Control Centre is not connected. Add a Control Centre connection in settings."
+msgstr "Control Centre bağlı değil. Ayarlardan bir Control Centre bağlantısı ekleyin."
 
 #: src/renderer/views/CampaignWorkspace/parts/RecordDecisionModal.tsx
 msgid "Control Centre isn't connected for this project yet."
@@ -2993,12 +3038,15 @@ msgid "Control Centre needs authorization to list decisions."
 msgstr "Kararları listelemek için Control Centre yetkilendirme gerektiriyor."
 
 #: src/renderer/services/campaignDecisions/recordCampaignDecision.ts
+msgid "Control Centre needs authorization. Reconnect it in MCP settings."
+msgstr "Kontrol Merkezinin yetkilendirilmesi gerekiyor. MCP ayarlarından yeniden bağlayın."
+
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignApprovalsPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
-msgid "Control Centre needs authorization. Reconnect it in MCP settings."
-msgstr "Kontrol Merkezinin yetkilendirilmesi gerekiyor. MCP ayarlarından yeniden bağlayın."
+msgid "Control Centre needs authorization. Reconnect it in settings."
+msgstr "Control Centre yetkilendirme gerektiriyor. Ayarlardan yeniden bağlayın."
 
 #: src/renderer/views/CampaignWorkspace/parts/PlanDiffView.tsx
 msgid "Control Centre reports the revised plan matches the published plan."
@@ -3144,6 +3192,10 @@ msgstr "Yedek çalışan bu sürüye bağlanamadı."
 msgid "Could not complete the merge"
 msgstr "Birleştirme tamamlanamadı"
 
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not create a thread for the campaigns workspace."
+msgstr "Kampanyalar çalışma alanı için bir konu oluşturulamadı."
+
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not create a thread for the existing campaign workspace."
 msgstr "Mevcut kampanya çalışma alanı için bir konu oluşturulamadı."
@@ -3155,6 +3207,14 @@ msgstr "Kampanya çalışma alanı dizini oluşturulamadı."
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not create the campaign workspace thread."
 msgstr "Kampanya çalışma alanı konusu oluşturulamadı."
+
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not create the campaigns workspace directory."
+msgstr "Kampanyalar çalışma alanı dizini oluşturulamadı."
+
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not create the campaigns workspace thread."
+msgstr "Kampanyalar çalışma alanı konusu oluşturulamadı."
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
@@ -3185,6 +3245,10 @@ msgstr "Kampanya projesi kaydedilemedi."
 #: src/renderer/actions/campaignProjectActions.ts
 msgid "Could not save the campaign workspace thread."
 msgstr "Kampanya çalışma alanı konusu kaydedilemedi."
+
+#: src/renderer/campaign/ensureCampaignsHubProject.ts
+msgid "Could not save the campaigns workspace."
+msgstr "Kampanyalar çalışma alanı kaydedilemedi."
 
 #: src/renderer/actions/campaignTopicThreadActions.ts
 msgid "Could not save the topic thread."
@@ -3293,8 +3357,8 @@ msgid "Create approval proposal"
 msgstr "Onay teklifi oluştur"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Create Campaign Workspace"
-msgstr "Kampanya Çalışma Alanı Oluştur"
+#~ msgid "Create Campaign Workspace"
+#~ msgstr "Kampanya Çalışma Alanı Oluştur"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CreatePrModal.tsx
 msgid "Create Draft PR"
@@ -3303,6 +3367,10 @@ msgstr "Taslak PR Oluştur"
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 msgid "Create file"
 msgstr "Dosya oluştur"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Create manually"
+msgstr "Manuel oluştur"
 
 #: src/renderer/components/common/BranchSelector/parts/BranchFooterActions.tsx
 msgid "Create new branch"
@@ -3549,13 +3617,13 @@ msgstr "DeepSeek"
 msgid "Default"
 msgstr "Varsayılan"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Default agent"
 msgstr "Varsayılan temsilci"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Default Agent"
-msgstr "Varsayılan Temsilci"
+#~ msgid "Default Agent"
+#~ msgstr "Varsayılan Temsilci"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
@@ -3567,13 +3635,13 @@ msgstr "Varsayılan otomatik yenileme (dakika)"
 msgid "Default Create PR action"
 msgstr "Varsayılan PR Oluşturma eylemi"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Default model"
 msgstr "Varsayılan model"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Default Model"
-msgstr "Varsayılan Model"
+#~ msgid "Default Model"
+#~ msgstr "Varsayılan Model"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4059,14 +4127,14 @@ msgid "e.g. Allow TikTok to run up to 30% ahead of pace"
 msgstr "örn. TikTok'un temponun %30 önünde gitmesine izin ver"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "e.g. cg-abc-123"
-msgstr "örn. cg-abc-123"
+#~ msgid "e.g. cg-abc-123"
+#~ msgstr "örn. cg-abc-123"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "e.g. claude-sonnet-4"
 msgstr "örn. claude-sonnet-4"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "e.g. claude, codex, gemini"
 msgstr "örn. claude, codex, gemini"
 
@@ -5604,13 +5672,13 @@ msgstr "italik"
 msgid "Job no."
 msgstr "İş no."
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Job number"
 msgstr "İş numarası"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Job Number"
-msgstr "İş Numarası"
+#~ msgid "Job Number"
+#~ msgstr "İş Numarası"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "JSON"
@@ -5800,6 +5868,10 @@ msgstr "Hesaplar yükleniyor…"
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Loading campaign context…"
 msgstr "Kampanya bağlamı yükleniyor…"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Loading campaigns from Control Centre…"
+msgstr "Control Centre’dan kampanyalar yükleniyor…"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "Loading campaigns…"
@@ -6084,8 +6156,8 @@ msgid "Maximize browser"
 msgstr "Tarayıcıyı büyüt"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "MCP Profile"
-msgstr "MCP Profili"
+#~ msgid "MCP Profile"
+#~ msgstr "MCP Profili"
 
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
@@ -6589,7 +6661,6 @@ msgstr "Yeni işlem adı"
 msgid "New branch name..."
 msgstr "Yeni şube adı..."
 
-#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 #: src/renderer/views/CampaignWorkspace/parts/CampaignNavPane.tsx
 msgid "New Campaign Project"
 msgstr "Yeni Kampanya Projesi"
@@ -6806,6 +6877,10 @@ msgstr "Bütçe yapılandırılmadı"
 msgid "No camera found"
 msgstr "Kamera bulunamadı"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "No campaigns match your search."
+msgstr "Aramanızla eşleşen kampanya yok."
+
 #: src/renderer/components/diff/DiffCardList.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrReviewSidebar.tsx
 msgid "No changes"
@@ -6983,8 +7058,8 @@ msgid "No matching threads"
 msgstr "Eşleşen konu yok"
 
 #: src/renderer/campaign/controlCentreAvailabilityCopy.ts
-msgid "No MCP server named \"control-centre\" is configured. Add one in MCP settings."
-msgstr "\"control-centre\" adında bir MCP sunucusu yapılandırılmamış. MCP ayarlarından bir tane ekleyin."
+#~ msgid "No MCP server named \"control-centre\" is configured. Add one in MCP settings."
+#~ msgstr "\"control-centre\" adında bir MCP sunucusu yapılandırılmamış. MCP ayarlarından bir tane ekleyin."
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "No MCP servers are enabled for this run"
@@ -7321,6 +7396,10 @@ msgstr "Bir kez"
 msgid "Online"
 msgstr "Çevrimiçi"
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Only needed when Control Centre cannot be reached."
+msgstr "Yalnızca Control Centre’ye ulaşılamadığında gerekir."
+
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "Only when unfocused"
 msgstr "Yalnızca odaklanmadığında"
@@ -7621,6 +7700,10 @@ msgstr "Operasyon özeti"
 msgid "Optional"
 msgstr "İsteğe bağlı"
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Optional Control Centre campaign id"
+msgstr "İsteğe bağlı Control Centre kampanya kimliği"
+
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "Optional note recorded with the approval"
 msgstr "Onayla kaydedilen isteğe bağlı not"
@@ -7629,7 +7712,7 @@ msgstr "Onayla kaydedilen isteğe bağlı not"
 msgid "Optional reason recorded with the rejection"
 msgstr "Redle kaydedilen isteğe bağlı neden"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Optional reference number"
 msgstr "İsteğe bağlı referans numarası"
 
@@ -7649,8 +7732,8 @@ msgid "Options"
 msgstr "Seçenekler"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Or pick from Control Centre"
-msgstr "Veya Kontrol Merkezinden seçin"
+#~ msgid "Or pick from Control Centre"
+#~ msgstr "Veya Kontrol Merkezinden seçin"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/userInputForm.tsx
 msgid "Or write a custom answer"
@@ -7865,7 +7948,7 @@ msgstr "Girişe yapıştır"
 msgid "Paste the SSH private key."
 msgstr "SSH özel anahtarını yapıştırın."
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Path or URL"
 msgstr "Yol veya URL"
 
@@ -7919,6 +8002,10 @@ msgstr "İzin kısıtlı içerik gizlendi"
 msgid "Pi"
 msgstr "Pi"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Pick a live campaign from Control Centre. Everything else is filled in for you."
+msgstr "Control Centre’dan aktif bir kampanya seçin. Geri kalan her şey sizin için doldurulur."
+
 #: src/mobile/ThreadDetail.tsx
 #: src/mobile/views/ThreadView.tsx
 msgid "Pick a thread from the list to follow the agent from here."
@@ -7939,6 +8026,10 @@ msgstr "Seçici başarısız oldu"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
 msgid "Picker returned no attachment"
 msgstr "Seçici hiçbir ek döndürmedi"
+
+#: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
+msgid "Pin campaign workspace"
+msgstr "Kampanya çalışma alanını sabitle"
 
 #: src/mobile/ThreadTitleRow.tsx
 #: src/mobile/views/threadActionSurfaces.tsx
@@ -8395,8 +8486,8 @@ msgid "Push updates to paired mobile devices when threads finish or need you, ev
 msgstr "Konular tamamlandığında veya ilginizi gerektirdiğinde, uygulama kapalıyken bile eşleştirilmiş mobil cihazlara güncellemeler gönderin."
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Q4 Brand Launch"
-msgstr "Q4 Marka Lansmanı"
+#~ msgid "Q4 Brand Launch"
+#~ msgstr "Q4 Marka Lansmanı"
 
 #: src/renderer/components/providers/qoder/manifest.ts
 msgid "Qoder CLI"
@@ -8730,7 +8821,7 @@ msgstr "<0>{0}</0> öğesini kaldırıp tüm konularını kalıcı olarak silins
 msgid "Remove action"
 msgstr "Eylemi kaldır"
 
-#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
 msgid "Remove alias"
 msgstr "Takma adı kaldır"
 
@@ -8987,9 +9078,13 @@ msgstr "Terminal panelini yeniden boyutlandır"
 msgid "Resolves merge conflicts during rebase or merge."
 msgstr "Yeniden temel alma veya birleştirme sırasındaki birleştirme çakışmalarını çözer."
 
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Resource aliases"
+msgstr "Kaynak takma adları"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "Resource Aliases"
-msgstr "Kaynak Takma Adları"
+#~ msgid "Resource Aliases"
+#~ msgstr "Kaynak Takma Adları"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Restore"
@@ -9464,6 +9559,14 @@ msgstr "Aracıları ara..."
 msgid "Search branches..."
 msgstr "Şube ara..."
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Search by campaign, client, or job number…"
+msgstr "Kampanya, müşteri veya iş numarasına göre ara…"
+
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Search campaigns"
+msgstr "Kampanyalarda ara"
+
 #: src/mobile/views/FilesView.tsx
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/ProjectTreeView.tsx
 msgid "Search files"
@@ -9874,6 +9977,10 @@ msgstr "{0, plural, one {# beceri} other {# beceri}} gösteriliyor"
 #: src/mobile/views/HostFolderPicker.tsx
 msgid "Showing the first 4,000 entries."
 msgstr "İlk 4.000 giriş gösteriliyor."
+
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Shown in the sidebar"
+msgstr "Kenar çubuğunda gösterilir"
 
 #. Toggle: show this provider's usage ring in the sidebar
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
@@ -10798,12 +10905,12 @@ msgid "the chosen folder"
 msgstr "seçilen klasör"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
-msgid "The Control Centre campaign group this workspace binds to."
-msgstr "Bu çalışma alanının bağlı olduğu Kontrol Merkezi kampanya grubu."
+#~ msgid "The Control Centre campaign group this workspace binds to."
+#~ msgstr "Bu çalışma alanının bağlı olduğu Kontrol Merkezi kampanya grubu."
 
 #: src/renderer/campaign/controlCentreAvailabilityCopy.ts
-msgid "The Control Centre MCP server is disabled. Enable it in MCP settings."
-msgstr "Control Centre MCP sunucusu devre dışı. MCP ayarlarından etkinleştirin."
+#~ msgid "The Control Centre MCP server is disabled. Enable it in MCP settings."
+#~ msgstr "Control Centre MCP sunucusu devre dışı. MCP ayarlarından etkinleştirin."
 
 #: src/renderer/components/campaignDeployment/approvalDocketStrings.ts
 msgid "The decision could not be submitted"
@@ -11651,6 +11758,10 @@ msgstr "Kaldır"
 msgid "Unknown"
 msgstr "Bilinmiyor"
 
+#: src/renderer/views/MainView/parts/CreateProject/CreateCampaignWorkspaceDialog.tsx
+msgid "Unknown client"
+msgstr "Bilinmeyen müşteri"
+
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "Unknown mention. Try @codex, @claude, @daily-operator, @verify, etc."
 msgstr "Bilinmeyen bahis. @codex, @claude, @daily-operator, @verify vb. deneyin."
@@ -12353,6 +12464,10 @@ msgstr "Çalışma alanı"
 #: src/renderer/views/ProjectSettingsOverlay/parts/McpSection.tsx
 msgid "Workspace MCP servers override user servers with the same name and are added only when agents start in this project."
 msgstr "Çalışma alanı MCP sunucuları aynı adlı kullanıcı sunucularını geçersiz kılar ve yalnızca aracılar bu projede başlatıldığında eklenir."
+
+#: src/renderer/views/MainView/parts/CreateProject/CampaignWorkspaceAdvancedFields.tsx
+msgid "Workspace name"
+msgstr "Çalışma alanı adı"
 
 #: src/mobile/views/WorkspaceView.tsx
 msgid "Workspace view"
