@@ -582,8 +582,8 @@ msgid "@{0} is reserved for a built-in mention."
 msgstr "@{0} est réservé à une mention intégrée."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
-msgid "@codex check budget pacing, or type a message…"
-msgstr "@codex vérifier le rythme du budget ou saisissez un message…"
+#~ msgid "@codex check budget pacing, or type a message…"
+#~ msgstr "@codex vérifier le rythme du budget ou saisissez un message…"
 
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "@codex check the budget pacing"
@@ -1379,6 +1379,11 @@ msgstr "Arguments"
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Ask"
 msgstr "Demander"
+
+#. placeholder {0}: props.defaultProvider
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+msgid "Ask {0} about this campaign — @mention for roles"
+msgstr "Demandez à {0} à propos de cette campagne — @mention pour les rôles"
 
 #. placeholder {0}: agentStatus?.label ?? agentFallbackLabel
 #. placeholder {0}: project.name
@@ -2964,8 +2969,8 @@ msgid "Consultation failed"
 msgstr "La consultation a échoué"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
-msgstr "Les résultats des consultations s'affichent ici. Utilisez @codex, @verify, @panel et d'autres mentions dans le composeur ci-dessous."
+#~ msgid "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
+#~ msgstr "Les résultats des consultations s'affichent ici. Utilisez @codex, @verify, @panel et d'autres mentions dans le composeur ci-dessous."
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Consultation was cancelled"
@@ -6025,6 +6030,10 @@ msgstr "Chargement des compétences…"
 #: src/mobile/views/ThreadView.tsx
 msgid "Loading thread"
 msgstr "Chargement du fil"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Loading thread…"
+msgstr "Chargement du fil…"
 
 #: src/mobile/views/ThreadsView.tsx
 msgid "Loading threads"

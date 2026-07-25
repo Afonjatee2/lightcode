@@ -582,8 +582,8 @@ msgid "@{0} is reserved for a built-in mention."
 msgstr "@{0} jest zarezerwowane dla wbudowanej wzmianki."
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
-msgid "@codex check budget pacing, or type a message…"
-msgstr "@codex sprawdź tempo budżetu lub wpisz wiadomość…"
+#~ msgid "@codex check budget pacing, or type a message…"
+#~ msgstr "@codex sprawdź tempo budżetu lub wpisz wiadomość…"
 
 #: src/renderer/components/consultations/ConsultationComposer.tsx
 msgid "@codex check the budget pacing"
@@ -1379,6 +1379,11 @@ msgstr "Argumenty"
 #: src/renderer/views/CampaignTodayView/CampaignTodayView.tsx
 msgid "Ask"
 msgstr "Zapytaj"
+
+#. placeholder {0}: props.defaultProvider
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadComposer.tsx
+msgid "Ask {0} about this campaign — @mention for roles"
+msgstr "Zapytaj {0} o tę kampanię — @wzmianka dla ról"
 
 #. placeholder {0}: agentStatus?.label ?? agentFallbackLabel
 #. placeholder {0}: project.name
@@ -2964,8 +2969,8 @@ msgid "Consultation failed"
 msgstr "Konsultacja nie powiodła się"
 
 #: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
-msgid "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
-msgstr "Wyniki konsultacji pojawią się tutaj. Użyj @codex, @verify, @panel i innych wzmianek w polu poniżej."
+#~ msgid "Consultation results appear here. Use @codex, @verify, @panel, and other mentions in the composer below."
+#~ msgstr "Wyniki konsultacji pojawią się tutaj. Użyj @codex, @verify, @panel i innych wzmianek w polu poniżej."
 
 #: src/renderer/components/consultations/ConsultationCard.tsx
 msgid "Consultation was cancelled"
@@ -6025,6 +6030,10 @@ msgstr "Ładowanie umiejętności…"
 #: src/mobile/views/ThreadView.tsx
 msgid "Loading thread"
 msgstr "Ładowanie wątku"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignThreadPane.tsx
+msgid "Loading thread…"
+msgstr "Ładowanie wątku…"
 
 #: src/mobile/views/ThreadsView.tsx
 msgid "Loading threads"

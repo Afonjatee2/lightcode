@@ -6,6 +6,7 @@ import {
 } from "@/shared/consultations";
 
 export type CampaignComposerRouteResult =
+  | { kind: "chat"; message: string }
   | { kind: "consultation"; message: string }
   | { kind: "parse_error"; message: string }
   | { kind: "empty" };
@@ -22,13 +23,12 @@ export function resolvePrimaryCampaignThread(threads: Thread[]): Thread | undefi
 }
 
 /**
- * Route a campaign-thread composer message to the Phase 4 consultation IPC.
- * Known @mentions pass through verbatim; plain text is wrapped with the thread's
- * default provider so the supervisor parses a standard consultation.
+ * Route a campaign-thread composer message. Plain prose goes to the active
+ * thread as a normal GUI turn; known @mentions route through consultations.
  */
 export function routeCampaignComposerMessage(
   input: string,
-  defaultProvider: string,
+  _defaultProvider: string,
   options?: ParseMentionOptions,
 ): CampaignComposerRouteResult {
   const trimmed = input.trim();
@@ -39,13 +39,12 @@ export function routeCampaignComposerMessage(
     return { kind: "consultation", message: trimmed };
   }
   if (parsed.code === "unknown_mention") {
-    // Plain prose falls back to the thread's default provider, but text that
-    // *starts* with an @word is a mistyped mention — surface it instead of
-    // launching a consultation doomed to fail on a nonexistent agent.
+    // Plain prose is a normal agent turn; text that *starts* with an @word is
+    // a mistyped mention — surface it instead of sending a doomed turn.
     if (trimmed.startsWith("@")) {
       return { kind: "parse_error", message: parsed.message };
     }
-    return { kind: "consultation", message: `@${defaultProvider} ${trimmed}` };
+    return { kind: "chat", message: trimmed };
   }
   return { kind: "parse_error", message: parsed.message };
 }
