@@ -4,14 +4,19 @@ import { Button, Chip, Disclosure, Spinner } from "@heroui/react";
 import {
   AlertTriangle,
   ArrowUp,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
   WifiOff,
 } from "lucide-react";
-import type { CampaignContextViewModel } from "@/renderer/adapters/campaignViewModels";
+import type {
+  CampaignContextKpiViewModel,
+  CampaignContextViewModel,
+} from "@/renderer/adapters/campaignViewModels";
 import type { CampaignContextState } from "@/renderer/hooks/useCampaignContext";
 import type { CampaignDecisionsState } from "@/renderer/hooks/useCampaignDecisions";
 import type { RecordCampaignDecision } from "@/renderer/hooks/useRecordCampaignDecision";
@@ -19,6 +24,7 @@ import { CampaignContextStatusStrip } from "./CampaignContextStatusStrip";
 import { CampaignDecisionsList } from "./CampaignDecisionsList";
 import { RecordDecisionModal } from "./RecordDecisionModal";
 import type { DecisionFormSeed } from "./decisionForm";
+import { groupAlerts } from "./alertGrouping";
 
 /**
  * Everything the decisions surface needs, resolved once in the shell and
@@ -92,6 +98,13 @@ const priorityChipColors: Record<string, "danger" | "warning" | "default" | "suc
   P4: "default",
 };
 
+function alertSeverityClass(severity: string, priority: string): string {
+  const norm = severity.toLowerCase();
+  if (norm === "critical" || priority === "P1") return "cockpit-alert-row--crit";
+  if (norm === "warning" || priority === "P2") return "cockpit-alert-row--warn";
+  return "cockpit-alert-row--info";
+}
+
 function channelStatusTone(status: string | null): string {
   if (!status) return "bg-[var(--row-hover)] text-muted";
   const normalized = status.toLowerCase();
@@ -102,6 +115,39 @@ function channelStatusTone(status: string | null): string {
   if (normalized.includes("schedule"))
     return "bg-[var(--cockpit-accent-soft)] text-[var(--cockpit-accent)]";
   return "bg-[var(--row-hover)] text-muted";
+}
+
+interface KpiGroup {
+  metricKey: string;
+  items: CampaignContextKpiViewModel[];
+}
+
+function deriveKpiGroups(kpis: CampaignContextKpiViewModel[]): {
+  groups: KpiGroup[];
+  hasChannelLabels: boolean;
+} {
+  const hasChannelLabels = kpis.some((kpi) => {
+    const raw = kpi as { channel?: string; platform?: string; source?: string };
+    return Boolean(raw.channel || raw.platform || raw.source);
+  });
+
+  const map = new Map<string, CampaignContextKpiViewModel[]>();
+  for (const kpi of kpis) {
+    const key = kpi.metricKey || kpi.label;
+    const existing = map.get(key);
+    if (existing) {
+      existing.push(kpi);
+    } else {
+      map.set(key, [kpi]);
+    }
+  }
+
+  const groups: KpiGroup[] = Array.from(map.entries()).map(([metricKey, items]) => ({
+    metricKey,
+    items,
+  }));
+
+  return { groups, hasChannelLabels };
 }
 
 function ContextSections(props: {
@@ -116,6 +162,8 @@ function ContextSections(props: {
     seed?: DecisionFormSeed;
     alertTitle?: string;
   }>({ open: false });
+  const [showAllAlerts, setShowAllAlerts] = useState(false);
+  const [expandedAlertKeys, setExpandedAlertKeys] = useState<Set<string>>(new Set());
 
   const openRecordModal = (options?: { seed?: DecisionFormSeed; alertTitle?: string }) => {
     setRecordModal({
@@ -136,9 +184,78 @@ function ContextSections(props: {
     return warning;
   });
 
+  const groupedAlerts = groupAlerts(context.openAlerts);
+  const displayedAlertGroups = showAllAlerts ? groupedAlerts : groupedAlerts.slice(0, 3);
+  const kpiGroupData = deriveKpiGroups(context.kpis);
+
   return (
     <div className="space-y-0">
       <CampaignContextStatusStrip context={context} />
+
+      <CollapsibleSection title={<Trans>KPI health</Trans>} count={context.kpis.length}>
+        {context.kpis.length === 0 ? (
+          <p className="text-muted">
+            <Trans>No KPI targets set.</Trans>
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {kpiGroupData.groups.map((group) => {
+              const isMultiNoChannel = !kpiGroupData.hasChannelLabels && group.items.length > 1;
+              return (
+                <li
+                  key={group.metricKey}
+                  className="border-t border-[var(--hairline)] pt-2.5 first:border-0 first:pt-0"
+                >
+                  {isMultiNoChannel ? (
+                    <div className="cockpit-klabel mb-1.5 font-bold tracking-wider text-foreground uppercase">
+                      {group.metricKey}
+                    </div>
+                  ) : null}
+                  <div className="space-y-2.5">
+                    {group.items.map((kpi) => {
+                      const raw = kpi as { channel?: string; platform?: string; source?: string };
+                      const channelLabel = raw.channel || raw.platform || raw.source;
+                      const pct = kpi.pctAchieved ?? 0;
+                      const onTrack = kpi.status === "on_track" || kpi.status === "healthy";
+                      const over = kpi.pctAchieved !== null && pct > 100;
+                      const displayLabel = isMultiNoChannel
+                        ? t`Target: ${kpi.targetValue}`
+                        : kpi.label;
+
+                      return (
+                        <div key={kpi.id}>
+                          <div className="mb-1 flex justify-between text-xs">
+                            <span className="font-semibold text-foreground">
+                              {displayLabel}
+                              {channelLabel ? (
+                                <span className="ml-1 text-[11px] font-normal text-muted">
+                                  ({channelLabel})
+                                </span>
+                              ) : null}
+                            </span>
+                            <span
+                              className={`inline-flex items-center gap-0.5 tabular-nums font-semibold ${onTrack ? "text-success" : "text-warning"}`}
+                            >
+                              {over ? <ArrowUp className="size-3" aria-hidden /> : null}
+                              {kpi.pctAchieved !== null ? `${Math.round(kpi.pctAchieved)}%` : "—"}
+                            </span>
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-[var(--hairline-strong)]">
+                            <div
+                              className={`h-full rounded-full ${onTrack ? "bg-success" : "bg-warning"} ${over ? "cockpit-kpi-bar--over" : ""}`}
+                              style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </CollapsibleSection>
 
       <CollapsibleSection
         title={<Trans>Open alerts</Trans>}
@@ -150,84 +267,121 @@ function ContextSections(props: {
             <Trans>No open alerts.</Trans>
           </p>
         ) : (
-          <ul className="space-y-2">
-            {context.openAlerts.map((alert) => (
-              <li
-                key={alert.id}
-                className="flex items-center justify-between gap-2 border-t border-[var(--hairline)] pt-2 first:border-0 first:pt-0"
-              >
-                <span className="truncate text-sm text-foreground">{alert.title}</span>
-                <div className="flex shrink-0 items-center gap-1">
-                  {decisions ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      isIconOnly
-                      className="h-6 w-6 min-w-6 text-[var(--cockpit-accent)]"
-                      aria-label={t`Record a decision for ${alert.title}`}
-                      onPress={() =>
-                        openRecordModal({
-                          seed: { mode: "suppress" },
-                          alertTitle: alert.title,
-                        })
-                      }
-                    >
-                      <ShieldCheck className="size-3.5" aria-hidden />
-                    </Button>
-                  ) : null}
-                  <Chip
-                    size="sm"
-                    variant="soft"
-                    color={priorityChipColors[alert.priority] ?? "default"}
-                  >
-                    {alert.priority}
-                  </Chip>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CollapsibleSection>
+          <div>
+            <ul className="space-y-2">
+              {displayedAlertGroups.map((alertGroup) => {
+                const isExpanded = expandedAlertKeys.has(alertGroup.key);
+                const toggleExpand = () => {
+                  setExpandedAlertKeys((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(alertGroup.key)) {
+                      next.delete(alertGroup.key);
+                    } else {
+                      next.add(alertGroup.key);
+                    }
+                    return next;
+                  });
+                };
 
-      <CollapsibleSection title={<Trans>KPI health</Trans>} count={context.kpis.length}>
-        {context.kpis.length === 0 ? (
-          <p className="text-muted">
-            <Trans>No KPI targets set.</Trans>
-          </p>
-        ) : (
-          <ul className="space-y-3">
-            {context.kpis.map((kpi) => {
-              const pct = kpi.pctAchieved ?? 0;
-              const onTrack = kpi.status === "on_track" || kpi.status === "healthy";
-              // `pctAchieved` is direction-normalized by Control Centre (100% =
-              // exactly on target for both min and max KPIs), so anything past
-              // 100% is genuine over-attainment. Tone follows the on-track flag
-              // the data carries — we never re-derive good/bad from the numbers.
-              const over = kpi.pctAchieved !== null && pct > 100;
-              return (
-                <li
-                  key={kpi.id}
-                  className="border-t border-[var(--hairline)] pt-2 first:border-0 first:pt-0"
-                >
-                  <div className="mb-1 flex justify-between text-xs">
-                    <span className="font-semibold text-foreground">{kpi.label}</span>
-                    <span
-                      className={`inline-flex items-center gap-0.5 tabular-nums font-semibold ${onTrack ? "text-success" : "text-warning"}`}
-                    >
-                      {over ? <ArrowUp className="size-3" aria-hidden /> : null}
-                      {kpi.pctAchieved !== null ? `${Math.round(kpi.pctAchieved)}%` : "—"}
-                    </span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-[var(--hairline-strong)]">
-                    <div
-                      className={`h-full rounded-full ${onTrack ? "bg-success" : "bg-warning"} ${over ? "cockpit-kpi-bar--over" : ""}`}
-                      style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
-                    />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                return (
+                  <li
+                    key={alertGroup.key}
+                    className={`cockpit-alert-row p-2.5 ${alertSeverityClass(alertGroup.severity, alertGroup.priority)}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        {alertGroup.instances.length > 1 ? (
+                          <button
+                            type="button"
+                            className="flex min-w-0 items-center gap-2 text-left"
+                            onClick={toggleExpand}
+                          >
+                            <span className="truncate text-xs font-semibold text-foreground">
+                              {alertGroup.title}
+                            </span>
+                            <span className="rounded-full bg-surface-tertiary px-1.5 py-0.5 text-[10px] font-bold text-foreground">
+                              ×{alertGroup.count}
+                            </span>
+                          </button>
+                        ) : (
+                          <span className="truncate text-xs font-semibold text-foreground">
+                            {alertGroup.title}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {decisions ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            isIconOnly
+                            className="h-6 w-6 min-w-6 text-[var(--cockpit-accent)]"
+                            aria-label={t`Record a decision for ${alertGroup.title}`}
+                            onPress={() =>
+                              openRecordModal({
+                                seed: { mode: "suppress" },
+                                alertTitle: alertGroup.title,
+                              })
+                            }
+                          >
+                            <ShieldCheck className="size-3.5" aria-hidden />
+                          </Button>
+                        ) : null}
+                        <Chip
+                          size="sm"
+                          variant="soft"
+                          color={priorityChipColors[alertGroup.priority] ?? "default"}
+                        >
+                          {alertGroup.priority}
+                        </Chip>
+                        {alertGroup.instances.length > 1 ? (
+                          <button
+                            type="button"
+                            className="ml-0.5 text-muted hover:text-foreground"
+                            aria-label={isExpanded ? t`Collapse instances` : t`Expand instances`}
+                            onClick={toggleExpand}
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="size-3.5" />
+                            ) : (
+                              <ChevronDown className="size-3.5" />
+                            )}
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {isExpanded && alertGroup.instances.length > 1 ? (
+                      <ul className="mt-2 space-y-1 border-t border-[var(--hairline)] pt-2 text-tiny text-muted">
+                        {alertGroup.instances.map((inst, idx) => (
+                          <li
+                            key={inst.id || idx}
+                            className="flex items-center justify-between gap-2 text-[10.5px]"
+                          >
+                            <span className="truncate font-mono">
+                              {inst.openedAt ? new Date(inst.openedAt).toLocaleString() : inst.id}
+                            </span>
+                            <span className="shrink-0 font-semibold">{inst.priority}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+
+            {groupedAlerts.length > 3 ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="mt-2.5 w-full text-xs font-semibold text-[var(--cockpit-accent)]"
+                onPress={() => setShowAllAlerts((v) => !v)}
+              >
+                {showAllAlerts ? <Trans>Show less</Trans> : <Trans>Show all</Trans>}
+              </Button>
+            ) : null}
+          </div>
         )}
       </CollapsibleSection>
 

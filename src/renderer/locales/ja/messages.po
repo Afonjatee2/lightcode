@@ -2619,6 +2619,10 @@ msgstr "エラーを折りたたむ"
 msgid "Collapse group"
 msgstr "グループを折りたたむ"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Collapse instances"
+msgstr "インスタンスを折りたたむ"
+
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Collapse terminal composer"
@@ -4538,6 +4542,10 @@ msgstr "エラーを展開"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 msgid "Expand group"
 msgstr "グループを展開"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Expand instances"
+msgstr "インスタンスを展開"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Expand to review or revoke access."
@@ -8682,7 +8690,7 @@ msgstr "記録"
 msgid "Record a decision"
 msgstr "決定を記録"
 
-#. placeholder {0}: alert.title
+#. placeholder {0}: alertGroup.title
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Record a decision for {0}"
 msgstr "{0} の決定を記録"
@@ -9911,6 +9919,7 @@ msgid "Show a projectless Home scope for OS-level agent sessions."
 msgstr "OS レベルのエージェント セッション用に、プロジェクトに属さないホームスコープを表示します。"
 
 #: src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 #: src/renderer/views/SettingsOverlay/parts/ModelVisibilitySection.tsx
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/ModelVisibilityDropdown.tsx
@@ -9954,6 +9963,7 @@ msgstr "ファイルエクスプローラーで表示"
 
 #: src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/UserMessage.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
 msgid "Show less"
 msgstr "表示を少なくする"
@@ -10823,6 +10833,11 @@ msgstr "対象ブランチ"
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Target provider"
 msgstr "対象プロバイダー"
+
+#. placeholder {0}: kpi.targetValue
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Target: {0}"
+msgstr "目標: {0}"
 
 #: src/renderer/components/providers/qwen/index.tsx
 #: src/renderer/views/SwarmView/SwarmTaskPanel.tsx

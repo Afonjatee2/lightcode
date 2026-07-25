@@ -2620,6 +2620,10 @@ msgstr "오류 접기"
 msgid "Collapse group"
 msgstr "그룹 접기"
 
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Collapse instances"
+msgstr "인스턴스 접기"
+
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Collapse terminal composer"
@@ -4539,6 +4543,10 @@ msgstr "확장 오류"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 msgid "Expand group"
 msgstr "그룹 펼치기"
+
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Expand instances"
+msgstr "인스턴스 펼치기"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Expand to review or revoke access."
@@ -8684,7 +8692,7 @@ msgstr "기록"
 msgid "Record a decision"
 msgstr "결정 기록"
 
-#. placeholder {0}: alert.title
+#. placeholder {0}: alertGroup.title
 #: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 msgid "Record a decision for {0}"
 msgstr "{0}에 대한 결정 기록"
@@ -9913,6 +9921,7 @@ msgid "Show a projectless Home scope for OS-level agent sessions."
 msgstr "OS 수준 에이전트 세션에 대해 프로젝트 없는 홈 범위를 표시합니다."
 
 #: src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 #: src/renderer/views/SettingsOverlay/parts/ModelVisibilitySection.tsx
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/ModelVisibilityDropdown.tsx
@@ -9956,6 +9965,7 @@ msgstr "파일 탐색기에 표시"
 
 #: src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/UserMessage.tsx
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
 msgid "Show less"
 msgstr "간략히 보기"
@@ -10825,6 +10835,11 @@ msgstr "대상 브랜치"
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Target provider"
 msgstr "대상 공급자"
+
+#. placeholder {0}: kpi.targetValue
+#: src/renderer/views/CampaignWorkspace/parts/CampaignContextPane.tsx
+msgid "Target: {0}"
+msgstr "목표: {0}"
 
 #: src/renderer/components/providers/qwen/index.tsx
 #: src/renderer/views/SwarmView/SwarmTaskPanel.tsx

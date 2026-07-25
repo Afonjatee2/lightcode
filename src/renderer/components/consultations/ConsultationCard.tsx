@@ -158,22 +158,22 @@ export function ConsultationCard({
       ) : null}
 
       {record.status === "failed" ? (
-        <div className="border-t border-danger/30 bg-danger/10 px-4 py-3 space-y-2">
-          <div className="flex items-center gap-2 text-sm font-medium text-danger">
-            <XCircle size={16} />
+        <div className="mx-4 my-3 rounded-[10px] border border-danger/30 bg-danger/5 p-3 space-y-2">
+          <div className="flex items-center gap-2 text-xs font-semibold text-danger">
+            <XCircle size={14} />
             <Trans>Consultation failed</Trans>
           </div>
           {record.safeFailureMessage ? (
-            <p className="text-xs text-danger/80">{record.safeFailureMessage}</p>
+            <p className="text-xs text-muted-foreground">{record.safeFailureMessage}</p>
           ) : null}
           {canRetry ? (
             <Button
               size="sm"
               variant="secondary"
-              className="border border-[var(--cockpit-accent-line)] text-[var(--cockpit-accent)]"
+              className="h-7 border border-[var(--cockpit-accent-line)] text-[var(--cockpit-accent)] hover:bg-[var(--cockpit-accent-soft)]"
               onPress={() => onRetry(record.id)}
             >
-              <RefreshCw size={14} />
+              <RefreshCw size={12} />
               <Trans>Retry</Trans>
             </Button>
           ) : null}
